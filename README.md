@@ -30,6 +30,7 @@ Efficiency Focus:
 - [Efficient neural supersampling on a noval gaming dataset](http://openaccess.thecvf.com/content/ICCV2023/papers/Mercier_Efficient_Neural_Supersampling_on_a_Novel_Gaming_Dataset_ICCV_2023_paper.pdf)
 - [FuseSR](https://arxiv.org/abs/2310.09726)
 - [SSR](https://arxiv.org/pdf/2301.01036.pdf)
+- [ExtraNet](https://dl.acm.org/doi/abs/10.1145/3478513.3480531)
 - [Space-time Supersampling](https://arxiv.org/pdf/2312.10890v1.pdf)
 
 ### Temporal Super-Resolution
