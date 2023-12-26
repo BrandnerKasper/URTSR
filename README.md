@@ -21,7 +21,7 @@ Efficiency Focus:
 - **RLFN** [Link](https://arxiv.org/pdf/2205.07514.pdf)
 - LAPAR [Link](https://papers.nips.cc/paper/2020/file/eaae339c4d89fc102edd9dbdb6a28915-Paper.pdf)
 - **RepSR** [Link](https://arxiv.org/pdf/2205.05671.pdf)
-- ELAN [Link](https://arxiv.org/pdf/2203.05568.pdf) 
+- ELAN [Link](https://www4.comp.polyu.edu.hk/~cslzhang/paper/ECCV_2022_ELAN.pdf) 
 - NTIRE 2023 Real-Time 4K SR [Link](https://openaccess.thecvf.com/content/CVPR2023W/NTIRE/papers/Conde_Efficient_Deep_Models_for_Real-Time_4K_Image_Super-Resolution._NTIRE_2023_CVPRW_2023_paper.pdf)
 - NTIRE 2023 Efficient SR [Link](https://openaccess.thecvf.com/content/CVPR2023W/NTIRE/papers/Li_NTIRE_2023_Challenge_on_Efficient_Super-Resolution_Methods_and_Results_CVPRW_2023_paper.pdf)
 
