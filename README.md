@@ -10,9 +10,11 @@ Given the motivation of this thesis, transformer-based methods are neglected as 
 
 Basics (only CNN based):
 - SRCNN [Link](https://arxiv.org/abs/1501.00092)
+- FSRCN [Link](https://arxiv.org/abs/1608.00367)
 - **Sub-Pixel Convolution** [Link](https://arxiv.org/abs/1609.05158)
 - **EDSR** [Link](https://arxiv.org/abs/1707.02921)
 - **RCAN** [Link](https://arxiv.org/abs/1807.02758)
+- HAN [Link](https://arxiv.org/pdf/2008.08767.pdf)
 
 
 Efficiency Focus:
@@ -21,7 +23,9 @@ Efficiency Focus:
 - **RLFN** [Link](https://arxiv.org/pdf/2205.07514.pdf)
 - LAPAR [Link](https://papers.nips.cc/paper/2020/file/eaae339c4d89fc102edd9dbdb6a28915-Paper.pdf)
 - **RepSR** [Link](https://arxiv.org/pdf/2205.05671.pdf)
-- ELAN [Link](https://www4.comp.polyu.edu.hk/~cslzhang/paper/ECCV_2022_ELAN.pdf) 
+- ELAN [Link](https://www4.comp.polyu.edu.hk/~cslzhang/paper/ECCV_2022_ELAN.pdf)
+- SAFMN .[Link](https://arxiv.org/pdf/2302.13800.pdf)
+- ShuffleMixer .[Link](https://arxiv.org/pdf/2205.15175.pdf)
 - NTIRE 2023 Real-Time 4K SR [Link](https://openaccess.thecvf.com/content/CVPR2023W/NTIRE/papers/Conde_Efficient_Deep_Models_for_Real-Time_4K_Image_Super-Resolution._NTIRE_2023_CVPRW_2023_paper.pdf)
 - NTIRE 2023 Efficient SR [Link](https://openaccess.thecvf.com/content/CVPR2023W/NTIRE/papers/Li_NTIRE_2023_Challenge_on_Efficient_Super-Resolution_Methods_and_Results_CVPRW_2023_paper.pdf)
 
@@ -33,6 +37,8 @@ Efficiency Focus:
 - **ExtraNet** [Link](https://dl.acm.org/doi/abs/10.1145/3478513.3480531)
 - **Space-time Supersampling** [Link](https://arxiv.org/pdf/2312.10890v1.pdf)
 
+### Multi-Frame Super-Resolution
+- 
 ### Temporal Super-Resolution
 - TemporalSR [Link](https://www.wisdom.weizmann.ac.il/~vision/DeepTemporalSR/supplementary/AcrossScalesAndDimensions_ECCV2020.pdf)
 
