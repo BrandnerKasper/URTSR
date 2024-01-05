@@ -11,7 +11,7 @@ Given the motivation of this thesis, transformer-based methods are neglected as 
 Basics (only CNN based):
 - SRCNN [Link](https://arxiv.org/abs/1501.00092)
 - FSRCN [Link](https://arxiv.org/abs/1608.00367)
-- **Sub-Pixel Convolution** [Link](https://arxiv.org/abs/1609.05158)
+- **Sub-Pixel Convolution** [Link](https://arxiv.org/abs/1609.05158) x
 - **EDSR** [Link](https://arxiv.org/abs/1707.02921)
 - **RCAN** [Link](https://arxiv.org/abs/1807.02758)
 - HAN [Link](https://arxiv.org/pdf/2008.08767.pdf)
