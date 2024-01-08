@@ -37,7 +37,7 @@ Efficiency Focus:
 - **ExtraNet** [Link](https://dl.acm.org/doi/abs/10.1145/3478513.3480531)
 - **Space-time Supersampling** [Link](https://arxiv.org/pdf/2312.10890v1.pdf)
 - **ExtraSS: Frame Extrapolation** [Link](https://dl.acm.org/doi/pdf/10.1145/3610548.3618224) x
-- **QRISP**[Link]https://arxiv.org/pdf/2308.01483v1.pdf
+- **QRISP** [Link]https://arxiv.org/pdf/2308.01483v1.pdf
 
 ### Multi-Frame Super-Resolution
 - MFSR [Link](https://dl.acm.org/doi/pdf/10.1145/3306346.3323024)
