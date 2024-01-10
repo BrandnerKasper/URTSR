@@ -14,18 +14,18 @@ def main() -> None:
     # Hyperparameters
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     lr = 0.001
-    batch_size = 16
+    batch_size = 8
     epochs = 10
-    num_workers = 1
+    num_workers = 24
 
     # Model details
     model = SRCNN().to(device)
-    criterion = nn.L1Loss()
+    criterion = nn.MSELoss()
     optimizer = optim.Adam(model.parameters(), lr=lr)
 
     # Loading and preparing data
     transform = transforms.Compose([
-        transforms.Resize((256, 256)),
+        transforms.Resize((1024, 1024)),
         transforms.ToTensor(),
     ])
 
