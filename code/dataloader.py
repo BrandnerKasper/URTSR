@@ -1,22 +1,31 @@
 from torch.utils.data import Dataset
 from PIL import Image
 import os
+import torch
 
 
 class CustomDataset(Dataset):
     def __init__(self, root, transform=None):
-        self.root_hr = root + "/HR"
-        self.root_lr = root + "/LR"
+        self.root_hr = os.path.join(root, "HR")
+        self.root_lr = os.path.join(root, "LR")
         self.transform = transform
-        self.hr_images = os.listdir(self.root_hr)
-        self.lr_images = os.listdir(self.root_lr)
+
+        # Extract common part of the filenames (e.g., '0001')
+        hr_filenames = [filename[:-4] for filename in os.listdir(self.root_hr) if filename.endswith(".png")]
+        lr_filenames = [filename[:-6] for filename in os.listdir(self.root_lr) if filename.endswith("x2.png")]
+
+        # Ensure matching filenames in HR and LR
+        self.filenames = sorted(set(hr_filenames) & set(lr_filenames))
+        for lr_filename, hr_filename in zip(sorted(set(lr_filenames)), sorted(set(hr_filenames))):
+            assert lr_filename == hr_filename, f"Filenames were not equal: lr filename {lr_filename} != hr filename {hr_filename}"
 
     def __len__(self):
-        return len(self.hr_images)
+        return len(self.filenames)
 
     def __getitem__(self, idx):
-        hr_path = os.path.join(self.root_hr, self.hr_images[idx])
-        lr_path = os.path.join(self.root_lr, self.lr_images[idx])
+        common_filename = self.filenames[idx]
+        hr_path = os.path.join(self.root_hr, common_filename + ".png")
+        lr_path = os.path.join(self.root_lr, common_filename + "x2.png")
 
         hr_image = Image.open(hr_path).convert('RGB')
         lr_image = Image.open(lr_path).convert('RGB')

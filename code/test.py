@@ -12,13 +12,10 @@ def main() -> None:
     lr_image = Image.open("dataset/test/LR/0010x2.png").convert('RGB')
     hr_image = Image.open("dataset/test/HR/0010.png").convert('RGB')
 
-    transform = transforms.Compose([
-        transforms.Resize((256, 256)),
-        transforms.ToTensor(),
-    ])
+    transform = transforms.ToTensor()
 
-    transformed_lr_tensor = transform(lr_image).unsqueeze(0)
-    transformed_hr_tensor = transform(hr_image).unsqueeze(0)
+    transformed_lr_tensor = transform(lr_image)
+    transformed_hr_tensor = transform(hr_image)
 
     model = SRCNN()
 
@@ -28,13 +25,13 @@ def main() -> None:
     with torch.no_grad():
         output = model(transformed_lr_tensor)
 
-    lr_image = F.to_pil_image(transformed_lr_tensor.squeeze(0).clamp(0.0, 1.0))
-    hr_image = F.to_pil_image(transformed_hr_tensor.squeeze(0).clamp(0.0, 1.0))
-    srcnn_image = F.to_pil_image(output.squeeze(0).clamp(0.0, 1.0))
+    lr_image = F.to_pil_image(transformed_lr_tensor)
+    hr_image = F.to_pil_image(transformed_hr_tensor)
+    srcnn_image = F.to_pil_image(output)
 
     # Display the original and transformed images side by side
     # Create a figure with two subplots
-    fig, axes = plt.subplots(1, 3, figsize=(30, 30))
+    fig, axes = plt.subplots(1, 3, figsize=(50, 50))
 
     # Display the original image
     axes[0].imshow(lr_image)
