@@ -13,7 +13,7 @@ def psnr(original, reconstructed, max_val=1.0):
     return psnr_value.item()
 
 
-def calculate_ssim(img, img2, input_order='HWC', test_y_channel=False, **kwargs):
+def calculate_ssim(img, img2):
     """Calculate SSIM (structural similarity).
 
     Ref:
@@ -37,19 +37,8 @@ def calculate_ssim(img, img2, input_order='HWC', test_y_channel=False, **kwargs)
     """
 
     assert img.shape == img2.shape, (f'Image shapes are different: {img.shape}, {img2.shape}.')
-    # if input_order not in ['HWC', 'CHW']:<
-    #     raise ValueError(f'Wrong input_order {input_order}. Supported input_orders are "HWC" and "CHW"')
-    # img = reorder_image(img, input_order=input_order)
-    # img2 = reorder_image(img2, input_order=input_order)
     img = np.array(img, dtype=np.float32)
     img2 = np.array(img2, dtype=np.float32)
-
-    # img = img.astype(np.float64)
-    # img2 = img2.astype(np.float64)
-
-    # if test_y_channel:
-    #     img = to_y_channel(img)
-    #     img2 = to_y_channel(img2)
 
     ssims = []
     for i in range(img.shape[2]):
@@ -106,7 +95,7 @@ def main() -> None:
     evaluate_dataset = CustomDataset(root='dataset/evaluate', transform=transform)
 
     # Loading model
-    model_path = "pretrained_models/srcnn_model_e10.pth"
+    model_path = "pretrained_models/srcnn_model_e25.pth"
     model = SRCNN()
 
     model.load_state_dict(torch.load(model_path))

@@ -8,7 +8,7 @@ from dataloader import CustomDataset
 
 
 def main() -> None:
-    model_path = "pretrained_models/srcnn_model.pth"
+    model_path = "pretrained_models/srcnn_model_e25.pth"
 
     # Loading and preparing data
     transform = transforms.ToTensor()

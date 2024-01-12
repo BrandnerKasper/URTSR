@@ -7,6 +7,7 @@ from tqdm import tqdm
 
 from dataloader import CustomDataset
 from model.srcnn import SRCNN
+from model.subpixel import SubPixelNN
 
 
 def main() -> None:
@@ -14,11 +15,12 @@ def main() -> None:
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     lr = 0.001
     batch_size = 1
-    epochs = 25
+    epochs = 5
     num_workers = 16
 
     # Model details
-    model = SRCNN().to(device)
+    # model = SRCNN().to(device)
+    model = SubPixelNN(scale_factor=2).to(device)
     criterion = nn.L1Loss()
     optimizer = optim.Adam(model.parameters(), lr=lr)
 
@@ -45,7 +47,7 @@ def main() -> None:
         print(f"Epoch [{epoch + 1}/{epochs}], Loss: {average_loss:.4f}")
 
     # Save trained model
-    torch.save(model.state_dict(), 'pretrained_models/srcnn_model.pth')
+    torch.save(model.state_dict(), 'pretrained_models/subpnn_model.pth')
 
 
 # Press the green button in the gutter to run the script.
