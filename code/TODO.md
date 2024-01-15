@@ -1,5 +1,87 @@
 # TODO
 
+Just some notes and todos what I'd like to consider for my thesis.
+
+## Network
+
 -[ ] [crop](https://pytorch.org/vision/main/generated/torchvision.transforms.RandomCrop.html) images into smaller parts so more can be processed in parallel (batch size > 1)
--[ ] play with subpixel super res 
-- [ ] SRCNN should have a psnr score of ~32 dB after 100 epochs (while gradually reducing learning rate from 0.01 to 0.0001)
+-[ ] SRCNN should have a psnr score of ~32 dB after 100 epochs (while gradually reducing learning rate from 0.01 to 0.0001)
+-[ ] train networks for x2 from scratch use x3, x4 the pretrained x2 network 
+-[ ] Enhanced Deep Residual Networks for Single Image Super-Resolution (EDSR), also has a multi-scale deep super-resolution (MDSR), with different scale based blocks that only train on data designed for its upscaling proportions (x2, x3, x4)
+-[ ] Play around with Basic SR -> e.g. EDSR and try to modify the network architecture based on a different paper!
+-[ ] Look into fraction based values (DLSS, XESS, FSR -> quality modes, like 1.3, 1.5, 1.7, 2.0, 3.0)
+
+
+## Dataset
+
+We want to create our own dataset in Unreal Engine 5.3:
+-[ ] LR frames + associated HR frames
+-[ ] LR depth buffer
+-[ ] LR geometry buffer
+-[ ] LR motion vectors
+-[ ] last drawn LR and/or upsampled HR frames
+- upsampled HR frames from
+- [ ] DLSS
+- [ ] FSR
+- [ ] XeSS
+- [ ] (TSR)
+
+### Typical render resolutions
+
+4k
+
+| Input       | Scale | Target        |
+|-------------|-------|---------------|
+| 2953 x 1661 | 1.3   | 3840 x 2160   |
+| 2560 x 1440 | 1.5   | 3840 x 2160   |
+| 2258 x 1270 | 1.7   | 3840 x 2160   |
+| 1920 x 1080 | 2     | 3840 x 2160   |
+| 1280 x 720  | 3     | 3840 x 2160   |
+| 960 x 540   | 4     | 3840 x 2160   |
+
+WQHD
+
+| Input       | Scale | Target        |
+|-------------|-------|---------------|
+| 1969 x 1107 | 1.3   | 2560 x 1440   |
+| 1706 x 960  | 1.5   | 2560 x 1440   |
+| 1505 x 807  | 1.7   | 2560 x 1440   |
+| 1280 x 720  | 2     | 2560 x 1440   |
+| 853 x 480   | 3     | 2560 x 1440   |
+| 640 x 360   | 4     | 2560 x 1440   |
+
+Full HD
+
+| Input      | Scale | Target        |
+|------------|-------|---------------|
+| 1476 x 830 | 1.3   | 1920 x 1080   |
+| 1280 x 720 | 1.5   | 1920 x 1080   |
+| 1129 x 635 | 1.7   | 1920 x 1080   |
+| 960 x 520  | 2     | 1920 x 1080   |
+| 640 x 360  | 3     | 1920 x 1080   |
+| 480 x 270  | 4     | 1920 x 1080   |
+
+HD
+
+| Input     | Scale | Target        |
+|-----------|-------|---------------|
+| 984 x 553 | 1.3   | 1280 x 720    |
+| 853 x 480 | 1.5   | 1280 x 720    |
+| 752 x 423 | 1.7   | 1280 x 720    |
+| 640 x 360 | 2     | 1280 x 720    |
+| 426 x 240 | 3     | 1280 x 720    |
+| 320 x 180 | 4     | 1280 x 720    |
+
+
+## Evaluation
+
+We want to evaluate on:
+- PSNR
+- SSIM (for now all channels, maybe only Y-channel)
+
+Against:
+- Bicubic
+- DLSS
+- FSR
+- XeSS
+- TSR

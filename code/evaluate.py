@@ -3,6 +3,7 @@ from torchvision import transforms
 import torch
 import torch.nn.functional as F
 from model.srcnn import SRCNN
+from model.subpixel import SubPixelNN
 import numpy as np
 from scipy.ndimage import convolve
 
@@ -95,8 +96,8 @@ def main() -> None:
     evaluate_dataset = CustomDataset(root='dataset/evaluate', transform=transform)
 
     # Loading model
-    model_path = "pretrained_models/srcnn_model_e25.pth"
-    model = SRCNN()
+    model_path = "pretrained_models/subpnn_model_e100.pth"
+    model = SubPixelNN(2)
 
     model.load_state_dict(torch.load(model_path))
     model.eval()

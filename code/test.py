@@ -1,5 +1,6 @@
 import torch
 from model.srcnn import SRCNN
+from model.subpixel import SubPixelNN
 from PIL import Image
 from torchvision import transforms
 import torchvision.transforms.functional as F
@@ -8,13 +9,13 @@ from dataloader import CustomDataset
 
 
 def main() -> None:
-    model_path = "pretrained_models/srcnn_model_e25.pth"
+    model_path = "pretrained_models/subpnn_model_e100.pth"
 
     # Loading and preparing data
     transform = transforms.ToTensor()
     test_dataset = CustomDataset(root='dataset/test', transform=transform)
 
-    model = SRCNN()
+    model = SubPixelNN(2)
 
     model.load_state_dict(torch.load(model_path))
     model.eval()

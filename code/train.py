@@ -15,8 +15,8 @@ def main() -> None:
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     lr = 0.001
     batch_size = 1
-    epochs = 5
-    num_workers = 16
+    epochs = 100
+    num_workers = 8
 
     # Model details
     # model = SRCNN().to(device)
