@@ -5,11 +5,15 @@ Just some notes and todos what I'd like to consider for my thesis.
 ## Network
 
 -[ ] [crop](https://pytorch.org/vision/main/generated/torchvision.transforms.RandomCrop.html) images into smaller parts so more can be processed in parallel (batch size > 1)
--[ ] SRCNN should have a psnr score of ~32 dB after 100 epochs (while gradually reducing learning rate from 0.01 to 0.0001)
--[ ] train networks for x2 from scratch use x3, x4 the pretrained x2 network 
--[ ] Enhanced Deep Residual Networks for Single Image Super-Resolution (EDSR), also has a multi-scale deep super-resolution (MDSR), with different scale based blocks that only train on data designed for its upscaling proportions (x2, x3, x4)
 -[ ] Play around with Basic SR -> e.g. EDSR and try to modify the network architecture based on a different paper!
 -[ ] Look into fraction based values (DLSS, XESS, FSR -> quality modes, like 1.3, 1.5, 1.7, 2.0, 3.0)
+
+### Nice to know
+
+- SRCNN should have a psnr score of ~32 dB after 100 epochs (while gradually reducing learning rate from 0.01 to 0.0001)
+- train networks for x2 from scratch use x3, x4 the pretrained x2 network
+- Enhanced Deep Residual Networks for Single Image Super-Resolution (EDSR), also has a multi-scale deep super-resolution (MDSR), with different scale based blocks that only train on data designed for its upscaling proportions (x2, x3, x4)
+- Rough estimation on CNN architecture's # of params: # of layers = depth, # of feature channels = width, memory allocated is O(depth * width) and # params is O(depth * width^2)
 
 
 ## Dataset
