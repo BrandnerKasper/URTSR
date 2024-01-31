@@ -8,6 +8,7 @@ from tqdm import tqdm
 from dataloader import CustomDataset
 from model.srcnn import SRCNN
 from model.subpixel import SubPixelNN
+from model.extraNet import ExtraNet
 
 
 def main() -> None:
@@ -16,11 +17,11 @@ def main() -> None:
     lr = 0.001
     batch_size = 1
     epochs = 100
-    num_workers = 8
+    num_workers = 16
 
     # Model details
     # model = SRCNN().to(device)
-    model = SubPixelNN(scale_factor=2).to(device)
+    model = ExtraNet(scale_factor=2).to(device)
     criterion = nn.L1Loss()
     optimizer = optim.Adam(model.parameters(), lr=lr)
 

@@ -4,7 +4,7 @@ Just some notes and todos what I'd like to consider for my thesis.
 
 ## Network
 
-- [ ] Implement ExtraNet's UNet architecure for SISR 
+- [x] Implement ExtraNet's UNet architecure for SISR 
 - [ ] Look into fraction based values (DLSS, XESS, FSR -> quality modes, like 1.3, 1.5, 1.7, 2.0, 3.0)
 
 ## Data Loader
@@ -14,10 +14,10 @@ Just some notes and todos what I'd like to consider for my thesis.
 - [ ] [crop](https://pytorch.org/vision/main/generated/torchvision.transforms.RandomCrop.html) images into smaller parts so more can be processed in parallel (batch size > 1)
 
 
-## Gneral
+## General
 
 - [ ] abstract loading different networks based on model path / string
-
+- [ ] only use DIV2K to train and evaluate/test
 
 ### Nice to know
 
