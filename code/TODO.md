@@ -4,9 +4,20 @@ Just some notes and todos what I'd like to consider for my thesis.
 
 ## Network
 
--[ ] [crop](https://pytorch.org/vision/main/generated/torchvision.transforms.RandomCrop.html) images into smaller parts so more can be processed in parallel (batch size > 1)
--[ ] Play around with Basic SR -> e.g. EDSR and try to modify the network architecture based on a different paper!
--[ ] Look into fraction based values (DLSS, XESS, FSR -> quality modes, like 1.3, 1.5, 1.7, 2.0, 3.0)
+- [ ] Implement ExtraNet's UNet architecure for SISR 
+- [ ] Look into fraction based values (DLSS, XESS, FSR -> quality modes, like 1.3, 1.5, 1.7, 2.0, 3.0)
+
+## Data Loader
+
+- [x] test if preparing data structure is faster than reading from disk for every item
+- [x] get name of lr/hr image
+- [ ] [crop](https://pytorch.org/vision/main/generated/torchvision.transforms.RandomCrop.html) images into smaller parts so more can be processed in parallel (batch size > 1)
+
+
+## Gneral
+
+- [ ] abstract loading different networks based on model path / string
+
 
 ### Nice to know
 
@@ -19,7 +30,7 @@ Just some notes and todos what I'd like to consider for my thesis.
 ## Dataset
 
 We want to create our own dataset in Unreal Engine 5.3:
--[ ] LR frames + associated HR frames
+-[x] LR frames + associated HR frames
 -[ ] LR depth buffer
 -[ ] LR geometry buffer
 -[ ] LR motion vectors
@@ -80,12 +91,14 @@ HD
 ## Evaluation
 
 We want to evaluate on:
-- PSNR
-- SSIM (for now all channels, maybe only Y-channel)
+- [x] PSNR
+- [x] SSIM all channels -> mean
+- [ ] SSIM only y-channel
 
 Against:
-- Bicubic
-- DLSS
-- FSR
-- XeSS
-- TSR
+- [x] Bilinear
+- [x] Bicubic
+- [ ] DLSS
+- [ ] FSR
+- [ ] XeSS
+- [ ] TSR

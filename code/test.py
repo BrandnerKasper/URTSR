@@ -1,7 +1,6 @@
 import torch
 from model.srcnn import SRCNN
 from model.subpixel import SubPixelNN
-from PIL import Image
 from torchvision import transforms
 import torchvision.transforms.functional as F
 import matplotlib.pyplot as plt

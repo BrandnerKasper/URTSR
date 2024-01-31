@@ -8,9 +8,9 @@ from model.srcnn import SRCNN
 from model.subpixel import SubPixelNN
 
 
-def psnr(original, reconstructed, max_val=1.0):
+def calculate_psnr(original, reconstructed, data_range=1.0):
     mse = F.mse_loss(original, reconstructed)
-    psnr_value = 10 * torch.log10((max_val ** 2) / mse)
+    psnr_value = 10 * torch.log10((data_range ** 2) / mse)
     return psnr_value.item()
 
 
@@ -32,6 +32,12 @@ def calculate_ssim(img_tensor, img2_tensor):
     return ssim_value
 
 
+def calculate_metrics(img1, img2):
+    psnr_value = calculate_psnr(img1, img2)
+    ssim_value = calculate_ssim(img1, img2)
+    return psnr_value, ssim_value
+
+
 def upscale(lr_tensor, scale_factor: int, upscale_mode: str = 'bicubic'):
     return F.interpolate(lr_tensor.unsqueeze(0), scale_factor=scale_factor, mode=upscale_mode).squeeze(0)
 
@@ -40,14 +46,11 @@ def main() -> None:
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     # Loading and preparing data
     transform = transforms.ToTensor()
-    evaluate_dataset = CustomDataset(root='dataset/matrix', transform=transform)
+    evaluate_dataset = CustomDataset(root='dataset/evaluate', transform=transform)
 
     # Loading model
     model_path = "pretrained_models/subpnn_model_e100.pth"
     model = SubPixelNN(2).to(device)
-
-    # input_size = (3, 1920, 1080)  # Assuming your input is a 3-channel image
-    # print(f"Number of parameters: {summary(model, input_size=input_size, device='cuda')}")
 
     model.load_state_dict(torch.load(model_path))
     model.eval()
@@ -55,42 +58,36 @@ def main() -> None:
     total_bilinear = (0.0, 0.0)
     total_net = (0.0, 0.0)
     total_bicubic = (0.0, 0.0)
-    for lr_image, hr_image in evaluate_dataset:
+
+    for i in range(len(evaluate_dataset)):
+        filename = evaluate_dataset.get_filename(i)
+        lr_image, hr_image = evaluate_dataset.__getitem__(i)
         lr_image = lr_image.to(device)
         hr_image = hr_image.to(device)
+
         with torch.no_grad():
-            output = model(lr_image.unsqueeze(0)).squeeze(0)
-        bilinear = upscale(lr_image, 2, "bilinear")
-        bicubic = upscale(lr_image, 2, "bicubic")
+            output_image = model(lr_image.unsqueeze(0)).squeeze(0)
+        bilinear_image = upscale(lr_image, 2, "bilinear")
+        bicubic_image = upscale(lr_image, 2, "bicubic")
 
-        # Calc PSNR for BILINEAR, NET and BICUBIC
-        psnr_value_bilinear = psnr(hr_image, bilinear)
-        psnr_value_net = psnr(hr_image, output)
-        psnr_value_bicubic = psnr(hr_image, bicubic)
-        print(f"PSNR "
-              f"| Bilinear: {psnr_value_bilinear:.2f} dB "
-              f"| Net: {psnr_value_net:.2f} dB "
-              f"| Bicubic: {psnr_value_bicubic:.2f} dB")
-
-        # Calc SSIM for BILINEAR, NET and BICUBIC
-        ssim_value_bilinear = calculate_ssim(hr_image, bilinear)
-        ssim_value_net = calculate_ssim(hr_image, output)
-        ssim_value_bicubic = calculate_ssim(hr_image, bicubic)
-        print(f"SSIM "
-              f"| Bilinear: {ssim_value_bilinear:.2f} "
-              f"| Net: {ssim_value_net:.2f} "
-              f"| Bicubic: {ssim_value_bicubic:.2f}")
+        # Calc Metrics for BILINEAR, NET and BICUBIC
+        bilinear_values = calculate_metrics(hr_image, bilinear_image)
+        net_values = calculate_metrics(hr_image, output_image)
+        bicubic_values = calculate_metrics(hr_image, bicubic_image)
+        print(f"{filename}: "
+              f"PSNR | bilinear {bilinear_values[0]:.2f} dB | network {net_values[0]:.2f} dB | bicubic {bicubic_values[0]:.2f} dB || "
+              f"SSIM | bilinear {bilinear_values[1]:.2f} | network {net_values[1]:.2f} | bicubic {bicubic_values[1]:.2f}")
 
         # Calc total
-        total_bilinear = (total_bilinear[0] + psnr_value_bilinear, total_bilinear[1] + ssim_value_bilinear)
-        total_net = (total_net[0] + psnr_value_net, total_net[1] + ssim_value_net)
-        total_bicubic = (total_bicubic[0] + psnr_value_bicubic, total_bicubic[1] + ssim_value_bicubic)
+        total_bilinear = tuple(x + y for x, y in zip(total_bilinear, bilinear_values))
+        total_net = tuple(x + y for x, y in zip(total_net, net_values))
+        total_bicubic = tuple(x + y for x, y in zip(total_bicubic, bicubic_values))
 
     # Calc average
-    n = len(evaluate_dataset)
-    average_bilinear = tuple(x/n for x in total_bilinear)
-    average_net = tuple(x/n for x in total_net)
-    average_bicubic = tuple(x/n for x in total_bicubic)
+    length = len(evaluate_dataset)
+    average_bilinear = tuple(x / length for x in total_bilinear)
+    average_net = tuple(x / length for x in total_net)
+    average_bicubic = tuple(x / length for x in total_bicubic)
     print(f"Average (PSNR, SSIM) over dataset "
           f"| Bilinear: ({average_bilinear[0]:.2f} dB, {average_bilinear[1]:.2f})"
           f"| Net: ({average_net[0]:.2f} dB, {average_net[1]:.2f})"
