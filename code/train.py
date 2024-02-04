@@ -17,7 +17,7 @@ def main() -> None:
     lr = 0.001
     batch_size = 1
     epochs = 100
-    num_workers = 16
+    num_workers = 8
 
     # Model details
     # model = SRCNN().to(device)
@@ -28,7 +28,7 @@ def main() -> None:
     # Loading and preparing data
     transform = transforms.ToTensor()
 
-    train_dataset = CustomDataset(root='dataset/train', transform=transform, pattern="x2")
+    train_dataset = CustomDataset(root='dataset/matrix', transform=transform, pattern="")
     train_loader = DataLoader(dataset=train_dataset, batch_size=batch_size, shuffle=True, num_workers=num_workers)
 
     # Training Loop
@@ -48,7 +48,7 @@ def main() -> None:
         print(f"Epoch [{epoch + 1}/{epochs}], Loss: {average_loss:.4f}")
 
     # Save trained model
-    torch.save(model.state_dict(), 'pretrained_models/subpnn_model.pth')
+    torch.save(model.state_dict(), 'pretrained_models/extranet.pth')
 
 
 # Press the green button in the gutter to run the script.
