@@ -15,7 +15,7 @@ def main() -> None:
     # Hyperparameters
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     lr = 0.001
-    batch_size = 1
+    batch_size = 8
     epochs = 100
     num_workers = 8
 
@@ -28,7 +28,7 @@ def main() -> None:
     # Loading and preparing data
     transform = transforms.ToTensor()
 
-    train_dataset = CustomDataset(root='dataset/matrix', transform=transform, pattern="")
+    train_dataset = CustomDataset(root='dataset/train', transform=transform, pattern="x2", patch_size=256)
     train_loader = DataLoader(dataset=train_dataset, batch_size=batch_size, shuffle=True, num_workers=num_workers)
 
     # Training Loop
