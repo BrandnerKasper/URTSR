@@ -28,7 +28,7 @@ def main() -> None:
     # Loading and preparing data
     transform = transforms.ToTensor()
 
-    train_dataset = CustomDataset(root='dataset/train', transform=transform, pattern="x2", patch_size=256)
+    train_dataset = CustomDataset(root='dataset/train', transform=transform, pattern="x2", patch_size=256, scale=2)
     train_loader = DataLoader(dataset=train_dataset, batch_size=batch_size, shuffle=True, num_workers=num_workers)
 
     # Training Loop
