@@ -2,10 +2,12 @@ from dataloader import CustomDataset
 from torchvision import transforms
 import torch
 import torch.nn.functional as F
+import utils
 from pytorch_msssim import ssim
 
 from model.srcnn import SRCNN
 from model.subpixel import SubPixelNN
+from model.extraNet import ExtraNet
 
 
 def calculate_psnr(original, reconstructed, data_range=1.0):
@@ -39,18 +41,18 @@ def calculate_metrics(img1, img2):
 
 
 def upscale(lr_tensor, scale_factor: int, upscale_mode: str = 'bicubic'):
-    return F.interpolate(lr_tensor.unsqueeze(0), scale_factor=scale_factor, mode=upscale_mode).squeeze(0)
+    return F.interpolate(lr_tensor, scale_factor=scale_factor, mode=upscale_mode).squeeze(0)
 
 
 def main() -> None:
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     # Loading and preparing data
     transform = transforms.ToTensor()
-    evaluate_dataset = CustomDataset(root='dataset/evaluate', transform=transform)
+    evaluate_dataset = CustomDataset(root='dataset/Set14', transform=transform, pattern="x2")
 
     # Loading model
-    model_path = "pretrained_models/subpnn_model_e100.pth"
-    model = SubPixelNN(2).to(device)
+    model_path = "pretrained_models/extranet.pth"
+    model = ExtraNet(2).to(device)
 
     model.load_state_dict(torch.load(model_path))
     model.eval()
@@ -62,13 +64,22 @@ def main() -> None:
     for i in range(len(evaluate_dataset)):
         filename = evaluate_dataset.get_filename(i)
         lr_image, hr_image = evaluate_dataset.__getitem__(i)
-        lr_image = lr_image.to(device)
-        hr_image = hr_image.to(device)
+        lr_image, hr_image = lr_image.to(device), hr_image.to(device)
+        print(f"HR dim: {hr_image.size()}")
+
+        lr_image_model = utils.pad_to_divisible(lr_image.unsqueeze(0), 8)
+        lr_image_bi = utils.pad_to_divisible(lr_image.unsqueeze(0), 2)
 
         with torch.no_grad():
-            output_image = model(lr_image.unsqueeze(0)).squeeze(0)
-        bilinear_image = upscale(lr_image, 2, "bilinear")
-        bicubic_image = upscale(lr_image, 2, "bicubic")
+            output_image = model(lr_image_model).squeeze(0)
+            output_image = utils.pad_or_crop_to_target(output_image, hr_image)
+            output_image = torch.clamp(output_image, min=0.0, max=1.0)
+
+        bilinear_image = upscale(lr_image_bi, 2, "bilinear")
+        bilinear_image = utils.pad_or_crop_to_target(bilinear_image, hr_image)
+
+        bicubic_image = upscale(lr_image_bi, 2, "bicubic")
+        bicubic_image = utils.pad_or_crop_to_target(bicubic_image, hr_image)
 
         # Calc Metrics for BILINEAR, NET and BICUBIC
         bilinear_values = calculate_metrics(hr_image, bilinear_image)

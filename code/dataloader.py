@@ -41,7 +41,7 @@ def get_random_crop_pair(lr_tensor: torch.Tensor, hr_tensor: torch.Tensor, patch
 
 class CustomDataset(Dataset):
     def __init__(self, root: str, transform=transforms.ToTensor(), pattern: str = None,
-                 patch_size: int = None, scale: int = 1):
+                 patch_size: int = None, scale: int = 2):
         self.root_hr = os.path.join(root, "HR")
         self.root_lr = os.path.join(root, "LR")
         self.transform = transform
