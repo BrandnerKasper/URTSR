@@ -6,18 +6,22 @@ Just some notes and todos what I'd like to consider for my thesis.
 
 - [x] Implement ExtraNet's UNet architecure for SISR 
 - [ ] Look into fraction based values (DLSS, XESS, FSR -> quality modes, like 1.3, 1.5, 1.7, 2.0, 3.0)
+- [ ] U-net architectures up/down-sample an image multiple times, look into what is best practice when the input image sizes are not dividable by 2^x where x the number of up/down-sampling steps
+- [x] adjust training details to ExtraNet's parameter (Cosine learning rate decay, beta 1 and 2 of adam)
 
 ## Data Loader
 
 - [x] test if preparing data structure is faster than reading from disk for every item
 - [x] get name of lr/hr image
-- [ ] [crop](https://pytorch.org/vision/main/generated/torchvision.transforms.RandomCrop.html) images into smaller parts so more can be processed in parallel (batch size > 1)
+- [x] [crop](https://pytorch.org/vision/main/generated/torchvision.transforms.RandomCrop.html) images into smaller parts so more can be processed in parallel (batch size > 1)
+- [x] crop/pad image to hr output size if needed (padding for image when there dimensions are not dividable by 2^x where x the number of up/down-sampling steps)
 
 
 ## General
 
 - [ ] abstract loading different networks based on model path / string
-- [ ] only use DIV2K to train and evaluate/test
+- [x] only use DIV2K to train and evaluate/test
+- [x] add a validation to the training script
 
 ### Nice to know
 
@@ -90,6 +94,8 @@ HD
 
 ## Evaluation
 
+- [ ] Write evaluation results in one csv file
+
 We want to evaluate on:
 - [x] PSNR
 - [x] SSIM all channels -> mean
@@ -102,3 +108,4 @@ Against:
 - [ ] FSR
 - [ ] XeSS
 - [ ] TSR
+
