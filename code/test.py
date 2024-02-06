@@ -1,7 +1,7 @@
 import torch
-from model.srcnn import SRCNN
-from model.subpixel import SubPixelNN
-from model.extraNet import ExtraNet
+from models.srcnn import SRCNN
+from models.subpixel import SubPixelNN
+from models.extraNet import ExtraNet
 from torchvision import transforms
 import torchvision.transforms.functional as F
 import matplotlib.pyplot as plt
@@ -16,7 +16,7 @@ def main() -> None:
     transform = transforms.ToTensor()
     test_dataset = CustomDataset(root='dataset/Set14', transform=transform, pattern="x2")
 
-    # Load model
+    # Load models
     model_path = "pretrained_models/extranet.pth"
     model = ExtraNet(2).to(device)
 

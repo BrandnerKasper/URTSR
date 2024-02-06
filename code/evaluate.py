@@ -4,19 +4,19 @@ import torch
 import torch.nn.functional as F
 import utils
 
-from model.srcnn import SRCNN
-from model.subpixel import SubPixelNN
-from model.extraNet import ExtraNet
+from models.srcnn import SRCNN
+from models.subpixel import SubPixelNN
+from models.extraNet import ExtraNet
 
 
 def main() -> None:
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     # Loading and preparing data
     transform = transforms.ToTensor()
-    evaluate_dataset = CustomDataset(root='dataset/Urban100', transform=transform, pattern="x2")
+    evaluate_dataset = CustomDataset(root='dataset/Set14', transform=transform, pattern="x2")
 
-    # Loading model
-    model_path = "pretrained_models/extranet.pth"
+    # Loading models
+    model_path = "pretrained_models/extranet_e150_x2_bs16_ps128.pth"
     model = ExtraNet(2).to(device)
 
     model.load_state_dict(torch.load(model_path))

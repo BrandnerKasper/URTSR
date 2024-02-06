@@ -45,15 +45,15 @@ class ExtraNet(nn.Module):
             nn.Conv2d(32, 32, kernel_size=3, stride=1, padding=1),
             nn.BatchNorm2d(32),
             nn.ReLU(inplace=True),
-            nn.Conv2d(32, 64, kernel_size=3, stride=1, padding=1),
-            nn.BatchNorm2d(64), # this is hacked since we do not yet use motion vectors from previous frames
+            nn.Conv2d(32, 32, kernel_size=3, stride=1, padding=1),
+            nn.BatchNorm2d(32), # this is hacked since we do not yet use motion vectors from previous frames where we would get 32 more layers!
             nn.ReLU(inplace=True)
         )
 
-        self.up_1 = nn.ConvTranspose2d(64, 64, kernel_size=2, stride=2)
+        self.up_1 = nn.ConvTranspose2d(32, 32, kernel_size=2, stride=2)
 
         self.after_up_1 = nn.Sequential(
-            nn.Conv2d(96, 48, kernel_size=3, stride=1, padding=1),
+            nn.Conv2d(64, 48, kernel_size=3, stride=1, padding=1),
             nn.BatchNorm2d(48),
             nn.ReLU(inplace=True),
             nn.Conv2d(48, 32, kernel_size=3, stride=1, padding=1),
