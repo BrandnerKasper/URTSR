@@ -39,6 +39,37 @@ General:
 - [x] add a validation to the training script
 - [ ] make it easy to train with no patchsize (crop/pad if input images are not suitable for down-/up-sampling multiple times) maybe add a variable into the model files for that?
 
+### Config
+
+VARS_IN
+
+MODEL_NAME: str
+
+EPOCHS: int = 100
+
+SCALE: int = 2
+
+LEARNING_RATE: float = 0.001
+
+OPTIMIZER: str = adam
+
+SCHEDULER: str = null
+
+START_DECAY_EPOCH: int = null
+
+BATCH_SIZE: int = 1
+
+PATCH_SIZE: int = null
+
+NUMBER_WORKERS: int = 8
+
+TRAIN_DATASET: str = DIV2K/train
+
+VAL_DATASET: str = DIV2K/val
+
+- [ ] valid config file -> yaml parser -> make class called config, load from yaml
+- [ ] model_name, scheduler, optimizer -> class object return
+
 ### Nice to know
 
 - SRCNN should have a psnr score of ~32 dB after 100 epochs (while gradually reducing learning rate from 0.01 to 0.0001)

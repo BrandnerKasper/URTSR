@@ -39,7 +39,7 @@ def main() -> None:
     val_dataset = CustomDataset("dataset/DIV2K/val", transform=transform, pattern="x2", patch_size=patch_size)
     val_loader = DataLoader(dataset=val_dataset, batch_size=batch_size, shuffle=True, num_workers=num_workers)
 
-    # Training  & Validation Loop
+    # Training & Validation Loop
     for epoch in tqdm(range(epochs), desc='Train & Validate', dynamic_ncols=True):
         # train loop
         total_loss = 0.0

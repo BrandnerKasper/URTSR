@@ -10,7 +10,7 @@ import torch
 import torchvision.transforms.functional as F
 
 
-def init_filenames(root_hr: str, root_lr: str, pattern: str):
+def init_filenames(root_hr: str, root_lr: str, pattern: str) -> list[str]:
     # Extract common part of the filenames (e.g., '0001')
     hr_filenames = [os.path.splitext(filename)[0] for filename in os.listdir(root_hr) if
                     filename.endswith(".png")]
@@ -29,7 +29,8 @@ def init_filenames(root_hr: str, root_lr: str, pattern: str):
     return sorted(set(hr_filenames))
 
 
-def get_random_crop_pair(lr_tensor: torch.Tensor, hr_tensor: torch.Tensor, patch_size: int, scale: int) -> (torch.Tensor, torch.Tensor):
+def get_random_crop_pair(lr_tensor: torch.Tensor, hr_tensor: torch.Tensor, patch_size: int, scale: int) \
+        -> (torch.FloatTensor, torch.FloatTensor):
     lr_i, lr_j, lr_h, lr_w = transforms.RandomCrop.get_params(lr_tensor, output_size=(patch_size, patch_size))
     hr_i, hr_j, hr_h, hr_w = lr_i * scale, lr_j * scale, lr_h * scale, lr_w * scale
 
@@ -50,10 +51,10 @@ class CustomDataset(Dataset):
         self.scale = scale
         self.filenames = init_filenames(self.root_hr, self.root_lr, self.pattern)
 
-    def __len__(self):
+    def __len__(self) -> int:
         return len(self.filenames)
 
-    def __getitem__(self, idx):
+    def __getitem__(self, idx: int) -> (torch.FloatTensor, torch.FloatTensor):
         common_filename = self.filenames[idx]
         if self.pattern:
             lr_path = os.path.join(self.root_lr, common_filename + self.pattern + ".png")
@@ -71,7 +72,7 @@ class CustomDataset(Dataset):
 
         return lr_image, hr_image
 
-    def get_filename(self, idx):
+    def get_filename(self, idx: int) -> str:
         path = self.filenames[idx]
         filename = path.split("/")[-1]
         filename = filename.split(".")[0]
@@ -81,14 +82,14 @@ class CustomDataset(Dataset):
 def main() -> None:
     # measuring time of utils fcts
     transform = transforms.ToTensor()
-    root_hr = "dataset/DIV2K/HR"
-    root_lr = "dataset/DIV2K/LR"
+    root_hr = "dataset/DIV2K/train/HR"
+    root_lr = "dataset/DIV2K/train/LR"
     pattern = "x2"
     # Use a lambda function to pass the function with its arguments to timeit
     execution_time_filenames = timeit.timeit(lambda: init_filenames(root_hr, root_lr, pattern), number=1)
     print(f"Execution time of filenames: {execution_time_filenames} seconds")
 
-    dataset = CustomDataset(root="dataset/DIV2K", pattern=pattern, patch_size=256, scale=2)
+    dataset = CustomDataset(root="dataset/DIV2K/train", pattern=pattern, patch_size=256, scale=2)
 
     for lr_image, hr_image in dataset:
         lr_image = F.to_pil_image(lr_image)
