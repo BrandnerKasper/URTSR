@@ -3,10 +3,10 @@ import torch.nn as nn
 
 
 class ExtraNet(nn.Module):
-    def __init__(self, scale_factor: int):
+    def __init__(self, scale: int):
         super(ExtraNet, self).__init__()
 
-        self.scale_factor = scale_factor
+        self.scale = scale
 
         self.conv_in = nn.Sequential(
             nn.Conv2d(3, 24, kernel_size=3, stride=1, padding=1), # the original paper uses 18 as first in_channels!
@@ -84,8 +84,8 @@ class ExtraNet(nn.Module):
         )
 
         self.sub_pixel_conv = nn.Sequential(
-            nn.Conv2d(24, 3 * scale_factor ** 2, kernel_size=3, padding=1),
-            nn.PixelShuffle(scale_factor)
+            nn.Conv2d(24, 3 * self.scale ** 2, kernel_size=3, padding=1),
+            nn.PixelShuffle(self.scale)
         )
         # self.conv_out = nn.Conv2d(24, 3, kernel_size=1)
 

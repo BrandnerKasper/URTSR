@@ -2,10 +2,10 @@ import torch.nn as nn
 
 
 class SubPixelNN(nn.Module):
-    def __init__(self, scale_factor: int):
+    def __init__(self, scale: int):
         super(SubPixelNN, self).__init__()
 
-        self.scale_factor = scale_factor
+        self.scale = scale
 
         # Feature extraction
         self.features = nn.Sequential(
@@ -19,8 +19,8 @@ class SubPixelNN(nn.Module):
 
         # Sub-pixel convolution
         self.sub_pixel_conv = nn.Sequential(
-            nn.Conv2d(256, 3 * scale_factor**2, kernel_size=3, padding=1),
-            nn.PixelShuffle(scale_factor)
+            nn.Conv2d(256, 3 * self.scale ** 2, kernel_size=3, padding=1),
+            nn.PixelShuffle(scale)
         )
 
     def forward(self, x):

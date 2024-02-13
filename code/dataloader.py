@@ -42,12 +42,12 @@ def get_random_crop_pair(lr_tensor: torch.Tensor, hr_tensor: torch.Tensor, patch
 
 class CustomDataset(Dataset):
     def __init__(self, root: str, transform=transforms.ToTensor(), pattern: str = None,
-                 patch_size: int = None, scale: int = 2):
+                 crop_size: int = None, scale: int = 2):
         self.root_hr = os.path.join(root, "HR")
         self.root_lr = os.path.join(root, "LR")
         self.transform = transform
         self.pattern = pattern
-        self.patch_size = patch_size
+        self.crop_size = crop_size
         self.scale = scale
         self.filenames = init_filenames(self.root_hr, self.root_lr, self.pattern)
 
@@ -67,8 +67,8 @@ class CustomDataset(Dataset):
         lr_image = self.transform(lr_image)
         hr_image = self.transform(hr_image)
 
-        if self.patch_size:
-            lr_image, hr_image = get_random_crop_pair(lr_image, hr_image, self.patch_size, self.scale)
+        if self.crop_size:
+            lr_image, hr_image = get_random_crop_pair(lr_image, hr_image, self.crop_size, self.scale)
 
         return lr_image, hr_image
 
@@ -89,7 +89,7 @@ def main() -> None:
     execution_time_filenames = timeit.timeit(lambda: init_filenames(root_hr, root_lr, pattern), number=1)
     print(f"Execution time of filenames: {execution_time_filenames} seconds")
 
-    dataset = CustomDataset(root="dataset/DIV2K/train", pattern=pattern, patch_size=256, scale=2)
+    dataset = CustomDataset(root="dataset/DIV2K/train", pattern=pattern, crop_size=256, scale=2)
 
     for lr_image, hr_image in dataset:
         lr_image = F.to_pil_image(lr_image)

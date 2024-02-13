@@ -82,9 +82,9 @@ VAL_DATASET: str = DIV2K/val
 
 We want to create our own dataset in Unreal Engine 5.3:
 -[x] LR frames + associated HR frames
--[ ] LR depth buffer
--[ ] LR geometry buffer
--[ ] LR motion vectors
+-[x] LR depth buffer
+-[x] LR geometry buffer
+-[x] LR motion vectors
 -[ ] last drawn LR and/or upsampled HR frames
 - upsampled HR frames from
 - [ ] DLSS

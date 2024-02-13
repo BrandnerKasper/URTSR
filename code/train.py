@@ -20,12 +20,12 @@ def main() -> None:
     batch_size = 16
     epochs = 150
     num_workers = 8
-    patch_size = 128
+    crop_size = 128
     scale = 2
     start_decay_epoch = 20
 
     # Model details
-    model = ExtraNet(scale_factor=scale).to(device)
+    model = ExtraNet(scale=scale).to(device)
     criterion = nn.L1Loss()
     optimizer = optim.Adam(model.parameters(), lr=lr)
     scheduler = CosineAnnealingLR(optimizer, T_max=epochs, eta_min=1e-6, verbose=True)
@@ -33,10 +33,10 @@ def main() -> None:
     # Loading and preparing data
     transform = transforms.ToTensor()
     # train data
-    train_dataset = CustomDataset(root='dataset/DIV2K/train', transform=transform, pattern="x2", patch_size=patch_size)
+    train_dataset = CustomDataset(root='dataset/DIV2K/train', transform=transform, pattern="x2", crop_size=crop_size)
     train_loader = DataLoader(dataset=train_dataset, batch_size=batch_size, shuffle=True, num_workers=num_workers)
     # val data
-    val_dataset = CustomDataset("dataset/DIV2K/val", transform=transform, pattern="x2", patch_size=patch_size)
+    val_dataset = CustomDataset("dataset/DIV2K/val", transform=transform, pattern="x2", crop_size=crop_size)
     val_loader = DataLoader(dataset=val_dataset, batch_size=batch_size, shuffle=True, num_workers=num_workers)
 
     # Training & Validation Loop
@@ -74,7 +74,7 @@ def main() -> None:
         print(f"PSNR: {average_metric[0]:.2f} db, SSIM: {average_metric[1]:.4f}\n")
 
     # Save trained models
-    model_str = f"extranet_e{epochs}_x{scale}_bs{batch_size}_ps{patch_size}"
+    model_str = f"extranet_e{epochs}_x{scale}_bs{batch_size}_ps{crop_size}"
     model_path = "pretrained_models/" + model_str + ".pth"
     torch.save(model.state_dict(), model_path)
 
