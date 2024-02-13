@@ -8,35 +8,35 @@ from tqdm import tqdm
 
 import utils
 from dataloader import CustomDataset
-from models.srcnn import SRCNN
-from models.subpixel import SubPixelNN
-from models.extraNet import ExtraNet
+from config import load_yaml_into_config
 
 
 def main() -> None:
     # Hyperparameters
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    lr = 0.001
-    batch_size = 16
-    epochs = 150
-    num_workers = 8
-    crop_size = 128
-    scale = 2
-    start_decay_epoch = 20
+    config = load_yaml_into_config("config.yaml")
+    batch_size = config.batch_size
+    epochs = config.epochs
+    num_workers = config.number_workers
+    crop_size = config.crop_size
+    scale = config.scale
+    start_decay_epoch = config.start_decay_epoch
 
     # Model details
-    model = ExtraNet(scale=scale).to(device)
-    criterion = nn.L1Loss()
-    optimizer = optim.Adam(model.parameters(), lr=lr)
-    scheduler = CosineAnnealingLR(optimizer, T_max=epochs, eta_min=1e-6, verbose=True)
+    model = config.model.to(device)
+    criterion = config.criterion
+    optimizer = config.optimizer
+    scheduler = config.scheduler
 
     # Loading and preparing data
     transform = transforms.ToTensor()
     # train data
-    train_dataset = CustomDataset(root='dataset/DIV2K/train', transform=transform, pattern="x2", crop_size=crop_size)
+    train_data_path = config.train_dataset
+    train_dataset = CustomDataset(root=train_data_path, transform=transform, pattern="x2", crop_size=crop_size)
     train_loader = DataLoader(dataset=train_dataset, batch_size=batch_size, shuffle=True, num_workers=num_workers)
     # val data
-    val_dataset = CustomDataset("dataset/DIV2K/val", transform=transform, pattern="x2", crop_size=crop_size)
+    val_data_path = config.val_dataset
+    val_dataset = CustomDataset(val_data_path, transform=transform, pattern="x2", crop_size=crop_size)
     val_loader = DataLoader(dataset=val_dataset, batch_size=batch_size, shuffle=True, num_workers=num_workers)
 
     # Training & Validation Loop
@@ -53,10 +53,13 @@ def main() -> None:
 
             total_loss += loss.item()
 
-        if epoch > start_decay_epoch:
-            scheduler.step()
-        average_loss = total_loss / len(train_loader)
-        print(f"Loss: {average_loss:.4f}\n")
+        # scheduler update if we have one
+        if scheduler is not None:
+            if epoch > start_decay_epoch:
+                scheduler.step()
+            average_loss = total_loss / len(train_loader)
+            print("\n")
+            print(f"Loss: {average_loss:.4f}\n")
 
         # val loop
         if (epoch+1) % 10 != 0:
@@ -71,10 +74,12 @@ def main() -> None:
             total_metrics = tuple(x + y for x, y in zip(total_metrics, metrics))
 
         average_metric = tuple(x / len(val_loader) for x in total_metrics)
+        print("\n")
         print(f"PSNR: {average_metric[0]:.2f} db, SSIM: {average_metric[1]:.4f}\n")
 
     # Save trained models
-    model_str = f"extranet_e{epochs}_x{scale}_bs{batch_size}_ps{crop_size}"
+    filename = config.filename
+    model_str = f"{filename}_e{epochs}_x{scale}_bs{batch_size}_ps{crop_size}"
     model_path = "pretrained_models/" + model_str + ".pth"
     torch.save(model.state_dict(), model_path)
 
