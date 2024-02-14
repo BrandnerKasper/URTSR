@@ -1,5 +1,4 @@
 import yaml
-import csv
 import pandas as pd
 
 
@@ -15,22 +14,37 @@ def flatten_dict(d, parent_key='', sep='_'):
     return dict(items)
 
 
+def create_csv(data_file_path: str, csv_file_path: str) -> None:
+    # Read from yaml file
+    with open(data_file_path, 'r') as file:
+        data = yaml.safe_load(file)
+        data = flatten_dict(data)
+    # Create new dataframe from yaml
+    df = pd.DataFrame.from_dict(data, orient='index', columns=['1'])
+    # Save to csv file
+    df.to_csv(csv_file_path)
+
+
+def add_to_csv(data_file_path: str, csv_file_path: str) -> None:
+    # Read from yaml file
+    with open(data_file_path, 'r') as file:
+        data = yaml.safe_load(file)
+        data = flatten_dict(data)
+    # Create dataframe from csv file
+    df = pd.read_csv(csv_file_path)
+    idx = df.shape[1] - 1
+    # Insert the config file data into the old csv
+    df.insert(idx, idx+1, data)
+    df.to_csv(csv_file_path)
+
+
 def main():
-    file_path1 = 'configs/srcnn.yaml'
-    file_path2 = 'configs/extranet.yaml'
-    with open(file_path1, 'r') as file:
-        data1 = yaml.safe_load(file)
-        data1 = flatten_dict(data1)
-        print(data1)
-    df = pd.DataFrame.from_dict(data1, orient='index', columns=['A'])
-    print(df)
-    with open(file_path2, 'r') as file:
-        data2 = yaml.safe_load(file)
-        data2 = flatten_dict(data2)
-        print(data2)
-    df.insert(1, "B", data2)
-    print(df)
-    df.to_csv('results.csv')
+    data_file_path1 = 'configs/srcnn.yaml'
+    data_file_path2 = 'configs/extranet.yaml'
+    csv_file_path = "results2.csv"
+
+    # create_csv(data_file_path1, csv_file_path)
+    add_to_csv(data_file_path2, csv_file_path)
 
 
 if __name__ == '__main__':
