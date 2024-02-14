@@ -74,9 +74,10 @@ def train(filepath: str):
         if scheduler is not None:
             if epoch > start_decay_epoch:
                 scheduler.step()
-            average_loss = total_loss / len(train_loader)
-            print("\n")
-            print(f"Loss: {average_loss:.4f}\n")
+        # Loss
+        average_loss = total_loss / len(train_loader)
+        print("\n")
+        print(f"Loss: {average_loss:.4f}\n")
 
         # val loop
         if (epoch + 1) % 10 != 0:
@@ -89,7 +90,7 @@ def train(filepath: str):
                 output_image = torch.clamp(output_image, min=0.0, max=1.0)
             metrics = utils.calculate_metrics(hr_image, output_image)
             total_metrics = tuple(x + y for x, y in zip(total_metrics, metrics))
-
+        # PSNR & SSIM
         average_metric = tuple(x / len(val_loader) for x in total_metrics)
         print("\n")
         print(f"PSNR: {average_metric[0]:.2f} db, SSIM: {average_metric[1]:.4f}\n")
