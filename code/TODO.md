@@ -23,6 +23,7 @@ General:
 - [ ] Look into fraction based values (DLSS, XESS, FSR -> quality modes, like 1.3, 1.5, 1.7, 2.0, 3.0)
 - [ ] U-net architectures up/down-sample an image multiple times, look into what is best practice when the input image sizes are not dividable by 2^x where x the number of up/down-sampling steps
 - [x] adjust training details to ExtraNet's parameter (Cosine learning rate decay, beta 1 and 2 of adam)
+- [ ] add a 'how often is the image divided' number to every model so it can be abstracted for train, evaluate and test
 
 ## Data Loader
 
@@ -136,7 +137,13 @@ HD
 
 ## Evaluation
 
-- [ ] Write evaluation results in one csv file based on config file
+- [ ] Load model based on pretrained model filename
+- [ ] Write everything into one config file? or use evaluation config file? and write results into them?
+- [ ] Write evaluation results in one csv file based on config .yaml file
+- [ ] Clean up evalaute.py by removing the comparison of bilinear, bicubic and the network
+- [ ] Add entries for bilinear and bicubic for every evaluation dataset so we can compare more easily
+- [x] Load config files into pandas dataframe
+- [x] Save dataframe into csv file
 
 We want to evaluate on:
 - [x] PSNR

@@ -16,8 +16,8 @@ def main() -> None:
     evaluate_dataset = CustomDataset(root='dataset/Set14', transform=transform, pattern="x2")
 
     # Loading models
-    model_path = "pretrained_models/extranet_e150_x2_bs4_cs256.pth"
-    model = ExtraNet(2).to(device)
+    model_path = "pretrained_models/srcnn_e100_x2_bs4_cs256.pth"
+    model = SRCNN(2).to(device)
 
     model.load_state_dict(torch.load(model_path))
     model.eval()
@@ -31,7 +31,7 @@ def main() -> None:
         lr_image, hr_image = evaluate_dataset.__getitem__(i)
         lr_image, hr_image = lr_image.to(device), hr_image.to(device)
 
-        lr_image_model = utils.pad_to_divisible(lr_image.unsqueeze(0), 8)
+        lr_image_model = utils.pad_to_divisible(lr_image.unsqueeze(0), 2)
         lr_image_bi = utils.pad_to_divisible(lr_image.unsqueeze(0), 2)
 
         with torch.no_grad():
