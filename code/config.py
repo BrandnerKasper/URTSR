@@ -70,15 +70,14 @@ def init_optimizer(optimizer_data: dict, model: nn.Module, learning_rate: float)
 
 
 def init_scheduler(scheduler_data: dict, optimizer: optim.Optimizer, epochs: int) -> Optional[lr_scheduler.LRScheduler]:
-    if scheduler_data is None:
-        return None
-
     scheduler_name = scheduler_data["NAME"]
 
     match scheduler_name:
         case "Cosine":
             min_learning_rate = scheduler_data["MIN_LEARNING_RATE"]
             return lr_scheduler.CosineAnnealingLR(optimizer=optimizer, T_max=epochs, eta_min=min_learning_rate)
+        case None:
+            return None
         case _:
             raise ValueError(f"The scheduler '{scheduler_name}' is not a valid scheduler.")
 
@@ -130,16 +129,14 @@ def test_yaml_creation() -> None:
         "NAME": "Cosine",
         "MIN_LEARNING_RATE": 1e-6,
         "START_DECAY_EPOCH": 20,
-        "VERBOSE": True,
     }
     create_yaml("config", "ExtraNet", 150, 2, 1, 256, 8,
                 0.001, "L1", optimizer, scheduler,
                 "DIV2K/train", "DIV2K/val")
 
 
-def load_yaml_into_config(config_path: str) -> Config:
-    filename = config_path
-    with open(filename, "r") as file:
+def load_yaml_into_config(file_path: str) -> Config:
+    with open(file_path, "r") as file:
         config_dict = yaml.safe_load(file)
         model_name = config_dict["MODEL"]
         epochs = config_dict["EPOCHS"]
@@ -154,6 +151,7 @@ def load_yaml_into_config(config_path: str) -> Config:
         start_decay_epoch = scheduler["START_DECAY_EPOCH"]
         train_data = config_dict["TRAIN_DATASET"]
         val_data = config_dict["VAL_DATASET"]
+        filename = file_path.split('/')[-1]
 
     return Config(filename, model_name, epochs, scale, batch_size, crop_size, number_workers,
                   learning_rate, criterion, optimizer, scheduler, start_decay_epoch,
@@ -162,7 +160,7 @@ def load_yaml_into_config(config_path: str) -> Config:
 
 def main() -> None:
     # test_yaml_creation()
-    yaml_config = load_yaml_into_config("config.yaml")
+    yaml_config = load_yaml_into_config("configs/srcnn.yaml")
     print(yaml_config)
 
 

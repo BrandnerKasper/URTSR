@@ -1,20 +1,37 @@
 import torch
 import torch.nn as nn
-import torch.optim as optim
-from torch.optim.lr_scheduler import CosineAnnealingLR
 from torchvision import transforms
 from torch.utils.data import DataLoader
 from tqdm import tqdm
-
 import utils
+import argparse
+
 from dataloader import CustomDataset
-from config import load_yaml_into_config
+from config import load_yaml_into_config, Config
 
 
-def main() -> None:
-    # Hyperparameters
+def parse_arguments() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="Train a SR network based on a config file.")
+    parser.add_argument('file_path', type=str, nargs='?', default='configs/extranet.yaml', help="Path to the config file")
+    args = parser.parse_args()
+    return args
+
+
+def save_model(batch_size: int, config: Config, crop_size: int, epochs: int, model: nn.Module, scale: int) -> None:
+    filename = config.filename.split('.')[0]
+    model_str = f"{filename}_e{epochs}_x{scale}_bs{batch_size}_cs{crop_size}"
+    model_path = "pretrained_models/" + model_str + ".pth"
+    torch.save(model.state_dict(), model_path)
+
+
+def train(filepath: str):
+    # Setup
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    config = load_yaml_into_config("config.yaml")
+    print(f"Device: {device}")
+    config = load_yaml_into_config(filepath)
+    print(config)
+
+    # Hyperparameters
     batch_size = config.batch_size
     epochs = config.epochs
     num_workers = config.number_workers
@@ -43,7 +60,7 @@ def main() -> None:
     for epoch in tqdm(range(epochs), desc='Train & Validate', dynamic_ncols=True):
         # train loop
         total_loss = 0.0
-        for lr_image, hr_image in tqdm(train_loader, desc=f'Training, Epoch {epoch+1}/{epochs}', dynamic_ncols=True):
+        for lr_image, hr_image in tqdm(train_loader, desc=f'Training, Epoch {epoch + 1}/{epochs}', dynamic_ncols=True):
             input, target = lr_image.to(device), hr_image.to(device)
             optimizer.zero_grad()
             output = model(input)
@@ -62,10 +79,10 @@ def main() -> None:
             print(f"Loss: {average_loss:.4f}\n")
 
         # val loop
-        if (epoch+1) % 10 != 0:
+        if (epoch + 1) % 10 != 0:
             continue
         total_metrics = (0, 0)
-        for lr_image, hr_image in tqdm(val_loader, desc=f"Validation, Epoch {epoch+1}/{epochs}", dynamic_ncols=True):
+        for lr_image, hr_image in tqdm(val_loader, desc=f"Validation, Epoch {epoch + 1}/{epochs}", dynamic_ncols=True):
             lr_image, hr_image = lr_image.to(device), hr_image.to(device)
             with torch.no_grad():
                 output_image = model(lr_image)
@@ -78,10 +95,13 @@ def main() -> None:
         print(f"PSNR: {average_metric[0]:.2f} db, SSIM: {average_metric[1]:.4f}\n")
 
     # Save trained models
-    filename = config.filename
-    model_str = f"{filename}_e{epochs}_x{scale}_bs{batch_size}_ps{crop_size}"
-    model_path = "pretrained_models/" + model_str + ".pth"
-    torch.save(model.state_dict(), model_path)
+    save_model(batch_size, config, crop_size, epochs, model, scale)
+
+
+def main() -> None:
+    args = parse_arguments()
+    file_path = args.file_path
+    train(file_path)
 
 
 # Press the green button in the gutter to run the script.

@@ -16,7 +16,7 @@ def main() -> None:
     evaluate_dataset = CustomDataset(root='dataset/Set14', transform=transform, pattern="x2")
 
     # Loading models
-    model_path = "pretrained_models/extranet_e150_x2_bs16_ps128.pth"
+    model_path = "pretrained_models/extranet_e150_x2_bs4_cs256.pth"
     model = ExtraNet(2).to(device)
 
     model.load_state_dict(torch.load(model_path))

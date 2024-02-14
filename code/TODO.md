@@ -34,41 +34,36 @@ General:
 
 ## General
 
-- [ ] abstract loading different networks based on model path / string
+- [x] abstract loading different networks based on model path / string
 - [x] only use DIV2K to train and evaluate/test
 - [x] add a validation to the training script
 - [ ] make it easy to train with no patchsize (crop/pad if input images are not suitable for down-/up-sampling multiple times) maybe add a variable into the model files for that?
 
 ### Config
 
-VARS_IN
+```yaml
+MODEL: ExtraNet
+EPOCHS: 150
+SCALE: 2
+BATCH_SIZE: 4
+CROP_SIZE: 256
+NUMBER_WORKERS: 8
+LEARNING_RATE: 0.001
+CRITERION: L1
+OPTIMIZER:
+  NAME: Adam
+  BETA1: 0.9
+  BETA2: 0.99
+SCHEDULER:
+  NAME: Cosine
+  MIN_LEARNING_RATE: 1.0e-06
+  START_DECAY_EPOCH: 20
+TRAIN_DATASET: dataset/DIV2K/train
+VAL_DATASET: dataset/DIV2K/val
+```
 
-MODEL_NAME: str
-
-EPOCHS: int = 100
-
-SCALE: int = 2
-
-LEARNING_RATE: float = 0.001
-
-OPTIMIZER: str = adam
-
-SCHEDULER: str = null
-
-START_DECAY_EPOCH: int = null
-
-BATCH_SIZE: int = 1
-
-PATCH_SIZE: int = null
-
-NUMBER_WORKERS: int = 8
-
-TRAIN_DATASET: str = DIV2K/train
-
-VAL_DATASET: str = DIV2K/val
-
-- [ ] valid config file -> yaml parser -> make class called config, load from yaml
-- [ ] model_name, scheduler, optimizer -> class object return
+- [x] valid config file -> yaml parser -> make class called config, load from yaml
+- [x] model_name, scheduler, optimizer -> class object return
 
 ### Nice to know
 
@@ -141,7 +136,7 @@ HD
 
 ## Evaluation
 
-- [ ] Write evaluation results in one csv file
+- [ ] Write evaluation results in one csv file based on config file
 
 We want to evaluate on:
 - [x] PSNR
