@@ -25,6 +25,7 @@ def create_csv(data_file_path: str, csv_file_path: str) -> None:
     df.to_csv(csv_file_path)
 
 
+# TODO
 def add_to_csv(data_file_path: str, csv_file_path: str) -> None:
     # Read from yaml file
     with open(data_file_path, 'r') as file:
@@ -32,7 +33,7 @@ def add_to_csv(data_file_path: str, csv_file_path: str) -> None:
         data = flatten_dict(data)
     # Create dataframe from csv file
     df = pd.read_csv(csv_file_path)
-    idx = df.shape[1] - 1
+    idx = df.shape[1]
     # Insert the config file data into the old csv
     df.insert(idx, idx+1, data)
     df.to_csv(csv_file_path)
@@ -43,7 +44,7 @@ def main():
     data_file_path2 = 'configs/extranet.yaml'
     csv_file_path = "results2.csv"
 
-    # create_csv(data_file_path1, csv_file_path)
+    create_csv(data_file_path1, csv_file_path)
     add_to_csv(data_file_path2, csv_file_path)
 
 

@@ -39,6 +39,25 @@ def pad_or_crop_to_target(input_t: torch.FloatTensor, target_t: torch.FloatTenso
 
 
 # Metrics
+class Metrics:
+    def __init__(self, psnr_value=0.0, ssim_value=0.0):
+        self.psnr: float = psnr_value
+        self.ssim: float = ssim_value
+
+    def __add__(self, other):
+        if not isinstance(other, Metrics):
+            raise TypeError(f"Can't add type {other} to a Metric instance.")
+        return Metrics(self.psnr + other.psnr, self.ssim + other.ssim)
+
+    def __truediv__(self, divisor):
+        if not isinstance(divisor, (int, float)):
+            raise TypeError(f"Unsupported type for division: {type(divisor)}")
+        return Metrics(self.psnr / divisor, self.ssim / divisor)
+
+    def __str__(self):
+        return f"PSNR {self.psnr:.2f} dB | SSIM {self.ssim:.2f}"
+
+
 def calculate_psnr(input_t: torch.FloatTensor, target_t: torch.FloatTensor, data_range: float = 1.0) -> float:
     mse = nn.functional.mse_loss(input_t, target_t)
     psnr_value = 10 * torch.log10((data_range ** 2) / mse)
@@ -63,7 +82,7 @@ def calculate_ssim(img1_t: torch.FloatTensor, img2_t: torch.FloatTensor) -> floa
     return ssim_value
 
 
-def calculate_metrics(img1_t: torch.FloatTensor, img2_t: torch.FloatTensor) -> (torch.FloatTensor, torch.FloatTensor):
+def calculate_metrics(img1_t: torch.FloatTensor, img2_t: torch.FloatTensor) -> Metrics:
     psnr_value = calculate_psnr(img1_t, img2_t)
     ssim_value = calculate_ssim(img1_t, img2_t)
-    return psnr_value, ssim_value
+    return Metrics(psnr_value, ssim_value)

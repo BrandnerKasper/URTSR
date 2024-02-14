@@ -137,14 +137,25 @@ HD
 
 ## Evaluation
 
-- [ ] Load model based on pretrained model filename
-- [ ] Write everything into one config file? or use evaluation config file? and write results into them?
-- [ ] Write evaluation results in one csv file based on config .yaml file
-- [ ] Clean up evalaute.py by removing the comparison of bilinear, bicubic and the network
-- [ ] Add entries for bilinear and bicubic for every evaluation dataset so we can compare more easily
-- [x] Load config files into pandas dataframe
-- [x] Save dataframe into csv file
+### General
+- [x] Load model based on pretrained model filename
+- [x] Clean up evalaute.py by removing the comparison of bilinear, bicubic and the network
+- [ ] Load config files into pandas dataframe
+- [ ] Save dataframe into csv file
 
+hardcode on which datasets will be evaluated:
+- [x] Set5
+- [x] Set14
+- [x] Urban100
+
+### Results
+After calling evaluate.py with config.yaml we want to create a result.yaml file containing:
+- [ ] the train details (same as config.yaml)
+- [ ] results in form of for each dataset PSNR and SSIM value
+- [ ] write a results.py script, which generates a csv file based on all result files
+- [ ] add "pseudo" entry results for bilinear and bicubic (will have None for model details only name)
+
+### Metrics
 We want to evaluate on:
 - [x] PSNR
 - [x] SSIM all channels -> mean
