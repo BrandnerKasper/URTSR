@@ -3,8 +3,16 @@ from dataloader import CustomDataset
 from torchvision import transforms
 import torch
 import utils
+import argparse
 
 from config import load_yaml_into_config
+
+
+def parse_arguments() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="Evaluate a trained SR network based on a config file.")
+    parser.add_argument('file_path', type=str, nargs='?', default='configs/extranet.yaml', help="Path to the config file")
+    args = parser.parse_args()
+    return args
 
 
 def evaluate(config_path: str) -> None:
@@ -130,7 +138,9 @@ def evaluate_trad(config_path: str) -> None:
 
 def main() -> None:
     config_path = "configs/extranet.yaml"
-    evaluate(config_path)
+    args = parse_arguments()
+    file_path = args.file_path
+    evaluate(file_path)
 
 
 if __name__ == '__main__':
