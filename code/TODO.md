@@ -25,7 +25,7 @@ General:
 - [x] adjust training details to ExtraNet's parameter (Cosine learning rate decay, beta 1 and 2 of adam)
 - [ ] add a 'how often is the image divided' number to every model so it can be abstracted for train, evaluate and test
 - [ ] train for far longer (roughly 20 hours) with 500.000 iterations with batch size of 32 and crop size of 64 with flips and rotations!
-- [ ] checkout the formula in BasicSR for calculating the epochs amount based on iterations/dataset.size (check if batch size influences sth here) -> 
+- [ ] checkout the formula in BasicSR for calculating the epochs amount based on iterations/dataset.size (check if batch size influences sth here)
 
 ## Data Loader
 
@@ -34,6 +34,10 @@ General:
 - [x] [crop](https://pytorch.org/vision/main/generated/torchvision.transforms.RandomCrop.html) images into smaller parts so more can be processed in parallel (batch size > 1)
 - [x] crop/pad image to hr output size if needed (padding for image when there dimensions are not dividable by 2^x where x the number of up/down-sampling steps)
 - [ ] Random Cropping images and batching them does not increase the speed of my training (bottleneck is most likely the loading image from path process)
+
+For training:
+- [ ] flip images
+- [ ] rotate images
 
 ## General
 
@@ -142,8 +146,8 @@ HD
 ### General
 - [x] Load model based on pretrained model filename
 - [x] Clean up evalaute.py by removing the comparison of bilinear, bicubic and the network
-- [ ] Load config files into pandas dataframe
-- [ ] Save dataframe into csv file
+- [x] Load config files into pandas dataframe
+- [x] Save dataframe into csv file
 
 hardcode on which datasets will be evaluated:
 - [x] Set5
@@ -152,10 +156,10 @@ hardcode on which datasets will be evaluated:
 
 ### Results
 After calling evaluate.py with config.yaml we want to create a result.yaml file containing:
-- [ ] the train details (same as config.yaml)
-- [ ] results in form of for each dataset PSNR and SSIM value
-- [ ] write a results.py script, which generates a csv file based on all result files
-- [ ] add "pseudo" entry results for bilinear and bicubic (will have None for model details only name)
+- [x] the train details (same as config.yaml)
+- [x] results in form of for each dataset PSNR and SSIM value
+- [x] write a results.py script, which generates a csv file based on all result files
+- [x] add "pseudo" entry results for bilinear and bicubic (will have None for model details only name)
 
 ### Metrics
 We want to evaluate on:
@@ -170,3 +174,26 @@ Against:
 - [ ] FSR
 - [ ] XeSS
 - [ ] TSR
+
+
+## Code Quality
+Add Tests for:
+- [ ] train.py
+- [ ] evaluate.py
+- [ ] test.py
+- [ ] datalaoder.py
+- [ ] config.py
+- [ ] utils.py
+- [ ] results.py
+- [ ] size.py
+
+### Documentation:
+Add documentation for fcts in form of javadoc strings:
+- [ ] train.py
+- [ ] evaluate.py
+- [ ] test.py
+- [ ] datalaoder.py
+- [ ] config.py
+- [ ] utils.py
+- [ ] results.py
+- [ ] size.py
