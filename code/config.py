@@ -151,7 +151,7 @@ def load_yaml_into_config(file_path: str) -> Config:
         start_decay_epoch = scheduler["START_DECAY_EPOCH"]
         train_data = config_dict["TRAIN_DATASET"]
         val_data = config_dict["VAL_DATASET"]
-        filename = file_path.split('/')[-1]
+        filename = file_path.split('/')[-1].split('.')[0]
 
     return Config(filename, model_name, epochs, scale, batch_size, crop_size, number_workers,
                   learning_rate, criterion, optimizer, scheduler, start_decay_epoch,

@@ -82,18 +82,18 @@ def train(filepath: str):
         # val loop
         if (epoch + 1) % 10 != 0:
             continue
-        total_metrics = (0, 0)
+        total_metrics = utils.Metrics()
         for lr_image, hr_image in tqdm(val_loader, desc=f"Validation, Epoch {epoch + 1}/{epochs}", dynamic_ncols=True):
             lr_image, hr_image = lr_image.to(device), hr_image.to(device)
             with torch.no_grad():
                 output_image = model(lr_image)
                 output_image = torch.clamp(output_image, min=0.0, max=1.0)
             metrics = utils.calculate_metrics(hr_image, output_image)
-            total_metrics = tuple(x + y for x, y in zip(total_metrics, metrics))
+            total_metrics += metrics
         # PSNR & SSIM
-        average_metric = tuple(x / len(val_loader) for x in total_metrics)
+        average_metric = total_metrics / len(val_loader)
         print("\n")
-        print(f"PSNR: {average_metric[0]:.2f} db, SSIM: {average_metric[1]:.4f}\n")
+        print(f"PSNR: {average_metric.psnr:.2f} db, SSIM: {average_metric.ssim:.4f}\n")
 
     # Save trained models
     save_model(batch_size, config, crop_size, epochs, model, scale)

@@ -1,5 +1,7 @@
 import yaml
 import pandas as pd
+import os
+import glob
 
 
 def flatten_dict(d, parent_key='', sep='_'):
@@ -14,38 +16,28 @@ def flatten_dict(d, parent_key='', sep='_'):
     return dict(items)
 
 
-def create_csv(data_file_path: str, csv_file_path: str) -> None:
-    # Read from yaml file
-    with open(data_file_path, 'r') as file:
-        data = yaml.safe_load(file)
-        data = flatten_dict(data)
+def create_csv(folder_path: str) -> None:
+    d_list = []
+    # Iterate over all YAML files in the folder
+    for file_path in sorted(glob.glob(os.path.join(folder_path, '*.yaml'))):
+        with open(file_path, 'r') as file:
+            data = yaml.safe_load(file)
+            data = flatten_dict(data)
+            # Process data as needed
+            print(f"Processing {file_path}:\n{data}")
+            d_list.append(data)
+
     # Create new dataframe from yaml
-    df = pd.DataFrame.from_dict(data, orient='index', columns=['1'])
+    # df = pd.DataFrame.from_dict(data, orient='index', columns=['1'])
+    df = pd.DataFrame(d_list).T
     # Save to csv file
-    df.to_csv(csv_file_path)
-
-
-# TODO
-def add_to_csv(data_file_path: str, csv_file_path: str) -> None:
-    # Read from yaml file
-    with open(data_file_path, 'r') as file:
-        data = yaml.safe_load(file)
-        data = flatten_dict(data)
-    # Create dataframe from csv file
-    df = pd.read_csv(csv_file_path)
-    idx = df.shape[1]
-    # Insert the config file data into the old csv
-    df.insert(idx, idx+1, data)
-    df.to_csv(csv_file_path)
+    df.to_csv("results/results.csv")
 
 
 def main():
-    data_file_path1 = 'configs/srcnn.yaml'
-    data_file_path2 = 'configs/extranet.yaml'
-    csv_file_path = "results2.csv"
+    folder_path = "results"
 
-    create_csv(data_file_path1, csv_file_path)
-    add_to_csv(data_file_path2, csv_file_path)
+    create_csv(folder_path)
 
 
 if __name__ == '__main__':
