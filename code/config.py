@@ -6,6 +6,7 @@ import torch.optim.lr_scheduler as lr_scheduler
 
 from typing import Optional
 
+from models.basemodel import BaseModel
 from models.srcnn import SRCNN
 from models.subpixel import SubPixelNN
 from models.extraNet import ExtraNet
@@ -38,7 +39,7 @@ def create_yaml(filename: str, model: str, epochs: int, scale: int, batch_size: 
     return yaml_text
 
 
-def init_model(model_name: str, scale: int) -> nn.Module:
+def init_model(model_name: str, scale: int) -> BaseModel:
     match model_name:
         case "SRCNN":
             return SRCNN(scale=scale)
@@ -87,7 +88,7 @@ class Config:
                 learning_rate: float, criterion: str, optimizer: dict, scheduler: dict, start_decay_epoch: Optional[int],
                 train_dataset: str, val_dataset: str):
         self.filename: str = filename
-        self.model: nn.Module = init_model(model, scale)
+        self.model: BaseModel = init_model(model, scale)
         self.epochs: int = epochs
         self.scale: int = scale
         self.batch_size: int = batch_size

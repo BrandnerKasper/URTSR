@@ -1,12 +1,12 @@
 import torch
 import torch.nn as nn
 
+from .basemodel import BaseModel
 
-class ExtraNet(nn.Module):
+
+class ExtraNet(BaseModel):
     def __init__(self, scale: int):
-        super(ExtraNet, self).__init__()
-
-        self.scale = scale
+        super(ExtraNet, self).__init__(scale=scale, down_and_up=3)
 
         self.conv_in = nn.Sequential(
             nn.Conv2d(3, 24, kernel_size=3, stride=1, padding=1), # the original paper uses 18 as first in_channels!

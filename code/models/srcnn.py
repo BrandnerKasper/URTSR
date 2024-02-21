@@ -1,12 +1,10 @@
 import torch.nn as nn
-import torch.nn.functional
+from basemodel import BaseModel
 
 
-class SRCNN(nn.Module):
+class SRCNN(BaseModel):
     def __init__(self, scale):
-        super(SRCNN, self).__init__()
-
-        self.scale = scale
+        super(SRCNN, self).__init__(scale=scale)
 
         self.conv1 = nn.Conv2d(3, 64, kernel_size=9, padding=4, stride=1) # k // 2
         self.conv2 = nn.Conv2d(64, 32, kernel_size=1, padding=0)
@@ -16,7 +14,7 @@ class SRCNN(nn.Module):
 
     def forward(self, x):
         # Upscaling my lr image by times 2 to have the same tensor size than the hr image
-        x = torch.nn.functional.interpolate(x, scale_factor=self.scale, mode="bilinear")
+        x = nn.functional.interpolate(x, scale_factor=self.scale, mode="bilinear")
         # Input shape: (batch_size, channels, height, width)
         x = self.gelu(self.conv1(x))
         x = self.gelu(self.conv2(x))

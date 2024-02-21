@@ -59,7 +59,7 @@ def evaluate(pretrained_model_path: str) -> None:
             lr_image, hr_image = evaluate_dataset.__getitem__(i)
             lr_image, hr_image = lr_image.to(device), hr_image.to(device)
 
-            lr_image_model = utils.pad_to_divisible(lr_image.unsqueeze(0), 8)
+            lr_image_model = utils.pad_to_divisible(lr_image.unsqueeze(0), model.down_and_up * 2)
 
             with torch.no_grad():
                 output_image = model(lr_image_model).squeeze(0)

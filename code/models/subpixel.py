@@ -1,11 +1,11 @@
 import torch.nn as nn
 
+from .basemodel import BaseModel
 
-class SubPixelNN(nn.Module):
+
+class SubPixelNN(BaseModel):
     def __init__(self, scale: int):
-        super(SubPixelNN, self).__init__()
-
-        self.scale = scale
+        super(SubPixelNN, self).__init__(scale=scale)
 
         # Feature extraction
         self.features = nn.Sequential(

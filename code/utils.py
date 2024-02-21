@@ -15,6 +15,8 @@ def upscale(lr_tensor: torch.Tensor, scale_factor: int, upscale_mode: str = 'bic
 
 # Padding & Cropping
 def pad_to_divisible(image_tensor: torch.Tensor, factor: int) -> Tensor:
+    if factor == 0:
+        return image_tensor
     _, _, height, width = image_tensor.size()
     pad_height = (factor - height % factor) % factor
     pad_width = (factor - width % factor) % factor
