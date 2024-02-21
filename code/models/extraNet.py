@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 
-from .basemodel import BaseModel
+from code.models.basemodel import BaseModel
 
 
 class ExtraNet(BaseModel):

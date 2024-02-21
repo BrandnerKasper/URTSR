@@ -40,6 +40,14 @@ def get_random_crop_pair(lr_tensor: torch.Tensor, hr_tensor: torch.Tensor, patch
     return lr_tensor_patch, hr_tensor_patch
 
 
+def rotate_image(img: torch.Tensor, angle: int) -> torch.Tensor:
+    return F.rotate(img, angle)
+
+
+def flip_image_horizontal(img: torch.Tensor) -> torch.Tensor:
+    return F.hflip(img)
+
+
 class CustomDataset(Dataset):
     def __init__(self, root: str, transform=transforms.ToTensor(), pattern: str = None,
                  crop_size: int = None, scale: int = 2):
@@ -67,8 +75,21 @@ class CustomDataset(Dataset):
         lr_image = self.transform(lr_image)
         hr_image = self.transform(hr_image)
 
+        # Randomly crop image
         if self.crop_size:
             lr_image, hr_image = get_random_crop_pair(lr_image, hr_image, self.crop_size, self.scale)
+
+        # Apply random rotation
+        if self.use_rotation:
+            angle = random.randint(0, 360)
+            lr_image = rotate_image(lr_image, angle)
+            hr_image = rotate_image(hr_image, angle)
+
+        # Apply random horizontal flip
+        if self.use_hflip:
+            if random.random() > 0.5:
+                lr_image = F.hflip(lr_image)
+                hr_image = F.hflip(hr_image)
 
         return lr_image, hr_image
 

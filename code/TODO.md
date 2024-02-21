@@ -48,7 +48,10 @@ Boost Performance by:
 - [x] abstract loading different networks based on model path / string
 - [x] only use DIV2K to train and evaluate/test
 - [x] add a validation to the training script
-- [ ] make it easy to train with no patchsize (crop/pad if input images are not suitable for down-/up-sampling multiple times) maybe add a variable into the model files for that?
+- [x] make it easy to train with no patchsize (crop/pad if input images are not suitable for down-/up-sampling multiple times) maybe add a variable into the model files for that?
+
+### Size
+- [ ] abstract size.py to use config to summary network model and size for training and testing
 
 ### Config
 
