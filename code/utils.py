@@ -9,12 +9,12 @@ from torch import Tensor
 
 
 # Upscale
-def upscale(lr_tensor: torch.FloatTensor, scale_factor: int, upscale_mode: str = 'bicubic') -> torch.FloatTensor:
+def upscale(lr_tensor: torch.Tensor, scale_factor: int, upscale_mode: str = 'bicubic') -> torch.Tensor:
     return nn.functional.interpolate(lr_tensor, scale_factor=scale_factor, mode=upscale_mode).squeeze(0)
 
 
 # Padding & Cropping
-def pad_to_divisible(image_tensor: torch.FloatTensor, factor: int) -> Tensor:
+def pad_to_divisible(image_tensor: torch.Tensor, factor: int) -> Tensor:
     _, _, height, width = image_tensor.size()
     pad_height = (factor - height % factor) % factor
     pad_width = (factor - width % factor) % factor
@@ -22,7 +22,7 @@ def pad_to_divisible(image_tensor: torch.FloatTensor, factor: int) -> Tensor:
     return padded_image
 
 
-def pad_or_crop_to_target(input_t: torch.FloatTensor, target_t: torch.FloatTensor) -> Tensor:
+def pad_or_crop_to_target(input_t: torch.Tensor, target_t: torch.Tensor) -> Tensor:
     _, height, width = input_t.size()
     _, target_height, target_width = target_t.size()
     if height < target_height:
@@ -58,13 +58,13 @@ class Metrics:
         return f"PSNR {self.psnr:.2f} dB | SSIM {self.ssim:.2f}"
 
 
-def calculate_psnr(input_t: torch.FloatTensor, target_t: torch.FloatTensor, data_range: float = 1.0) -> float:
+def calculate_psnr(input_t: torch.Tensor, target_t: torch.Tensor, data_range: float = 1.0) -> float:
     mse = nn.functional.mse_loss(input_t, target_t)
     psnr_value = 10 * torch.log10((data_range ** 2) / mse)
     return psnr_value.item()
 
 
-def calculate_ssim(img1_t: torch.FloatTensor, img2_t: torch.FloatTensor) -> float:
+def calculate_ssim(img1_t: torch.Tensor, img2_t: torch.Tensor) -> float:
     """Calculate SSIM (structural similarity) for RGB images."""
     assert img1_t.shape == img2_t.shape, f'Image shapes are different: {img1_t.shape}, {img2_t.shape}.'
 
@@ -82,7 +82,7 @@ def calculate_ssim(img1_t: torch.FloatTensor, img2_t: torch.FloatTensor) -> floa
     return ssim_value
 
 
-def calculate_metrics(img1_t: torch.FloatTensor, img2_t: torch.FloatTensor) -> Metrics:
+def calculate_metrics(img1_t: torch.Tensor, img2_t: torch.Tensor) -> Metrics:
     psnr_value = calculate_psnr(img1_t, img2_t)
     ssim_value = calculate_ssim(img1_t, img2_t)
     return Metrics(psnr_value, ssim_value)

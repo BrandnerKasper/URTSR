@@ -33,11 +33,15 @@ General:
 - [x] get name of lr/hr image
 - [x] [crop](https://pytorch.org/vision/main/generated/torchvision.transforms.RandomCrop.html) images into smaller parts so more can be processed in parallel (batch size > 1)
 - [x] crop/pad image to hr output size if needed (padding for image when there dimensions are not dividable by 2^x where x the number of up/down-sampling steps)
-- [ ] Random Cropping images and batching them does not increase the speed of my training (bottleneck is most likely the loading image from path process)
 
 For training:
 - [ ] flip images
 - [ ] rotate images
+
+Random Cropping images and batching them does not increase the speed of my training (bottleneck is most likely the loading image from path process)
+Boost Performance by:
+- [ ] preprocessing the image pairs as tensor in one .npz file and load them
+- [ ] use a similiar logic like BasicSR by using a Custom Data Sampler
 
 ## General
 
