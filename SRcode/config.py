@@ -12,8 +12,9 @@ from models.subpixel import SubPixelNN
 from models.extraNet import ExtraNet
 
 
-def create_yaml(filename: str, model: str, epochs: int, scale: int, batch_size: int, crop_size: int,  number_workers: int,
-                learning_rate: float, criterion: str, optimizer: dict, scheduler: dict,
+def create_yaml(filename: str, model: str, epochs: int, scale: int, batch_size: int,
+                crop_size: int,  use_hflip: bool, use_rotation: bool,
+                number_workers: int, learning_rate: float, criterion: str, optimizer: dict, scheduler: dict,
                 train_dataset: str, val_dataset: str):
 
     data = {
@@ -22,6 +23,8 @@ def create_yaml(filename: str, model: str, epochs: int, scale: int, batch_size: 
         "SCALE": scale,
         "BATCH_SIZE": batch_size,
         "CROP_SIZE": crop_size,
+        "USE_HFLIP": use_hflip,
+        "USE_ROTATION": use_rotation,
         "NUMBER_WORKERS": number_workers,
         "LEARNING_RATE": learning_rate,
         "CRITERION": criterion,
@@ -84,15 +87,19 @@ def init_scheduler(scheduler_data: dict, optimizer: optim.Optimizer, epochs: int
 
 
 class Config:
-    def __init__(self, filename: str, model: str, epochs: int, scale: int, batch_size: int, crop_size: int,  number_workers: int,
-                learning_rate: float, criterion: str, optimizer: dict, scheduler: dict, start_decay_epoch: Optional[int],
-                train_dataset: str, val_dataset: str):
+    def __init__(self, filename: str, model: str, epochs: int, scale: int, batch_size: int,
+                 crop_size: int, use_hflip: bool, use_rotation: bool, number_workers: int,
+                 learning_rate: float, criterion: str, optimizer: dict, scheduler: dict,
+                 start_decay_epoch: Optional[int],
+                 train_dataset: str, val_dataset: str):
         self.filename: str = filename
         self.model: BaseModel = init_model(model, scale)
         self.epochs: int = epochs
         self.scale: int = scale
         self.batch_size: int = batch_size
         self.crop_size: int = crop_size
+        self.use_hflip: bool = use_hflip
+        self.use_rotation: bool = use_rotation
         self.number_workers: int = number_workers
         self.learning_rate: float = learning_rate
         self.criterion: _Loss = init_criterion(criterion)
@@ -110,6 +117,8 @@ class Config:
                f"  Scale: {self.scale}\n" \
                f"  Batch Size: {self.batch_size}\n" \
                f"  Crop Size: {self.crop_size}\n" \
+               f"  Use HFlip: {self.use_hflip}\n"\
+               f"  Use Rotation: {self.use_rotation}\n" \
                f"  Number of Workers: {self.number_workers}\n" \
                f"  Learning Rate: {self.learning_rate}\n" \
                f"  Criterion: {self.criterion.__class__.__name__}\n" \
@@ -131,7 +140,8 @@ def test_yaml_creation() -> None:
         "MIN_LEARNING_RATE": 1e-6,
         "START_DECAY_EPOCH": 20,
     }
-    create_yaml("config", "ExtraNet", 150, 2, 1, 256, 8,
+    create_yaml("config", "ExtraNet", 150, 2, 1,
+                256, True, True, 8,
                 0.001, "L1", optimizer, scheduler,
                 "DIV2K/train", "DIV2K/val")
 
@@ -144,6 +154,8 @@ def load_yaml_into_config(file_path: str) -> Config:
         scale = config_dict["SCALE"]
         batch_size = config_dict["BATCH_SIZE"]
         crop_size = config_dict["CROP_SIZE"]
+        use_hflip = config_dict["USE_HFLIP"]
+        use_rotation = config_dict["USE_ROTATION"]
         number_workers = config_dict["NUMBER_WORKERS"]
         learning_rate = config_dict["LEARNING_RATE"]
         criterion = config_dict["CRITERION"]
@@ -154,13 +166,14 @@ def load_yaml_into_config(file_path: str) -> Config:
         val_data = config_dict["VAL_DATASET"]
         filename = file_path.split('/')[-1].split('.')[0]
 
-    return Config(filename, model_name, epochs, scale, batch_size, crop_size, number_workers,
+    return Config(filename, model_name, epochs, scale, batch_size,
+                  crop_size, use_hflip, use_rotation, number_workers,
                   learning_rate, criterion, optimizer, scheduler, start_decay_epoch,
                   train_data, val_data)
 
 
 def main() -> None:
-    # test_yaml_creation()
+    test_yaml_creation()
     yaml_config = load_yaml_into_config("configs/srcnn.yaml")
     print(yaml_config)
 

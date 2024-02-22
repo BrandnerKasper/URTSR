@@ -1,11 +1,13 @@
 import unittest
-from code.dataloader import *
+import torch
 import numpy as np
+
+from SRcode.dataloader import *
 
 
 class TestDataLoader(unittest.TestCase):
 
-    def test_random_crop(self):
+    def test_random_crop_pair(self):
         # Input images
         lr_image = torch.tensor([[[1, 2], [3, 4]]])
         hr_image = torch.tensor([[[1, 1, 2, 2], [1, 1, 2, 2], [3, 3, 4, 4], [3, 3, 4, 4]]])
@@ -46,6 +48,30 @@ class TestDataLoader(unittest.TestCase):
         print(f"Actual shapes: ({lr_patch.shape}, {hr_patch.shape}")
         print(f"Expected shapes: ({expected_lr_patch_shape}, {expected_hr_patch_shape}")
 
+    def test_flip_image_horizontal(self):
+        img = torch.tensor([[[1, 2], [3, 4]]])
+        flipped_img = flip_image_horizontal(img)
+        expected_flipped_img = torch.tensor([[[2, 1], [4, 3]]])
+
+        # Check if flip is as expected
+        self.assertTrue(torch.equal(flipped_img, expected_flipped_img),
+                        f"Flipped image {flipped_img} and expected {expected_flipped_img}")
+        print(f"Img {img.numpy()}")
+        print(f"Flipped img {flipped_img.numpy()}")
+        print(f"Expected Img {expected_flipped_img.numpy()}")
+
+    def test_flip_image_vertical(self):
+        img = torch.tensor([[[1, 2], [3, 4]]])
+        flipped_img = flip_image_vertical(img)
+        expected_flipped_img = torch.tensor([[[3, 4], [1, 2]]])
+
+        # Check if flip is as expected
+        self.assertTrue(torch.equal(flipped_img, expected_flipped_img),
+                        f"Flipped image {flipped_img} and expected {expected_flipped_img}")
+        print(f"Img {img.numpy()}")
+        print(f"Flipped img {flipped_img.numpy()}")
+        print(f"Expected Img {expected_flipped_img.numpy()}")
+
     def test_rotate_image(self):
         img = torch.tensor([[[1, 2], [3, 4]]])
         rotated_img = rotate_image(img, 90)
@@ -54,6 +80,9 @@ class TestDataLoader(unittest.TestCase):
         # Check if the rotated image is as expected
         self.assertTrue(torch.equal(rotated_img, expected_rotated_img),
                         f"Rotated image {rotated_img} and expected {expected_rotated_img}")
+        print(f"Img {img.numpy()}")
+        print(f"Rotated img {rotated_img.numpy()}")
+        print(f"Expected img {expected_rotated_img.numpy()}")
 
 
 if __name__ == '__main__':

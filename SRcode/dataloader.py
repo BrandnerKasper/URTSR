@@ -40,23 +40,30 @@ def get_random_crop_pair(lr_tensor: torch.Tensor, hr_tensor: torch.Tensor, patch
     return lr_tensor_patch, hr_tensor_patch
 
 
-def rotate_image(img: torch.Tensor, angle: int) -> torch.Tensor:
-    return F.rotate(img, angle)
-
-
 def flip_image_horizontal(img: torch.Tensor) -> torch.Tensor:
     return F.hflip(img)
 
 
+def flip_image_vertical(img: torch.Tensor) -> torch.Tensor:
+    return F.vflip(img)
+
+
+def rotate_image(img: torch.Tensor, angle: int) -> torch.Tensor:
+    return F.rotate(img, angle)
+
+
 class CustomDataset(Dataset):
     def __init__(self, root: str, transform=transforms.ToTensor(), pattern: str = None,
-                 crop_size: int = None, scale: int = 2):
+                 crop_size: int = None, scale: int = 2,
+                 use_hflip: bool = False, use_rotation: bool = False):
         self.root_hr = os.path.join(root, "HR")
         self.root_lr = os.path.join(root, "LR")
         self.transform = transform
         self.pattern = pattern
         self.crop_size = crop_size
         self.scale = scale
+        self.use_hflip = use_hflip
+        self.use_rotation = use_rotation
         self.filenames = init_filenames(self.root_hr, self.root_lr, self.pattern)
 
     def __len__(self) -> int:
@@ -79,19 +86,29 @@ class CustomDataset(Dataset):
         if self.crop_size:
             lr_image, hr_image = get_random_crop_pair(lr_image, hr_image, self.crop_size, self.scale)
 
-        # Apply random rotation
-        if self.use_rotation:
-            angle = random.randint(0, 360)
-            lr_image = rotate_image(lr_image, angle)
-            hr_image = rotate_image(hr_image, angle)
+        # Augment image by h and v flip and rot by 90
+        hr_image, lr_image = self.augment(hr_image, lr_image)
 
+        return lr_image, hr_image
+
+    def augment(self, hr_image, lr_image) -> (torch.Tensor, torch.Tensor):
         # Apply random horizontal flip
         if self.use_hflip:
             if random.random() > 0.5:
-                lr_image = F.hflip(lr_image)
-                hr_image = F.hflip(hr_image)
+                lr_image = flip_image_horizontal(lr_image)
+                hr_image = flip_image_horizontal(hr_image)
 
-        return lr_image, hr_image
+        # Apply random rotation by v flipping and rot of 90
+        if self.use_rotation:
+            if random.random() > 0.5:
+                lr_image = flip_image_vertical(lr_image)
+                hr_image = flip_image_vertical(hr_image)
+        if self.use_rotation:
+            if random.random() > 0.5:
+                angle = -90  # for clockwise rotation like BasicSR
+                lr_image = rotate_image(lr_image, angle)
+                hr_image = rotate_image(hr_image, angle)
+        return hr_image, lr_image
 
     def get_filename(self, idx: int) -> str:
         path = self.filenames[idx]
@@ -110,7 +127,8 @@ def main() -> None:
     execution_time_filenames = timeit.timeit(lambda: init_filenames(root_hr, root_lr, pattern), number=1)
     print(f"Execution time of filenames: {execution_time_filenames} seconds")
 
-    dataset = CustomDataset(root="dataset/DIV2K/train", pattern=pattern, crop_size=256, scale=2)
+    dataset = CustomDataset(root="dataset/DIV2K/train", pattern=pattern, crop_size=128, scale=2,
+                            use_hflip=True, use_rotation=True)
 
     for lr_image, hr_image in dataset:
         lr_image = F.to_pil_image(lr_image)
