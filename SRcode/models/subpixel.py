@@ -1,6 +1,6 @@
 import torch.nn as nn
 
-from SRcode.models.basemodel import BaseModel
+from .basemodel import BaseModel
 
 
 class SubPixelNN(BaseModel):
