@@ -35,8 +35,8 @@ General:
 - [x] crop/pad image to hr output size if needed (padding for image when there dimensions are not dividable by 2^x where x the number of up/down-sampling steps)
 
 For training:
-- [ ] flip images
-- [ ] rotate images
+- [x] flip images (hflip)
+- [x] rotate images (by vflip + 90 degree = 0, 90, 180, 270) -> total augmentation times 8 (800 * 8 = 6400)
 
 Random Cropping images and batching them does not increase the speed of my training (bottleneck is most likely the loading image from path process)
 Boost Performance by:
