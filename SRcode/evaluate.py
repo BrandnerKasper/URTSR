@@ -10,7 +10,7 @@ from config import load_yaml_into_config, Config
 
 def parse_arguments() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Evaluate a trained SR network based on a pretrained model file.")
-    parser.add_argument('file_path', type=str, nargs='?', default='pretrained_models/extranet.pth',
+    parser.add_argument('file_path', type=str, nargs='?', default='pretrained_models/extranet_4.pth',
                         help="Path to the pretrained model .pth file")
     args = parser.parse_args()
     return args
@@ -49,8 +49,7 @@ def evaluate(pretrained_model_path: str) -> None:
     for dataset in datasets:
         # Loading and preparing data
         dataset_path = f"dataset/{dataset}"
-        transform = transforms.ToTensor()
-        evaluate_dataset = CustomDataset(root=dataset_path, transform=transform, pattern="x2")
+        evaluate_dataset = CustomDataset(root=dataset_path)
 
         # Evaluate
         total = utils.Metrics()
@@ -59,7 +58,7 @@ def evaluate(pretrained_model_path: str) -> None:
             lr_image, hr_image = evaluate_dataset.__getitem__(i)
             lr_image, hr_image = lr_image.to(device), hr_image.to(device)
 
-            lr_image_model = utils.pad_to_divisible(lr_image.unsqueeze(0), 8)
+            lr_image_model = utils.pad_to_divisible(lr_image.unsqueeze(0), 2 ** model.down_and_up)
 
             with torch.no_grad():
                 output_image = model(lr_image_model).squeeze(0)

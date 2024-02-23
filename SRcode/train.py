@@ -17,9 +17,9 @@ def parse_arguments() -> argparse.Namespace:
     return args
 
 
-def save_model(batch_size: int, config: Config, crop_size: int, epochs: int, model: nn.Module, scale: int) -> None:
+def save_model(config: Config, model: nn.Module) -> None:
     filename = config.filename.split('.')[0]
-    model_str = f"{filename}_e{epochs}_x{scale}_bs{batch_size}_cs{crop_size}"
+    model_str = f"{filename}"
     model_path = "pretrained_models/" + model_str + ".pth"
     torch.save(model.state_dict(), model_path)
 
@@ -96,7 +96,7 @@ def train(filepath: str):
         print(f"PSNR: {average_metric.psnr:.2f} db, SSIM: {average_metric.ssim:.4f}\n")
 
     # Save trained models
-    save_model(batch_size, config, crop_size, epochs, model, scale)
+    save_model(config, model)
 
 
 def main() -> None:
