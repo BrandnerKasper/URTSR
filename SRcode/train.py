@@ -50,7 +50,7 @@ def train(filepath: str):
     # train data
     train_data_path = config.train_dataset
     train_dataset = CustomDataset(root=train_data_path, transform=transform, pattern="x2", crop_size=crop_size)
-    train_loader = DataLoader(dataset=train_dataset, batch_size=batch_size, shuffle=True, num_workers=num_workers)
+    train_loader = DataLoader(dataset=train_dataset, batch_size=batch_size, shuffle=True, num_workers=num_workers, pin_memory=True)
     # val data
     val_data_path = config.val_dataset
     val_dataset = CustomDataset(val_data_path, transform=transform, pattern="x2", crop_size=crop_size)

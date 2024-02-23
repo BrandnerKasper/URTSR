@@ -72,15 +72,17 @@ class CustomDataset(Dataset):
     def __getitem__(self, idx: int) -> (torch.FloatTensor, torch.FloatTensor):
         common_filename = self.filenames[idx]
         if self.pattern:
-            lr_path = os.path.join(self.root_lr, common_filename + self.pattern + ".png")
+            lr_path = os.path.join(self.root_lr, common_filename + self.pattern + ".pt")
         else:
-            lr_path = os.path.join(self.root_lr, common_filename + ".png")
-        hr_path = os.path.join(self.root_hr, common_filename + ".png")
+            lr_path = os.path.join(self.root_lr, common_filename + ".pt")
+        hr_path = os.path.join(self.root_hr, common_filename + ".pt")
 
-        lr_image = Image.open(lr_path).convert('RGB')
-        hr_image = Image.open(hr_path).convert('RGB')
-        lr_image = self.transform(lr_image)
-        hr_image = self.transform(hr_image)
+        # lr_image = Image.open(lr_path).convert('RGB')
+        # hr_image = Image.open(hr_path).convert('RGB')
+        # lr_image = self.transform(lr_image)
+        # hr_image = self.transform(hr_image)
+        lr_image = torch.load(lr_path)
+        hr_image = torch.load(hr_path)
 
         # Randomly crop image
         if self.crop_size:
