@@ -8,6 +8,7 @@ import argparse
 
 from dataloader import CustomDataset
 from config import load_yaml_into_config, Config
+from datasampler import EnlargedSampler, CPUPrefetcher
 
 
 def parse_arguments() -> argparse.Namespace:
@@ -50,7 +51,9 @@ def train(filepath: str):
     # train data
     train_data_path = config.train_dataset
     train_dataset = CustomDataset(root=train_data_path, transform=transform, pattern="x2", crop_size=crop_size)
-    train_loader = DataLoader(dataset=train_dataset, batch_size=batch_size, shuffle=True, num_workers=num_workers, pin_memory=True)
+    train_sampler = EnlargedSampler(train_dataset, 100)
+    train_loader = DataLoader(dataset=train_dataset, batch_size=batch_size, num_workers=num_workers, sampler=train_sampler) #shuffle=True)
+    pre_fetcher = CPUPrefetcher(train_loader)
     # val data
     val_data_path = config.val_dataset
     val_dataset = CustomDataset(val_data_path, transform=transform, pattern="x2", crop_size=crop_size)
@@ -59,9 +62,15 @@ def train(filepath: str):
     # Training & Validation Loop
     for epoch in tqdm(range(epochs), desc='Train & Validate', dynamic_ncols=True):
         # train loop
+        train_sampler.set_epoch(epoch)
+        pre_fetcher.reset()
+        train_data = pre_fetcher.next()
         total_loss = 0.0
-        for lr_image, hr_image in tqdm(train_loader, desc=f'Training, Epoch {epoch + 1}/{epochs}', dynamic_ncols=True):
-            input, target = lr_image.to(device), hr_image.to(device)
+        while train_data is not None:
+            input, target = train_data
+            input, target = input.to(device), target.to(device)
+        # for lr_image, hr_image in tqdm(train_loader, desc=f'Training, Epoch {epoch + 1}/{epochs}', dynamic_ncols=True):
+        #     input, target = lr_image.to(device), hr_image.to(device)
             optimizer.zero_grad()
             output = model(input)
             loss = criterion(output, target)
@@ -69,6 +78,7 @@ def train(filepath: str):
             optimizer.step()
 
             total_loss += loss.item()
+            train_data = pre_fetcher.next()
 
         # scheduler update if we have one
         if scheduler is not None:

@@ -77,10 +77,6 @@ class CustomDataset(Dataset):
             lr_path = os.path.join(self.root_lr, common_filename + ".pt")
         hr_path = os.path.join(self.root_hr, common_filename + ".pt")
 
-        # lr_image = Image.open(lr_path).convert('RGB')
-        # hr_image = Image.open(hr_path).convert('RGB')
-        # lr_image = self.transform(lr_image)
-        # hr_image = self.transform(hr_image)
         lr_image = torch.load(lr_path)
         hr_image = torch.load(hr_path)
 

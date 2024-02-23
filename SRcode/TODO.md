@@ -42,7 +42,8 @@ Random Cropping images and batching them does not increase the speed of my train
 Boost Performance by:
 - [ ] preprocessing the image pairs as tensor in one .npz file and load them
 - [x] preprocessing the image pairs as tensor in one .pt file and load them
-- [ ] use a similiar logic like BasicSR by using a Custom Data Sampler
+- [x] use a similiar logic like BasicSR by using a Custom Data Sampler
+- [x] use Prefetcher to load data while processing data (again similiar to BasicSR)
 
 ## General
 
