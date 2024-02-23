@@ -41,6 +41,7 @@ For training:
 Random Cropping images and batching them does not increase the speed of my training (bottleneck is most likely the loading image from path process)
 Boost Performance by:
 - [ ] preprocessing the image pairs as tensor in one .npz file and load them
+- [x] preprocessing the image pairs as tensor in one .pt file and load them
 - [ ] use a similiar logic like BasicSR by using a Custom Data Sampler
 
 ## General
@@ -188,7 +189,7 @@ Add Tests for:
 - [ ] train.py
 - [ ] evaluate.py
 - [ ] test.py
-- [ ] datalaoder.py
+- [x] datalaoder.py
 - [ ] config.py
 - [ ] utils.py
 - [ ] results.py
