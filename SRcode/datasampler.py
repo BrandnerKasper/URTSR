@@ -14,9 +14,6 @@ class EnlargedSampler(Sampler):
 
     Args:
         dataset (torch.utils.data.Dataset): Dataset used for sampling.
-        num_replicas (int | None): Number of processes participating in
-            the training. It is usually the world_size.
-        rank (int | None): Rank of the current process within num_replicas.
         ratio (int): Enlarging ratio. Default: 1.
     """
 
@@ -49,6 +46,7 @@ class EnlargedSampler(Sampler):
         self.epoch = epoch
 
 
+# Unfortunately not very effective
 class CPUPrefetcher():
     """CPU prefetcher.
     Copied from BasicSR
