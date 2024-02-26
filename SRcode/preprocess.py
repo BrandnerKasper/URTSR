@@ -110,8 +110,9 @@ def main() -> None:
     else:
         print(f"Directory {safe_folder_path} already exists.")
 
-    # Create sub images
-    create_sub_images(folder_path, factor, safe_folder_path)
+    if factor > 1:
+        # Create sub images
+        create_sub_images(folder_path, factor, safe_folder_path)
 
     # Create pt or npz files
     match file_format:

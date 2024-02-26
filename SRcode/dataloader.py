@@ -1,5 +1,7 @@
 import random
 import timeit
+
+import numpy as np
 from matplotlib import pyplot as plt
 from torch.utils.data import Dataset
 from PIL import Image
@@ -77,6 +79,13 @@ class CustomDataset(Dataset):
             lr_path = os.path.join(self.root_lr, common_filename + ".pt")
         hr_path = os.path.join(self.root_hr, common_filename + ".pt")
 
+        # Load from npz file
+        # lr_image = np.load(lr_path)
+        # lr_image = torch.from_numpy(next(iter(lr_image.values())))
+        # hr_image = np.load(hr_path)
+        # hr_image = torch.from_numpy(next(iter(hr_image.values())))
+
+        # Load from pt file
         lr_image = torch.load(lr_path)
         hr_image = torch.load(hr_path)
 

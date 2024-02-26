@@ -47,7 +47,8 @@ Boost Performance by:
 
 ### Preprocess
 
-- [ ] Divide images into sub images and save them as .png and pt/npz files
+- [x] Divide images into sub images and save them as .png and pt/npz files
+- [ ] For the config file add a file type option, based on that the dataloader loads, .png, .pt or .npz files
 
 ## General
 
