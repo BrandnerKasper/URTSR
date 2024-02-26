@@ -12,12 +12,15 @@ from torchvision import transforms
 def parse_arguments() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Preprocess dataset .png files into sub-images by factor and converting into .pt files.")
-    parser.add_argument('folder_path', type=str, nargs='?', default='dataset/Set5',
+
+    parser.add_argument('--folder_path', type=str, default='dataset/DIV2K',
                         help="Path to the dataset folder containing .png files")
-    parser.add_argument('factor', type=int, default=2,
+    parser.add_argument('--factor', type=int, default=2,
                         help="Dividing the images into sub-images by factor times 2. "
-                             "Ex: factor 2 = 4 sub- images, 3 = 9 sub-images..")
-    parser.add_argument('file_format', choices=['pt', 'npz'], default='pt', help="Output file format ('pt' or 'npz').")
+                             "Ex: factor 2 = 4 sub-images, 3 = 9 sub-images..")
+    parser.add_argument('--file_format', choices=['pt', 'npz'], default='pt',
+                        help="Output file format ('pt' or 'npz').")
+
     args = parser.parse_args()
     return args
 
@@ -50,10 +53,42 @@ def preprocess_images_to_compressed_npz_files(folder_path: str) -> None:
             convert_image_to_npz_file(f"{folder_path}/{filename}")
 
 
+def create_sub_directory(folder_path: str):
+    # Extract the sub-directory ("val" or "train") from the original_path
+    components = folder_path.split("/")
+    if len(components) < 3:
+        return
+    sub_dir = components[2]
+
+    # Combine the sub_directory_prefix with the extracted sub_directory
+    sub_directory_name = f"sub_{sub_dir}"
+
+    # Construct the new parent directory path
+    new_parent_directory = os.path.join(os.path.dirname(os.path.dirname(folder_path)), sub_directory_name)
+
+    # Construct the new directory path
+    new_directory_path = os.path.join(new_parent_directory, os.path.basename(folder_path))
+
+    # Check if the new parent directory already exists; if not, create it
+    if not os.path.exists(new_parent_directory):
+        os.makedirs(new_parent_directory)
+        print(f"New parent directory created: {new_parent_directory}")
+
+    # Check if the new directory already exists; if not, create it
+    if not os.path.exists(new_directory_path):
+        os.makedirs(new_directory_path)
+        print(f"New directory created: {new_directory_path}")
+    else:
+        print(f"New directory already exists: {new_directory_path}")
+
+
 def preprocess_images_to_sub_images(folder_path: str, factor: int, file_format: str) -> None:
     # Iterate through ALL subfolders inside the folder path and convert every image inside the subfolders
-    for root, dirs, files in os.walk(folder_path):
-        for filename in tqdm(files, desc="Preprocessing..", unit="image"):
+    for root, dirs, files in tqdm(os.walk(folder_path), desc="Preprocessing.."):
+
+        create_sub_directory(root)
+
+        for filename in tqdm(files, desc=f"sub directory {root}", unit="image"):
             if filename.endswith(".png"):
                 img = Image.open(os.path.join(root, filename)).convert('RGB')
                 # Get image size
@@ -89,19 +124,20 @@ def preprocess_images_to_sub_images(folder_path: str, factor: int, file_format: 
                             name = f"{name}_{n}"
 
                         # Save the file in a new folder in dataset called "sub_Original name of folder"
-                        save_folder = os.path.join(folder_path, f"sub_{dirs}")
-                        os.makedirs(save_folder, exist_ok=True)
-                        save_path = os.path.join(save_folder, f"{name}.png")
+                        components = root.split("/")
+                        components[-2] = f"sub_{components[-2]}"
+                        save_folder = "/".join(components)
+                        save_path = f"{save_folder}/{name}.png"
 
                         subimage.save(save_path, format='PNG')
 
                         # Choose conversion format
                         if file_format == 'pt':
                             # Save images as .pt file
-                            convert_image_to_pt_file(f"{save_path}.png")
+                            convert_image_to_pt_file(f"{save_path}")
                         elif file_format == 'npz':
                             # Save images as .npz file
-                            convert_image_to_npz_file(f"{save_path}.png")
+                            convert_image_to_npz_file(f"{save_path}")
                         else:
                             print(f"No conversion format for {save_path}!", file=sys.stderr)
 
