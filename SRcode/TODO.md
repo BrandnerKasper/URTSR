@@ -23,7 +23,7 @@ General:
 - [ ] Look into fraction based values (DLSS, XESS, FSR -> quality modes, like 1.3, 1.5, 1.7, 2.0, 3.0)
 - [ ] U-net architectures up/down-sample an image multiple times, look into what is best practice when the input image sizes are not dividable by 2^x where x the number of up/down-sampling steps
 - [x] adjust training details to ExtraNet's parameter (Cosine learning rate decay, beta 1 and 2 of adam)
-- [ ] add a 'how often is the image divided' number to every model so it can be abstracted for train, evaluate and test
+- [x] add a 'how often is the image divided' number to every model so it can be abstracted for train, evaluate and test
 - [ ] train for far longer (roughly 20 hours) with 500.000 iterations with batch size of 32 and crop size of 64 with flips and rotations!
 - [ ] checkout the formula in BasicSR for calculating the epochs amount based on iterations/dataset.size (check if batch size influences sth here)
 
@@ -44,6 +44,10 @@ Boost Performance by:
 - [x] preprocessing the image pairs as tensor in one .pt file and load them
 - [x] use a similiar logic like BasicSR by using a Custom Data Sampler
 - [x] use Prefetcher to load data while processing data (again similiar to BasicSR)
+
+### Preprocess
+
+- [ ] Divide images into sub images and save them as .png and pt/npz files
 
 ## General
 
