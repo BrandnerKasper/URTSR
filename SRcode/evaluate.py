@@ -49,7 +49,7 @@ def evaluate(pretrained_model_path: str) -> None:
     for dataset in datasets:
         # Loading and preparing data
         dataset_path = f"dataset/{dataset}"
-        evaluate_dataset = CustomDataset(root=dataset_path)
+        evaluate_dataset = CustomDataset(root=dataset_path, pattern="x2")
 
         # Evaluate
         total = utils.Metrics()
