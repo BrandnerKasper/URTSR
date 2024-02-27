@@ -56,6 +56,8 @@ Boost Performance by:
 - [x] only use DIV2K to train and evaluate/test
 - [x] add a validation to the training script
 - [x] make it easy to train with no patchsize (crop/pad if input images are not suitable for down-/up-sampling multiple times) maybe add a variable into the model files for that?
+- [ ] safe the time it took to train the model in hours:min inside the result file
+- [ ] play around with tensor board to visualize training process (loss, SSIM, PSNR)
 
 ### Size
 - [ ] abstract size.py to use config to summary network model and size for training and testing
