@@ -9,7 +9,7 @@ import utils
 import argparse
 
 from dataloader import CustomDataset
-from config import load_yaml_into_config, Config
+from config import load_yaml_into_config
 
 
 def parse_arguments() -> argparse.Namespace:
@@ -19,10 +19,8 @@ def parse_arguments() -> argparse.Namespace:
     return args
 
 
-def save_model(config: Config, model: nn.Module) -> None:
-    filename = config.filename.split('.')[0]
-    model_str = f"{filename}"
-    model_path = "pretrained_models/" + model_str + ".pth"
+def save_model(filename: str, model: nn.Module) -> None:
+    model_path = "pretrained_models/" + filename + ".pth"
     torch.save(model.state_dict(), model_path)
 
 
@@ -32,7 +30,8 @@ def train(filepath: str):
     print(f"Device: {device}")
     config = load_yaml_into_config(filepath)
     print(config)
-    writer = SummaryWriter('logs')
+    filename = config.filename.split('.')[0]
+    writer = SummaryWriter(log_dir=f"runs", filename_suffix=filename, comment="ExtraNet 6")
 
     # Hyperparameters
     batch_size = config.batch_size
@@ -106,7 +105,7 @@ def train(filepath: str):
     # End Log
     writer.close()
     # Save trained models
-    save_model(config, model)
+    save_model(filename, model)
 
 
 def main() -> None:
