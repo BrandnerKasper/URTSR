@@ -190,3 +190,5 @@ dataset
 pretrained_models
 # csv file locks
 *~lock*.csv#
+logs
+videos
