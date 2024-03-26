@@ -6,17 +6,17 @@ Just some notes and todos what I'd like to consider for my thesis.
 
 ExtraNet:
 - [x] Spatial SR for Single Image Super Resolution (SISR)
-- [ ] Spatial SR for Real-Time Super Resolution (RTSR) -> mutiple input frames
+- [ ] Spatial SR for Real-Time Super Resolution (RTSR) -> multiple input frames
 - [ ] Temporal SR
 
 ExtraSS
 - [ ] Spatial SR for Single Image Super Resolution (SISR)
-- [ ] Spatial SR for Real-Time Super Resolution (RTSR) -> mutiple input frames
+- [ ] Spatial SR for Real-Time Super Resolution (RTSR) -> multiple input frames
 - [ ] Temporal SR
 
 Space-time Supersampling (STSS):
 - [ ] Spatial SR for Single Image Super Resolution (SISR)
-- [ ] Spatial SR for Real-Time Super Resolution (RTSR) -> mutiple input frames
+- [ ] Spatial SR for Real-Time Super Resolution (RTSR) -> multiple input frames
 - [ ] Temporal SR
 
 General:
@@ -49,6 +49,8 @@ Boost Performance by:
 
 - [x] Divide images into sub images and save them as .png and pt/npz files
 - [ ] For the config file add a file type option, based on that the dataloader loads, .png, .pt or .npz files
+- [ ] Play around with loading image data for depth for example and min/max normalize the values and safe it back into an image
+- [ ] Load a motion vector image and play around if you can visualize the motion vector data (-x/-y m/s, x,y m/s) into a color range which makes negative values visible
 
 ## General
 
@@ -109,6 +111,15 @@ We want to create our own dataset in Unreal Engine 5.3:
 - [ ] FSR
 - [ ] XeSS
 - [ ] (TSR)
+
+Generate a dataset from the matrix scene:
+- [x] one for training
+- [x] one for testing/evaluating
+- [x] use png files for buffers and frames
+Generate a higher quality dataset for matrix:
+- [ ] not sure how big we should make the dataset
+- 900 frames for LR (+buffers) and HR are around 30GB
+
 
 ### Typical render resolutions
 
@@ -176,6 +187,9 @@ After calling evaluate.py with config.yaml we want to create a result.yaml file 
 - [x] results in form of for each dataset PSNR and SSIM value
 - [x] write a results.py script, which generates a csv file based on all result files
 - [x] add "pseudo" entry results for bilinear and bicubic (will have None for model details only name)
+
+### Frame Generation
+- [ ] write a script which generates a video based 
 
 ### Metrics
 We want to evaluate on:
