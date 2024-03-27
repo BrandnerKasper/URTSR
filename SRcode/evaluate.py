@@ -1,11 +1,11 @@
 import yaml
-from dataloader import CustomDataset
 from torchvision import transforms
 import torch
 from utils import utils
 import argparse
 
-from config import load_yaml_into_config, Config
+from data.dataloader import CustomDataset
+from data.config import load_yaml_into_config, Config
 
 
 def parse_arguments() -> argparse.Namespace:

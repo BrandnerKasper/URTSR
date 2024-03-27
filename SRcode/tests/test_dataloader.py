@@ -1,8 +1,6 @@
 import unittest
-import torch
-import numpy as np
 
-from SRcode.dataloader import *
+from SRcode.data.dataloader import *
 
 
 class TestDataLoader(unittest.TestCase):

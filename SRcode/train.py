@@ -1,14 +1,14 @@
+import argparse
+from tqdm import tqdm
 import torch
 import torch.nn as nn
 from torchvision import transforms
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
-from tqdm import tqdm
-from utils import utils
-import argparse
 
-from dataloader import CustomDataset
-from config import load_yaml_into_config
+from utils import utils
+from data.dataloader import CustomDataset
+from data.config import load_yaml_into_config
 
 
 def parse_arguments() -> argparse.Namespace:
