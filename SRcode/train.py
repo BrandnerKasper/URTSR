@@ -1,11 +1,10 @@
 import torch
 import torch.nn as nn
-import torchvision
 from torchvision import transforms
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
-import utils
+from utils import utils
 import argparse
 
 from dataloader import CustomDataset

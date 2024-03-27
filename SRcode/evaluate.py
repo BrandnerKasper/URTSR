@@ -2,7 +2,7 @@ import yaml
 from dataloader import CustomDataset
 from torchvision import transforms
 import torch
-import utils
+from utils import utils
 import argparse
 
 from config import load_yaml_into_config, Config
@@ -49,7 +49,7 @@ def evaluate(pretrained_model_path: str) -> None:
     for dataset in datasets:
         # Loading and preparing data
         dataset_path = f"dataset/{dataset}"
-        evaluate_dataset = CustomDataset(root=dataset_path, pattern="x2")
+        evaluate_dataset = CustomDataset(root=dataset_path, pattern="")
 
         # Evaluate
         total = utils.Metrics()
@@ -101,7 +101,7 @@ def evaluate_trad(config_path: str) -> None:
         # Loading and preparing data
         dataset_path = f"dataset/{dataset}"
         transform = transforms.ToTensor()
-        evaluate_dataset = CustomDataset(root=dataset_path, transform=transform, pattern="x2")
+        evaluate_dataset = CustomDataset(root=dataset_path, transform=transform, pattern="")
 
         # Evaluate
         total = utils.Metrics()
