@@ -119,7 +119,7 @@ def main() -> None:
     batch_size = 1
     input_size = (batch_size, 4, 3, 1920, 1080)
 
-    # summary(model, input_size=input_size)
+    summary(model, input_size=input_size)
 
     # Move the model to GPU if available
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -144,8 +144,8 @@ def main() -> None:
     # Measure VRAM usage
     vram_usage = torch.cuda.memory_allocated(device) / 1024 / 1024  # Convert bytes to MB
 
-    print(f"Forward pass time: {forward_pass_time} seconds")
-    print(f"VRAM usage: {vram_usage} MB")
+    print(f"Forward pass time: {forward_pass_time:.2f} seconds")
+    print(f"VRAM usage: {vram_usage:.2f} MB")
 
 
 if __name__ == '__main__':
