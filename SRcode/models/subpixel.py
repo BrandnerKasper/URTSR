@@ -1,6 +1,7 @@
+import torch
 import torch.nn as nn
 
-from .basemodel import BaseModel
+from basemodel import BaseModel
 
 
 class SubPixelNN(BaseModel):
@@ -27,3 +28,19 @@ class SubPixelNN(BaseModel):
         x = self.features(x)
         x = self.sub_pixel_conv(x)
         return x
+
+
+def main() -> None:
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+    model = SubPixelNN(scale=2).to(device)
+    batch_size = 1
+    input_size = (batch_size, 3, 1920, 1080)
+
+    model.summary(input_size)
+    model.measure_inference_time(input_size)
+    model.measure_vram_usage(input_size)
+
+
+if __name__ == '__main__':
+    main()

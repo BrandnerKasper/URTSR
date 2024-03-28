@@ -119,33 +119,9 @@ def main() -> None:
     batch_size = 1
     input_size = (batch_size, 4, 3, 1920, 1080)
 
-    summary(model, input_size=input_size)
-
-    # Move the model to GPU if available
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    model = model.to(device)
-
-    # Generate dummy input
-    input_data = torch.randn(input_size).to(device)
-
-    # Warm-up GPU to ensure accurate timing
-    torch.cuda.synchronize()
-    start = time.time()
-
-    # Run forward pass
-    with torch.no_grad():
-        output = model(input_data)
-
-    # Measure forward pass time
-    torch.cuda.synchronize()
-    end = time.time()
-    forward_pass_time = end - start
-
-    # Measure VRAM usage
-    vram_usage = torch.cuda.memory_allocated(device) / 1024 / 1024  # Convert bytes to MB
-
-    print(f"Forward pass time: {forward_pass_time:.2f} seconds")
-    print(f"VRAM usage: {vram_usage:.2f} MB")
+    model.summary(input_size)
+    model.measure_inference_time(input_size)
+    model.measure_vram_usage(input_size)
 
 
 if __name__ == '__main__':
