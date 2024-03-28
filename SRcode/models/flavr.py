@@ -1,7 +1,5 @@
 import torch
 import torch.nn as nn
-from torchinfo import summary
-import time
 
 from basemodel import BaseModel
 
@@ -28,58 +26,58 @@ class Flavr(BaseModel):
 
         self.conv_in = nn.Sequential(
             nn.Conv3d(frame_number, 16, kernel_size=(3, 3, 3), stride=(1, 1, 1), padding=(1, 1, 1), bias=False),
-            nn.ReLU(inplace=True),
+            nn.LeakyReLU(inplace=True),
             nn.Conv3d(16, 16, kernel_size=(3, 3, 3), stride=(1, 1, 1), padding=(1, 1, 1), bias=False),
         )
         self.gate_in = SEGating(16)
 
         self.down_1 = nn.Sequential(
-            nn.Conv3d(16, 32, kernel_size=(3, 3, 3), stride=(1, 2, 2), padding=(1, 1, 1), bias=False),
-            nn.ReLU(inplace=True),
-            nn.Conv3d(32, 32, kernel_size=(3, 3, 3), stride=(1, 1, 1), padding=(1, 1, 1), bias=False),
+            nn.Conv3d(16, 24, kernel_size=(3, 3, 3), stride=(1, 2, 2), padding=(1, 1, 1), bias=False),
+            nn.LeakyReLU(inplace=True),
+            nn.Conv3d(24, 24, kernel_size=(3, 3, 3), stride=(1, 1, 1), padding=(1, 1, 1), bias=False),
         )
-        self.gate_down_1 = SEGating(32)
+        self.gate_down_1 = SEGating(24)
 
         self.down_2 = nn.Sequential(
-            nn.Conv3d(32, 64, kernel_size=(3, 3, 3), stride=(1, 2, 2), padding=(1, 1, 1), bias=False),
-            nn.ReLU(inplace=True),
-            nn.Conv3d(64, 64, kernel_size=(3, 3, 3), stride=(1, 1, 1), padding=(1, 1, 1), bias=False),
+            nn.Conv3d(24, 32, kernel_size=(3, 3, 3), stride=(1, 2, 2), padding=(1, 1, 1), bias=False),
+            nn.LeakyReLU(inplace=True),
+            nn.Conv3d(32, 32, kernel_size=(3, 3, 3), stride=(1, 1, 1), padding=(1, 1, 1), bias=False),
         )
-        self.gate_down_2 = SEGating(64)
+        self.gate_down_2 = SEGating(32)
 
         self.down_3 = nn.Sequential(
-            nn.Conv3d(64, 128, kernel_size=(3, 3, 3), stride=(1, 2, 2), padding=(1, 1, 1), bias=False),
-            nn.ReLU(inplace=True),
-            nn.Conv3d(128, 128, kernel_size=(3, 3, 3), stride=(1, 1, 1), padding=(1, 1, 1), bias=False),
+            nn.Conv3d(32, 40, kernel_size=(3, 3, 3), stride=(1, 2, 2), padding=(1, 1, 1), bias=False),
+            nn.LeakyReLU(inplace=True),
+            nn.Conv3d(40, 40, kernel_size=(3, 3, 3), stride=(1, 1, 1), padding=(1, 1, 1), bias=False),
         )
-        self.gate_down_3 = SEGating(128)
+        self.gate_down_3 = SEGating(40)
 
         self.up_1 = nn.Sequential(
-            nn.ConvTranspose3d(128, 64, kernel_size=(3, 4, 4), stride=(1, 2, 2), padding=(1, 1, 1)),
-            nn.ReLU(inplace=True)
+            nn.ConvTranspose3d(40, 32, kernel_size=(3, 4, 4), stride=(1, 2, 2), padding=(1, 1, 1)),
+            nn.LeakyReLU(inplace=True)
         )
-        self.gate_up_1 = SEGating(64)
+        self.gate_up_1 = SEGating(32)
 
         self.up_2 = nn.Sequential(
-            nn.ConvTranspose3d(128, 32, kernel_size=(3, 4, 4), stride=(1, 2, 2), padding=(1, 1, 1)),
-            nn.ReLU(inplace=True)
+            nn.ConvTranspose3d(64, 24, kernel_size=(3, 4, 4), stride=(1, 2, 2), padding=(1, 1, 1)),
+            nn.LeakyReLU(inplace=True)
         )
-        self.gate_up_2 = SEGating(32)
+        self.gate_up_2 = SEGating(24)
 
         self.up_3 = nn.Sequential(
-            nn.ConvTranspose3d(64, 16, kernel_size=(3, 4, 4), stride=(1, 2, 2), padding=(1, 1, 1)),
-            nn.ReLU(inplace=True)
+            nn.ConvTranspose3d(48, 16, kernel_size=(3, 4, 4), stride=(1, 2, 2), padding=(1, 1, 1)),
+            nn.LeakyReLU(inplace=True)
         )
         self.gate_up_3 = SEGating(16)
 
         self.up_4 = nn.Sequential(
-            nn.ConvTranspose3d(32, 32, kernel_size=(3, 4, 4), stride=(1, 2, 2), padding=(1, 1, 1)),
-            nn.ReLU(inplace=True),
+            nn.ConvTranspose3d(32, 8, kernel_size=(3, 4, 4), stride=(1, 2, 2), padding=(1, 1, 1)),
+            nn.LeakyReLU(inplace=True),
         )
-        self.gate_up_4 = SEGating(32)
+        self.gate_up_4 = SEGating(8)
 
         self.sub_pixel_conv_out = nn.Sequential(
-            nn.ConvTranspose3d(32, int(frame_number/2), kernel_size=(3, 3, 3), stride=(1, 1, 1), padding=(1, 1, 1))
+            nn.ConvTranspose3d(8, int(frame_number/2), kernel_size=(3, 3, 3), stride=(1, 1, 1), padding=(1, 1, 1))
             # nn.PixelShuffle(self.scale),
         )
 
