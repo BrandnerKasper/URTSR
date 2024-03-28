@@ -8,7 +8,7 @@ from torch.utils.tensorboard import SummaryWriter
 
 from utils import utils
 from data.dataloader import CustomDataset
-from data.config import load_yaml_into_config
+from SRcode.config import load_yaml_into_config
 
 
 def parse_arguments() -> argparse.Namespace:

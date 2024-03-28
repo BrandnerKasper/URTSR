@@ -174,7 +174,7 @@ def load_yaml_into_config(file_path: str) -> Config:
 
 def main() -> None:
     test_yaml_creation()
-    yaml_config = load_yaml_into_config("../configs/srcnn.yaml")
+    yaml_config = load_yaml_into_config("configs/srcnn.yaml")
     print(yaml_config)
 
 

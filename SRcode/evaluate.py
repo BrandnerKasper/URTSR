@@ -5,7 +5,7 @@ from utils import utils
 import argparse
 
 from data.dataloader import CustomDataset
-from data.config import load_yaml_into_config, Config
+from SRcode.config import load_yaml_into_config, Config
 
 
 def parse_arguments() -> argparse.Namespace:
