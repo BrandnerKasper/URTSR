@@ -4,17 +4,27 @@ Just some notes and todos what I'd like to consider for my thesis.
 
 ## Network
 
-ExtraNet:
+### ExtraNet:
 - [x] Spatial SR for Single Image Super Resolution (SISR)
 - [ ] Spatial SR for Real-Time Super Resolution (RTSR) -> multiple input frames
 - [ ] Temporal SR
 
-ExtraSS
+### ExtraSS
 - [ ] Spatial SR for Single Image Super Resolution (SISR)
 - [ ] Spatial SR for Real-Time Super Resolution (RTSR) -> multiple input frames
 - [ ] Temporal SR
 
-Space-time Supersampling (STSS):
+### Space-time Supersampling (STSS):
+- [ ] Spatial SR for Single Image Super Resolution (SISR)
+- [ ] Spatial SR for Real-Time Super Resolution (RTSR) -> multiple input frames
+- [ ] Temporal SR
+
+### Flow-Agnostic Video Representations for Fast Frame Interpolation (FLAVR)
+- [ ] Spatial SR for Single Image Super Resolution (SISR)
+- [ ] Spatial SR for Real-Time Super Resolution (RTSR) -> multiple input frames
+- [ ] Temporal SR
+
+### Efficient Video Restoration (EVRNet)
 - [ ] Spatial SR for Single Image Super Resolution (SISR)
 - [ ] Spatial SR for Real-Time Super Resolution (RTSR) -> multiple input frames
 - [ ] Temporal SR
