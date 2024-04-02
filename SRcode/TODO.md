@@ -45,6 +45,9 @@ Boost Performance by:
 - [x] use a similiar logic like BasicSR by using a Custom Data Sampler
 - [x] use Prefetcher to load data while processing data (again similiar to BasicSR)
 
+### Video
+- [ ] Load and process the [Reds](https://seungjunnah.github.io/Datasets/reds.html) dataset with x4 for simplicity
+
 ### Preprocess
 
 - [x] Divide images into sub images and save them as .png and pt/npz files
@@ -117,9 +120,11 @@ Generate a dataset from the matrix scene:
 - [x] one for testing/evaluating
 - [x] use png files for buffers and frames
 Generate a higher quality dataset for matrix:
-- [ ] not sure how big we should make the dataset
+- not sure how big we should make the dataset
+- more scenes are better than one big data set
 - 900 frames for LR (+buffers) and HR are around 30GB
-
+- [ ] 8-20 training scenes
+- [ ] 2-5 test scenes
 
 ### Typical render resolutions
 
@@ -176,10 +181,14 @@ HD
 - [x] Load config files into pandas dataframe
 - [x] Save dataframe into csv file
 
-hardcode on which datasets will be evaluated:
+Single Image Super Resolution (SISR) eval:
 - [x] Set5
 - [x] Set14
 - [x] Urban100
+Video Image Super Resolution with frame gen eval:
+- [ ] Reds for frame generation
+- [ ] Matrix data set (our own)
+- [ ] maybe STSS net
 
 ### Results
 After calling evaluate.py with config.yaml we want to create a result.yaml file containing:
@@ -189,7 +198,7 @@ After calling evaluate.py with config.yaml we want to create a result.yaml file 
 - [x] add "pseudo" entry results for bilinear and bicubic (will have None for model details only name)
 
 ### Frame Generation
-- [ ] write a script which generates a video based 
+- [x] write a script which generates a video based on pngs
 
 ### Metrics
 We want to evaluate on:
