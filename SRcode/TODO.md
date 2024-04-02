@@ -29,13 +29,24 @@ Just some notes and todos what I'd like to consider for my thesis.
 - [ ] Spatial SR for Real-Time Super Resolution (RTSR) -> multiple input frames
 - [ ] Temporal SR
 
-General:
+### General:
 - [ ] Look into fraction based values (DLSS, XESS, FSR -> quality modes, like 1.3, 1.5, 1.7, 2.0, 3.0)
 - [ ] U-net architectures up/down-sample an image multiple times, look into what is best practice when the input image sizes are not dividable by 2^x where x the number of up/down-sampling steps
 - [x] adjust training details to ExtraNet's parameter (Cosine learning rate decay, beta 1 and 2 of adam)
 - [x] add a 'how often is the image divided' number to every model so it can be abstracted for train, evaluate and test
 - [ ] train for far longer (roughly 20 hours) with 500.000 iterations with batch size of 32 and crop size of 64 with flips and rotations!
 - [ ] checkout the formula in BasicSR for calculating the epochs amount based on iterations/dataset.size (check if batch size influences sth here)
+
+### Timing:
+A forward pass of our network should at max take 33.3ms
+
+| FPS       | Forward Pass Time (ms) |
+|-----------|-------------------------|
+| 24        | 41.6                    |
+| 30        | 33.3                    |
+| 60        | 16.6                    |
+| 120       | 8.3                     |
+
 
 ## Data Loader
 
