@@ -7,7 +7,7 @@ from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 
 from utils import utils
-from data.dataloader import CustomDataset
+from data.dataloader import SingleImagePair
 from SRcode.config import load_yaml_into_config
 
 
@@ -49,11 +49,11 @@ def train(filepath: str):
     transform = transforms.ToTensor()
     # train data
     train_data_path = config.train_dataset
-    train_dataset = CustomDataset(root=train_data_path, transform=transform, pattern="x2", crop_size=crop_size)
+    train_dataset = SingleImagePair(root=train_data_path, transform=transform, pattern="x2", crop_size=crop_size)
     train_loader = DataLoader(dataset=train_dataset, batch_size=batch_size, num_workers=num_workers, shuffle=True)
     # val data
     val_data_path = config.val_dataset
-    val_dataset = CustomDataset(val_data_path, transform=transform, pattern="x2", crop_size=crop_size)
+    val_dataset = SingleImagePair(val_data_path, transform=transform, pattern="x2", crop_size=crop_size)
     val_loader = DataLoader(dataset=val_dataset, batch_size=batch_size, shuffle=True, num_workers=num_workers)
 
     # Training & Validation Loop

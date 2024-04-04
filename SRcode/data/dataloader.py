@@ -12,25 +12,6 @@ import torch
 import torchvision.transforms.functional as F
 
 
-def init_filenames(root_hr: str, root_lr: str, pattern: str) -> list[str]:
-    # Extract common part of the filenames (e.g., '0001')
-    hr_filenames = [os.path.splitext(filename)[0] for filename in os.listdir(root_hr) if
-                    filename.endswith(".png")]
-    # Remove pattern
-    if pattern:
-        lr_filenames = [os.path.splitext(filename.replace(pattern, ''))[0] for filename in os.listdir(root_lr)
-                        if filename.endswith(".png")]
-    else:
-        lr_filenames = [os.path.splitext(filename)[0] for filename in os.listdir(root_lr) if
-                        filename.endswith(".png")]
-
-    # Ensure matching filenames in HR and LR
-    for lr_filename, hr_filename in zip(sorted(set(lr_filenames)), sorted(set(hr_filenames))):
-        assert lr_filename == hr_filename, f"Filenames were not equal: lr filename {lr_filename} != hr filename {hr_filename}"
-
-    return sorted(set(hr_filenames))
-
-
 def get_random_crop_pair(lr_tensor: torch.Tensor, hr_tensor: torch.Tensor, patch_size: int, scale: int) \
         -> (torch.Tensor, torch.Tensor):
     lr_i, lr_j, lr_h, lr_w = transforms.RandomCrop.get_params(lr_tensor, output_size=(patch_size, patch_size))
@@ -54,7 +35,7 @@ def rotate_image(img: torch.Tensor, angle: int) -> torch.Tensor:
     return F.rotate(img, angle)
 
 
-class CustomDataset(Dataset):
+class SingleImagePair(Dataset):
     def __init__(self, root: str, transform=transforms.ToTensor(), pattern: str = None,
                  crop_size: int = None, scale: int = 2,
                  use_hflip: bool = False, use_rotation: bool = False):
@@ -66,7 +47,25 @@ class CustomDataset(Dataset):
         self.scale = scale
         self.use_hflip = use_hflip
         self.use_rotation = use_rotation
-        self.filenames = init_filenames(self.root_hr, self.root_lr, self.pattern)
+        self.filenames = self.init_filenames()
+
+    def init_filenames(self) -> list[str]:
+        # Extract common part of the filenames (e.g., '0001')
+        hr_filenames = [os.path.splitext(filename)[0] for filename in os.listdir(self.root_hr) if
+                        filename.endswith(".png")]
+        # Remove pattern
+        if self.pattern:
+            lr_filenames = [os.path.splitext(filename.replace(self.pattern, ''))[0] for filename in os.listdir(self.root_lr)
+                            if filename.endswith(".png")]
+        else:
+            lr_filenames = [os.path.splitext(filename)[0] for filename in os.listdir(self.root_lr) if
+                            filename.endswith(".png")]
+
+        # Ensure matching filenames in HR and LR
+        for lr_filename, hr_filename in zip(sorted(set(lr_filenames)), sorted(set(hr_filenames))):
+            assert lr_filename == hr_filename, f"Filenames were not equal: lr filename {lr_filename} != hr filename {hr_filename}"
+
+        return sorted(set(hr_filenames))
 
     def __len__(self) -> int:
         return len(self.filenames)
@@ -122,6 +121,18 @@ class CustomDataset(Dataset):
         filename = path.split("/")[-1]
         filename = filename.split(".")[0]
         return filename
+
+    def display_item(self, idx: int) -> None:
+        lr_image, hr_image = self.__getitem__(idx)
+        lr_image = F.to_pil_image(lr_image)
+        hr_image = F.to_pil_image(hr_image)
+
+        fig, axes = plt.subplots(1, 2, figsize=(10, 10))
+        axes[0].imshow(lr_image)
+        axes[0].set_title('LR image')
+        axes[1].imshow(hr_image)
+        axes[1].set_title('HR image')
+        plt.show()
 
 
 class MultiImagePair(Dataset):
@@ -183,35 +194,39 @@ class MultiImagePair(Dataset):
         filename = filename.split(".")[0]
         return filename
 
+    def display_item(self, idx: int) -> None:
+        lr_frames, hr_frames = self.__getitem__(idx)
+
+        num_lr_frames = len(lr_frames)
+        num_hr_frames = len(hr_frames)
+
+        # Create a single plot with LR images on the left and HR images on the right
+        fig, axes = plt.subplots(1, num_lr_frames + num_hr_frames, figsize=(15, 5))
+
+        # Display LR frames
+        for i, lr_frame in enumerate(lr_frames):
+            lr_image = F.to_pil_image(lr_frame)
+            axes[i].imshow(lr_image)
+            axes[i].set_title(f'LR image {-i}')
+            axes[i].axis('off')
+
+        # Display HR frames
+        for i, hr_frame in enumerate(hr_frames):
+            hr_image = F.to_pil_image(hr_frame)
+            axes[num_lr_frames + i].imshow(hr_image)
+            axes[num_lr_frames + i].set_title(f'HR image {i}')
+            axes[num_lr_frames + i].axis('off')
+
+        plt.tight_layout()
+        plt.show()
+
 
 def main() -> None:
-    # measuring time of utils fcts
-    # transform = transforms.ToTensor()
-    # root_hr = "dataset/DIV2K/train/HR"
-    # root_lr = "dataset/DIV2K/train/LR"
-    # pattern = "x2"
-    # # Use a lambda function to pass the function with its arguments to timeit
-    # execution_time_filenames = timeit.timeit(lambda: init_filenames(root_hr, root_lr, pattern), number=1)
-    # print(f"Execution time of filenames: {execution_time_filenames} seconds")
-    #
-    # dataset = CustomDataset(root="dataset/DIV2K/train", pattern=pattern, crop_size=128, scale=2,
-    #                         use_hflip=True, use_rotation=True)
-    #
-    # for lr_image, hr_image in dataset:
-    #     lr_image = F.to_pil_image(lr_image)
-    #     hr_image = F.to_pil_image(hr_image)
-    #
-    #     fig, axes = plt.subplots(1, 2, figsize=(10, 10))
-    #     axes[0].imshow(lr_image)
-    #     axes[0].set_title('LR image')
-    #     axes[1].imshow(hr_image)
-    #     axes[1].set_title('HR image')
-    #     plt.show()
-    # root_hr = "dataset/DIV2K/train/HR"
-    # root_lr = "dataset/DIV2K/train/LR"
-    # pattern = "x2"
-    # filenames = init_filenames(root_hr, root_lr, pattern)
-    pass
+    div2k_dataset = SingleImagePair(root="../dataset/DIV2K/train", pattern="x2")
+    div2k_dataset.display_item(0)
+
+    reds_dataset = MultiImagePair(root="../dataset/Reds/train")
+    reds_dataset.display_item(0)
 
 
 if __name__ == '__main__':

@@ -4,7 +4,7 @@ import torch
 from utils import utils
 import argparse
 
-from data.dataloader import CustomDataset
+from data.dataloader import SingleImagePair
 from SRcode.config import load_yaml_into_config, Config
 
 
@@ -49,7 +49,7 @@ def evaluate(pretrained_model_path: str) -> None:
     for dataset in datasets:
         # Loading and preparing data
         dataset_path = f"dataset/{dataset}"
-        evaluate_dataset = CustomDataset(root=dataset_path, pattern="")
+        evaluate_dataset = SingleImagePair(root=dataset_path, pattern="")
 
         # Evaluate
         total = utils.Metrics()
@@ -101,7 +101,7 @@ def evaluate_trad(config_path: str) -> None:
         # Loading and preparing data
         dataset_path = f"dataset/{dataset}"
         transform = transforms.ToTensor()
-        evaluate_dataset = CustomDataset(root=dataset_path, transform=transform, pattern="")
+        evaluate_dataset = SingleImagePair(root=dataset_path, transform=transform, pattern="")
 
         # Evaluate
         total = utils.Metrics()
