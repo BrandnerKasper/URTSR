@@ -82,6 +82,14 @@ class TestDataLoader(unittest.TestCase):
         print(f"Rotated img {rotated_img.numpy()}")
         print(f"Expected img {expected_rotated_img.numpy()}")
 
+    def test_reds_dataset(self):
+        root = "../dataset/Reds/train"
+        # Reds dataset contains folders of exactly 100 images starting from 00000000 to 00000099
+        reds_dataset = MultiImagePair(root=root)
+
+        first_entry = reds_dataset.get_filename(0)
+        self.assertEqual(first_entry, "00000003", f"filename: {first_entry}, expected 00000003")
+
 
 if __name__ == '__main__':
     unittest.main()

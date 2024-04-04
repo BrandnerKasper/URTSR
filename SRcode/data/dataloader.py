@@ -124,63 +124,58 @@ class CustomDataset(Dataset):
         return filename
 
 
-def init_multi_dir_filenames(path: str, offset: int) -> list[str]:
-    filenames = []
-    for directory in os.listdir(path):
-        for file in os.listdir(os.path.join(path, directory)):
-            file = os.path.splitext(file)[0]
-            if int(file) < offset:
-                continue
-            filenames.append(os.path.join(directory, file))
-    return sorted(set(filenames))
-
-
-def test_get_item(filenames: list[str], number_of_frames: int):
-    transform = transforms.ToTensor()
-    root = "../dataset/Reds/train/HR"
-    common_filename = filenames[0]
-
-    # get_lr_frames(common_filename)
-    lr_frames = []
-    lr_frames_names = []
-    folder = common_filename.split("/")[0]
-    filename = common_filename.split("/")[-1]
-    # Extract the numeric part
-    filename = int(filename)
-    for i in range(number_of_frames):
-        file = int(filename) - i
-        # Generate right file name pattern
-        file = f"{file:08d}" # Ensure 8 digit format
-        # Put folder and file name back together and load the tensor
-        file = f"{root}/{folder}/{file}.png"
-        lr_frames_names.append(file)
-        lr_frame = Image.open(file).convert('RGB')
-        lr_frame = transform(lr_frame)
-        lr_frames.append(lr_frame)
-    print(lr_frames_names)
-    print(lr_frames)
-
-    # get hr frames
-
 class MultiImagePair(Dataset):
-    def __init__(self, root: str, number_of_frames: int = 4):
+    def __init__(self, root: str, number_of_frames: int = 4, last_frame_idx: int = 100, transform=transforms.ToTensor()):
         self.root_hr = os.path.join(root, "HR")
         self.root_lr = os.path.join(root, "LR/X4")
         self.number_of_frames = number_of_frames
-        self.filenames = init_multi_dir_filenames(self.root_hr, self.number_of_frames-1)
+        self.last_frame_idx = last_frame_idx
+        self.transform = transform
+        self.filenames = self.init_filenames()
+
+    def init_filenames(self) -> list[str]:
+        filenames = []
+        for directory in os.listdir(self.root_hr):
+            for file in os.listdir(os.path.join(self.root_hr, directory)):
+                file = os.path.splitext(file)[0]
+                if self.number_of_frames - 2 < int(file) < self.last_frame_idx - int(self.number_of_frames / 2):
+                    filenames.append(os.path.join(directory, file))
+        return sorted(set(filenames))
 
     def __len__(self) -> int:
         return len(self.filenames)
 
-    def __getitem__(self, idx: int) -> (torch.Tensor, torch.Tensor):
-        common_filename = self.filenames[idx]
-        # get_lr_frames(common_filename)
-        lr_frames = []
-        filename = common_filename.split("/")[-1]
-        for i in range(self.number_of_frames):
-            filename = int(filename) - i
+    # only works for extrapolation atm
+    def __getitem__(self, idx: int) -> (list[torch.Tensor], list[torch.Tensor]):
+        path = self.filenames[idx]
+        folder = path.split("/")[0]
+        filename = path.split("/")[-1]
 
-        # get hr_frames(common_filename)
+        # lr frames = [current, current - 1, ..., current -n], where n = # of frames
+        lr_frames = []
+        for i in range(self.number_of_frames):
+            # Extract the numeric part
+            file = int(filename) - i
+            # Generate right file name pattern
+            file = f"{file:08d}"  # Ensure 8 digit format
+            # Put folder and file name back together and load the tensor
+            file = f"{self.root_lr}/{folder}/{file}.png"
+            file = self.transform(Image.open(file).convert('RGB'))
+            lr_frames.append(file)
+
+        # hr frames = [current, current + 1, ..., current + n], where n = # of frames / 2
+        hr_frames = []
+        for i in range(int(self.number_of_frames / 2)):
+            # Extract the numeric part
+            file = int(filename) + i
+            # Generate right file name pattern
+            file = f"{file:08d}"  # Ensure 8 digit format
+            # Put folder and file name back together and load the tensor
+            file = f"{self.root_hr}/{folder}/{file}.png"
+            file = self.transform(Image.open(file).convert('RGB'))
+            hr_frames.append(file)
+
+        return lr_frames, hr_frames
 
     def get_filename(self, idx: int) -> str:
         path = self.filenames[idx]
@@ -216,12 +211,7 @@ def main() -> None:
     # root_lr = "dataset/DIV2K/train/LR"
     # pattern = "x2"
     # filenames = init_filenames(root_hr, root_lr, pattern)
-
-
-    root = "../dataset/Reds/train/HR"
-    files = init_multi_dir_filenames(root, 3)
-    # print(files)
-    test_get_item(files, 4)
+    pass
 
 
 if __name__ == '__main__':
