@@ -55,7 +55,8 @@ class SingleImagePair(Dataset):
                         filename.endswith(".png")]
         # Remove pattern
         if self.pattern:
-            lr_filenames = [os.path.splitext(filename.replace(self.pattern, ''))[0] for filename in os.listdir(self.root_lr)
+            lr_filenames = [os.path.splitext(filename.replace(self.pattern, ''))[0] for filename in
+                            os.listdir(self.root_lr)
                             if filename.endswith(".png")]
         else:
             lr_filenames = [os.path.splitext(filename)[0] for filename in os.listdir(self.root_lr) if
@@ -93,11 +94,11 @@ class SingleImagePair(Dataset):
             lr_image, hr_image = get_random_crop_pair(lr_image, hr_image, self.crop_size, self.scale)
 
         # Augment image by h and v flip and rot by 90
-        hr_image, lr_image = self.augment(hr_image, lr_image)
+        lr_image, hr_image = self.augment(lr_image, hr_image)
 
         return lr_image, hr_image
 
-    def augment(self, hr_image, lr_image) -> (torch.Tensor, torch.Tensor):
+    def augment(self, lr_image: torch.Tensor, hr_image: torch.Tensor) -> (torch.Tensor, torch.Tensor):
         # Apply random horizontal flip
         if self.use_hflip:
             if random.random() > 0.5:
@@ -114,7 +115,7 @@ class SingleImagePair(Dataset):
                 angle = -90  # for clockwise rotation like BasicSR
                 lr_image = rotate_image(lr_image, angle)
                 hr_image = rotate_image(hr_image, angle)
-        return hr_image, lr_image
+        return lr_image, hr_image
 
     def get_filename(self, idx: int) -> str:
         path = self.filenames[idx]
@@ -136,12 +137,18 @@ class SingleImagePair(Dataset):
 
 
 class MultiImagePair(Dataset):
-    def __init__(self, root: str, number_of_frames: int = 4, last_frame_idx: int = 100, transform=transforms.ToTensor()):
+    def __init__(self, root: str, number_of_frames: int = 4, last_frame_idx: int = 100,
+                 transform=transforms.ToTensor(), crop_size: int = None, scale: int = 4,
+                 use_hflip: bool = False, use_rotation: bool = False):
         self.root_hr = os.path.join(root, "HR")
         self.root_lr = os.path.join(root, "LR/X4")
         self.number_of_frames = number_of_frames
         self.last_frame_idx = last_frame_idx
         self.transform = transform
+        self.crop_size = crop_size
+        self.scale = scale
+        self.use_hflip = use_hflip
+        self.use_rotation = use_rotation
         self.filenames = self.init_filenames()
 
     def init_filenames(self) -> list[str]:
@@ -186,6 +193,12 @@ class MultiImagePair(Dataset):
             file = self.transform(Image.open(file).convert('RGB'))
             hr_frames.append(file)
 
+        # Randomly crop image
+        if self.crop_size:
+            lr_frames, hr_frames = self.get_random_crop_pair(lr_frames, hr_frames)
+        # Augment image by h and v flip and rot by 90
+        lr_frames, hr_frames = self.augment(lr_frames, hr_frames)
+
         return lr_frames, hr_frames
 
     def get_filename(self, idx: int) -> str:
@@ -208,25 +221,63 @@ class MultiImagePair(Dataset):
             lr_image = F.to_pil_image(lr_frame)
             axes[i].imshow(lr_image)
             axes[i].set_title(f'LR image {-i}')
-            axes[i].axis('off')
 
         # Display HR frames
         for i, hr_frame in enumerate(hr_frames):
             hr_image = F.to_pil_image(hr_frame)
             axes[num_lr_frames + i].imshow(hr_image)
             axes[num_lr_frames + i].set_title(f'HR image {i}')
-            axes[num_lr_frames + i].axis('off')
 
         plt.tight_layout()
         plt.show()
+
+    def get_random_crop_pair(self, lr_frames: list[torch.Tensor], hr_frames: list[torch.Tensor]) \
+            -> (list[torch.Tensor], list[torch.Tensor]):
+        lr_i, lr_j, lr_h, lr_w = transforms.RandomCrop.get_params(lr_frames[0], output_size=(self.crop_size, self.crop_size))
+        hr_i, hr_j, hr_h, hr_w = lr_i * self.scale, lr_j * self.scale, lr_h * self.scale, lr_w * self.scale
+
+        lr_frame_patches = []
+        for lr_frame in lr_frames:
+            lr_frame_patches.append(F.crop(lr_frame, lr_i, lr_j, lr_h, lr_w))
+        hr_frame_patches = []
+        for hr_frame in hr_frames:
+            hr_frame_patches.append(F.crop(hr_frame, hr_i, hr_j, hr_h, hr_w))
+
+        return lr_frame_patches, hr_frame_patches
+
+    def augment(self, lr_frames: list[torch.Tensor], hr_frames: list[torch.Tensor]) \
+            -> (list[torch.Tensor], list[torch.Tensor]):
+        # Apply random horizontal flip
+        if self.use_hflip:
+            if random.random() > 0.5:
+                for i in range(len(lr_frames)):
+                    lr_frames[i] = flip_image_horizontal(lr_frames[i])
+                for i in range(len(hr_frames)):
+                    hr_frames[i] = flip_image_horizontal(hr_frames[i])
+
+        # Apply random rotation by v flipping and rot of 90
+        if self.use_rotation:
+            if random.random() > 0.5:
+                for i in range(len(lr_frames)):
+                    lr_frames[i] = flip_image_vertical(lr_frames[i])
+                for i in range(len(hr_frames)):
+                    hr_frames[i] = flip_image_vertical(hr_frames[i])
+        if self.use_rotation:
+            if random.random() > 0.5:
+                angle = -90  # for clockwise rotation like BasicSR
+                for i in range(len(lr_frames)):
+                    lr_frames[i] = rotate_image(lr_frames[i], angle)
+                for i in range(len(hr_frames)):
+                    hr_frames[i] = rotate_image(hr_frames[i], angle)
+        return lr_frames, hr_frames
 
 
 def main() -> None:
     div2k_dataset = SingleImagePair(root="../dataset/DIV2K/train", pattern="x2")
     div2k_dataset.display_item(0)
 
-    reds_dataset = MultiImagePair(root="../dataset/Reds/train")
-    reds_dataset.display_item(0)
+    reds_dataset = MultiImagePair(root="../dataset/Reds/train", crop_size=96, use_hflip=True, use_rotation=True)
+    reds_dataset.display_item(888)
 
 
 if __name__ == '__main__':
