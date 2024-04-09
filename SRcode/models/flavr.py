@@ -23,6 +23,28 @@ class SEGating(nn.Module):
         return x * mask
 
 
+class PixelShuffle3d(nn.Module):
+    def __init__(self, upscale_factor):
+        super(PixelShuffle3d, self).__init__()
+        self.upscale_factor = upscale_factor
+
+    def forward(self, x):
+        batch_size, channels, depth, height, width = x.size()
+        new_channels = channels // self.upscale_factor ** 3
+        new_depth = depth * self.upscale_factor
+        new_height = height * self.upscale_factor
+        new_width = width * self.upscale_factor
+
+        # Reshape to split channels into groups
+        x = x.view(batch_size, new_channels, self.upscale_factor, self.upscale_factor, self.upscale_factor, depth, height, width)
+
+        # Transpose and reshape to perform pixel shuffling
+        x = x.permute(0, 1, 5, 2, 6, 3, 7, 4).contiguous()
+        x = x.view(batch_size, new_channels, new_depth, new_height, new_width)
+
+        return x
+
+
 class Flavr(BaseModel):
     def __init__(self, scale: int, frame_number: int = 4):
         super(Flavr, self).__init__(scale=scale, down_and_up=3)
@@ -80,8 +102,8 @@ class Flavr(BaseModel):
         self.gate_up_4 = SEGating(8)
 
         self.sub_pixel_conv_out = nn.Sequential(
-            nn.ConvTranspose3d(8, int(frame_number/2), kernel_size=(3, 3, 3), stride=(1, 1, 1), padding=(1, 1, 1))
-            # nn.PixelShuffle(self.scale),
+            nn.Conv3d(8, int(frame_number/2), kernel_size=(3, 3, 3), stride=(1, 1, 1), padding=(1, 1, 1)),
+            # PixelShuffle3d(scale)
         )
 
     def forward(self, x):

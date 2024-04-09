@@ -13,7 +13,7 @@ from SRcode.config import load_yaml_into_config
 
 def parse_arguments() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Train a SR network based on a config file.")
-    parser.add_argument('file_path', type=str, nargs='?', default='configs/extranet.yaml', help="Path to the config file")
+    parser.add_argument('file_path', type=str, nargs='?', default='configs/flavr.yaml', help="Path to the config file")
     args = parser.parse_args()
     return args
 
