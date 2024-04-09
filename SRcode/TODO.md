@@ -36,6 +36,8 @@ Just some notes and todos what I'd like to consider for my thesis.
 - [x] add a 'how often is the image divided' number to every model so it can be abstracted for train, evaluate and test
 - [ ] train for far longer (roughly 20 hours) with 500.000 iterations with batch size of 32 and crop size of 64 with flips and rotations!
 - [ ] checkout the formula in BasicSR for calculating the epochs amount based on iterations/dataset.size (check if batch size influences sth here)
+- [ ] abstract config and train so it can be trained on SISR and MISR (includes Spatial SR as well as Temporal SR)
+- 
 
 ### Timing:
 A forward pass of our network should at max take 33.3ms
@@ -73,8 +75,10 @@ Boost Performance by:
 
 - [x] Divide images into sub images and save them as .png and pt/npz files
 - [ ] For the config file add a file type option, based on that the dataloader loads, .png, .pt or .npz files
-- [ ] Play around with loading image data for depth for example and min/max normalize the values and safe it back into an image
-- [ ] Load a motion vector image and play around if you can visualize the motion vector data (-x/-y m/s, x,y m/s) into a color range which makes negative values visible
+- [x] Play around with loading image data for depth for example and min/max normalize the values and safe it back into an image
+- [x] Load a motion vector image and play around if you can visualize the motion vector data (-x/-y m/s, x,y m/s) into a color range which makes negative values visible
+- [ ] for depth try to see if we can put it on a logarithmic scale
+- [ ] honestly for motion vectors we can try logarithmic scale as well
 
 ## General
 
@@ -84,9 +88,7 @@ Boost Performance by:
 - [x] make it easy to train with no patchsize (crop/pad if input images are not suitable for down-/up-sampling multiple times) maybe add a variable into the model files for that?
 - [ ] safe the time it took to train the model in hours:min inside the result file
 - [ ] play around with tensor board to visualize training process (loss, SSIM, PSNR)
-
-### Size
-- [ ] abstract size.py to use config to summary network model and size for training and testing
+- [ ] abstract get item fct for loaders to either take ".png", ".pth" or ".npz"
 
 ### Config
 
@@ -113,6 +115,7 @@ VAL_DATASET: dataset/DIV2K/val
 
 - [x] valid config file -> yaml parser -> make class called config, load from yaml
 - [x] model_name, scheduler, optimizer -> class object return
+- [ ] add if the train/val dataset is either Single Image Pair or Multi Image Pair
 
 ### Nice to know
 
