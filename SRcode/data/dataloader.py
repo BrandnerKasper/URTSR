@@ -141,7 +141,7 @@ class MultiImagePair(Dataset):
                  transform=transforms.ToTensor(), crop_size: int = None, scale: int = 4,
                  use_hflip: bool = False, use_rotation: bool = False):
         self.root_hr = os.path.join(root, "HR")
-        self.root_lr = os.path.join(root, "LR/X4")
+        self.root_lr = os.path.join(root, "LR") # /X4 is only for Reds!
         self.number_of_frames = number_of_frames
         self.last_frame_idx = last_frame_idx
         self.transform = transform
@@ -177,7 +177,7 @@ class MultiImagePair(Dataset):
             # Extract the numeric part
             file = int(filename) - i
             # Generate right file name pattern
-            file = f"{file:08d}"  # Ensure 8 digit format
+            file = f"{file:04d}"  # Ensure 8 digit format
             # Put folder and file name back together and load the tensor
             file = f"{self.root_lr}/{folder}/{file}.png"
             file = self.transform(Image.open(file).convert('RGB'))
@@ -189,7 +189,7 @@ class MultiImagePair(Dataset):
             # Extract the numeric part
             file = int(filename) + i
             # Generate right file name pattern
-            file = f"{file:08d}"  # Ensure 8 digit format
+            file = f"{file:04d}"  # Ensure 8 digit format
             # Put folder and file name back together and load the tensor
             file = f"{self.root_hr}/{folder}/{file}.png"
             file = self.transform(Image.open(file).convert('RGB'))
@@ -200,6 +200,8 @@ class MultiImagePair(Dataset):
             lr_frames, hr_frames = self.get_random_crop_pair(lr_frames, hr_frames)
         # Augment image by h and v flip and rot by 90
         lr_frames, hr_frames = self.augment(lr_frames, hr_frames)
+
+        lr_frames, hr_frames = torch.stack(lr_frames), torch.stack(hr_frames)
 
         return lr_frames, hr_frames
 

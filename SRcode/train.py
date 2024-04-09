@@ -8,7 +8,7 @@ from torch.utils.tensorboard import SummaryWriter
 
 from utils import utils
 from data.dataloader import SingleImagePair
-from SRcode.config import load_yaml_into_config
+from config import load_yaml_into_config
 
 
 def parse_arguments() -> argparse.Namespace:
