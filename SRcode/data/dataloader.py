@@ -156,6 +156,8 @@ class MultiImagePair(Dataset):
         for directory in os.listdir(self.root_hr):
             for file in os.listdir(os.path.join(self.root_hr, directory)):
                 file = os.path.splitext(file)[0]
+                # we want a list of images for which # of frames is always possible to retrieve
+                # therefore the first (and last) couple of frames need to be excluded
                 if self.number_of_frames - 2 < int(file) < self.last_frame_idx - int(self.number_of_frames / 2):
                     filenames.append(os.path.join(directory, file))
         return sorted(set(filenames))

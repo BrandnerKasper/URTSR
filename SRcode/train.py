@@ -30,13 +30,12 @@ def train(filepath: str):
     config = load_yaml_into_config(filepath)
     print(config)
     filename = config.filename.split('.')[0]
-    writer = SummaryWriter(log_dir=f"runs", filename_suffix=filename, comment="ExtraNet 6")
+    writer = SummaryWriter(log_dir=f"runs", filename_suffix=filename, comment="a comment")
 
     # Hyperparameters
     batch_size = config.batch_size
     epochs = config.epochs
     num_workers = config.number_workers
-    crop_size = config.crop_size
     start_decay_epoch = config.start_decay_epoch
 
     # Model details
@@ -46,14 +45,11 @@ def train(filepath: str):
     scheduler = config.scheduler
 
     # Loading and preparing data
-    transform = transforms.ToTensor()
     # train data
-    train_data_path = config.train_dataset
-    train_dataset = SingleImagePair(root=train_data_path, transform=transform, pattern="x2", crop_size=crop_size)
+    train_dataset = config.train_dataset
     train_loader = DataLoader(dataset=train_dataset, batch_size=batch_size, num_workers=num_workers, shuffle=True)
     # val data
-    val_data_path = config.val_dataset
-    val_dataset = SingleImagePair(val_data_path, transform=transform, pattern="x2", crop_size=crop_size)
+    val_dataset = config.val_dataset
     val_loader = DataLoader(dataset=val_dataset, batch_size=batch_size, shuffle=True, num_workers=num_workers)
 
     # Training & Validation Loop

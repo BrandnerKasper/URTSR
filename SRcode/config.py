@@ -3,6 +3,8 @@ import torch.nn as nn
 from torch.nn.modules.loss import _Loss
 import torch.optim as optim
 import torch.optim.lr_scheduler as lr_scheduler
+from torch.utils.data import Dataset
+from torchvision import transforms
 
 from typing import Optional
 
@@ -10,12 +12,15 @@ from models.basemodel import BaseModel
 from models.srcnn import SRCNN
 from models.subpixel import SubPixelNN
 from models.extraNet import ExtraNet
+from models.flavr import Flavr
+
+from data.dataloader import SingleImagePair, MultiImagePair
 
 
 def create_yaml(filename: str, model: str, epochs: int, scale: int, batch_size: int,
                 crop_size: int,  use_hflip: bool, use_rotation: bool,
                 number_workers: int, learning_rate: float, criterion: str, optimizer: dict, scheduler: dict,
-                train_dataset: str, val_dataset: str):
+                dataset: str):
 
     data = {
         "MODEL": model,
@@ -30,8 +35,7 @@ def create_yaml(filename: str, model: str, epochs: int, scale: int, batch_size: 
         "CRITERION": criterion,
         "OPTIMIZER": optimizer,
         "SCHEDULER": scheduler,
-        "TRAIN_DATASET": train_dataset,
-        "VAL_DATASET": val_dataset
+        "DATASET": dataset,
     }
 
     yaml_text = yaml.dump(data, sort_keys=False)
@@ -50,6 +54,8 @@ def init_model(model_name: str, scale: int) -> BaseModel:
             return SubPixelNN(scale=scale)
         case "ExtraNet":
             return ExtraNet(scale=scale)
+        case "Flavr":
+            return Flavr(scale=scale)
         case _:
             raise ValueError(f"The model '{model_name}' is not a valid model.")
 
@@ -86,12 +92,35 @@ def init_scheduler(scheduler_data: dict, optimizer: optim.Optimizer, epochs: int
             raise ValueError(f"The scheduler '{scheduler_name}' is not a valid scheduler.")
 
 
+def init_dataset(name: str, crop_size: int, use_hflip: bool, use_rotation: bool) -> (Dataset, Dataset):
+    root = f"dataset/{name}"
+    match name:
+        case "DIV2K":
+            train = SingleImagePair(root=f"{root}/train", transform=transforms.ToTensor(), pattern="x2",
+                                    crop_size=crop_size, scale=2,
+                                    use_hflip=use_hflip, use_rotation=use_rotation)
+            val = SingleImagePair(root=f"{root}/val", transform=transforms.ToTensor(), pattern="x2",
+                                  crop_size=None, scale=2,
+                                  use_hflip=False, use_rotation=False)
+            return train, val
+        case "Reds": #TODO abstract number_of_frames
+            train = MultiImagePair(root=f"{root}/train", number_of_frames=4, last_frame_idx=100,
+                                  transform=transforms.ToTensor(), crop_size=crop_size, scale=4,
+                                  use_hflip=use_hflip, use_rotation=use_rotation)
+            val = MultiImagePair(root=f"{root}/val", number_of_frames=4, last_frame_idx=100,
+                                  transform=transforms.ToTensor(), crop_size=None, scale=4,
+                                  use_hflip=False, use_rotation=False)
+            return train, val
+        case _:
+            raise ValueError(f"The dataset '{name}' is not a valid dataset.")
+
+
 class Config:
     def __init__(self, filename: str, model: str, epochs: int, scale: int, batch_size: int,
                  crop_size: int, use_hflip: bool, use_rotation: bool, number_workers: int,
                  learning_rate: float, criterion: str, optimizer: dict, scheduler: dict,
                  start_decay_epoch: Optional[int],
-                 train_dataset: str, val_dataset: str):
+                 dataset: str):
         self.filename: str = filename
         self.model: BaseModel = init_model(model, scale)
         self.epochs: int = epochs
@@ -106,8 +135,8 @@ class Config:
         self.optimizer: optim.Optimizer = init_optimizer(optimizer, self.model, self.learning_rate)
         self.scheduler: Optional[lr_scheduler.LRScheduler] = init_scheduler(scheduler, self.optimizer, self.epochs)
         self.start_decay_epoch: Optional[int] = start_decay_epoch
-        self.train_dataset: str = train_dataset
-        self.val_dataset: str = val_dataset
+        self.dataset: str = dataset
+        self.train_dataset, self.val_dataset = init_dataset(dataset, crop_size, use_hflip, use_rotation)
 
     def __str__(self):
         return f"Config:\n" \
@@ -125,8 +154,7 @@ class Config:
                f"  Optimizer: {self.optimizer.__class__.__name__}\n" \
                f"  Scheduler: {self.scheduler.__class__.__name__ if self.scheduler else 'None'}\n" \
                f"  Start Decay Epoch: {self.start_decay_epoch if self.start_decay_epoch else 'None'}\n" \
-               f"  Train Dataset: {self.train_dataset}\n" \
-               f"  Validation Dataset: {self.val_dataset}"
+               f"  Dataset: {self.dataset}"
 
 
 def test_yaml_creation() -> None:
@@ -143,7 +171,7 @@ def test_yaml_creation() -> None:
     create_yaml("config", "ExtraNet", 150, 2, 1,
                 256, True, True, 8,
                 0.001, "L1", optimizer, scheduler,
-                "DIV2K/train", "DIV2K/val")
+                "DIV2K")
 
 
 def load_yaml_into_config(file_path: str) -> Config:
@@ -162,22 +190,20 @@ def load_yaml_into_config(file_path: str) -> Config:
         optimizer = config_dict["OPTIMIZER"]
         scheduler = config_dict["SCHEDULER"]
         start_decay_epoch = scheduler["START_DECAY_EPOCH"]
-        train_data = config_dict["TRAIN_DATASET"]
-        val_data = config_dict["VAL_DATASET"]
+        dataset = config_dict["DATASET"]
         filename = file_path.split('/')[-1].split('.')[0]
 
     return Config(filename, model_name, epochs, scale, batch_size,
                   crop_size, use_hflip, use_rotation, number_workers,
                   learning_rate, criterion, optimizer, scheduler, start_decay_epoch,
-                  train_data, val_data)
+                  dataset)
 
 
 def main() -> None:
-    test_yaml_creation()
-    yaml_config = load_yaml_into_config("configs/srcnn.yaml")
+    # test_yaml_creation()
+    yaml_config = load_yaml_into_config("configs/extranet.yaml")
     print(yaml_config)
 
 
-# Press the green button in the gutter to run the script.
 if __name__ == '__main__':
     main()
