@@ -115,7 +115,7 @@ def init_dataset(name: str, crop_size: int, use_hflip: bool, use_rotation: bool)
             train = MultiImagePair(root=f"{root}/train", number_of_frames=4, last_frame_idx=1499,
                                    transform=transforms.ToTensor(), crop_size=crop_size, scale=2,
                                    use_hflip=use_hflip, use_rotation=use_rotation)
-            val = MultiImagePair(root=f"{root}/val", number_of_frames=4, last_frame_idx=300,
+            val = MultiImagePair(root=f"{root}/val", number_of_frames=4, last_frame_idx=1799,
                                    transform=transforms.ToTensor(), crop_size=crop_size, scale=2,
                                    use_hflip=use_hflip, use_rotation=use_rotation)
             return train, val
