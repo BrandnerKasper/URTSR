@@ -139,9 +139,9 @@ class SingleImagePair(Dataset):
 class MultiImagePair(Dataset):
     def __init__(self, root: str, number_of_frames: int = 4, last_frame_idx: int = 100,
                  transform=transforms.ToTensor(), crop_size: int = None, scale: int = 4,
-                 use_hflip: bool = False, use_rotation: bool = False):
+                 use_hflip: bool = False, use_rotation: bool = False, digits: int = 4):
         self.root_hr = os.path.join(root, "HR")
-        self.root_lr = os.path.join(root, "LR") # /X4 is only for Reds!
+        self.root_lr = os.path.join(root, "LR")
         self.number_of_frames = number_of_frames
         self.last_frame_idx = last_frame_idx
         self.transform = transform
@@ -149,6 +149,7 @@ class MultiImagePair(Dataset):
         self.scale = scale
         self.use_hflip = use_hflip
         self.use_rotation = use_rotation
+        self.digits = digits
         self.filenames = self.init_filenames()
 
     def init_filenames(self) -> list[str]:
@@ -177,7 +178,7 @@ class MultiImagePair(Dataset):
             # Extract the numeric part
             file = int(filename) - i
             # Generate right file name pattern
-            file = f"{file:04d}"  # Ensure 8 digit format
+            file = f"{file:0{self.digits}d}"  # Ensure 4/8 digit format
             # Put folder and file name back together and load the tensor
             file = f"{self.root_lr}/{folder}/{file}.png"
             file = self.transform(Image.open(file).convert('RGB'))
@@ -189,7 +190,7 @@ class MultiImagePair(Dataset):
             # Extract the numeric part
             file = int(filename) + i
             # Generate right file name pattern
-            file = f"{file:04d}"  # Ensure 8 digit format
+            file = f"{file:0{self.digits}d}"  # Ensure 4/8 digit format
             # Put folder and file name back together and load the tensor
             file = f"{self.root_hr}/{folder}/{file}.png"
             file = self.transform(Image.open(file).convert('RGB'))
@@ -280,8 +281,13 @@ def main() -> None:
     div2k_dataset = SingleImagePair(root="../dataset/DIV2K/train", pattern="x2")
     div2k_dataset.display_item(0)
 
-    reds_dataset = MultiImagePair(root="../dataset/Reds/train", crop_size=96, use_hflip=True, use_rotation=True)
+    reds_dataset = MultiImagePair(root="../dataset/Reds/train", scale=4,
+                                  crop_size=96, use_hflip=True, use_rotation=True, digits=8)
     reds_dataset.display_item(888)
+
+    matrix_dataset = MultiImagePair(root="../dataset/matrix/train", scale=2, number_of_frames=4, last_frame_idx=1499,
+                                    crop_size=None, use_hflip=False, use_rotation=False, digits=4)
+    matrix_dataset.display_item(42)
 
 
 if __name__ == '__main__':

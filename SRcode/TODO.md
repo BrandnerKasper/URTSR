@@ -109,13 +109,18 @@ SCHEDULER:
   NAME: Cosine
   MIN_LEARNING_RATE: 1.0e-06
   START_DECAY_EPOCH: 20
-TRAIN_DATASET: dataset/DIV2K/train
-VAL_DATASET: dataset/DIV2K/val
+DATASET: DIV2K
 ```
 
 - [x] valid config file -> yaml parser -> make class called config, load from yaml
 - [x] model_name, scheduler, optimizer -> class object return
-- [ ] add if the train/val dataset is either Single Image Pair or Multi Image Pair
+- [x] add if the train/val dataset is either Single Image Pair or Multi Image Pair
+Support only certain datasets:
+- [x] DIV2K
+- [ ] REDS
+- [x] Urban 100
+- [x] Set 5 & 14
+- [ ] Matrix
 
 ### Nice to know
 
