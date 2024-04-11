@@ -111,7 +111,7 @@ def init_dataset(name: str, crop_size: int, use_hflip: bool, use_rotation: bool)
                                   transform=transforms.ToTensor(), crop_size=None, scale=4,
                                   use_hflip=False, use_rotation=False, digits=8)
             return train, val
-        case "Matrix":
+        case "matrix":
             train = MultiImagePair(root=f"{root}/train", number_of_frames=4, last_frame_idx=1499,
                                    transform=transforms.ToTensor(), crop_size=crop_size, scale=2,
                                    use_hflip=use_hflip, use_rotation=use_rotation)

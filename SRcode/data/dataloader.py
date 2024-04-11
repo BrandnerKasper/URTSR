@@ -1,10 +1,12 @@
 import random
 import timeit
+from enum import Enum, auto
 
 import numpy as np
 from matplotlib import pyplot as plt
 from torch.utils.data import Dataset
 from PIL import Image
+import cv2
 import os
 import time
 from torchvision import transforms
@@ -33,6 +35,35 @@ def flip_image_vertical(img: torch.Tensor) -> torch.Tensor:
 
 def rotate_image(img: torch.Tensor, angle: int) -> torch.Tensor:
     return F.rotate(img, angle)
+
+
+class DiskMode(Enum):
+    PIL = 1
+    CV2 = 2
+    PT = 3
+    NPZ = 4
+
+
+def load_image_from_disk(mode: DiskMode, path: str, transform: transforms.ToTensor) -> torch.Tensor:
+    match mode:
+        case DiskMode.PIL:
+            # Load with PIL Image
+            return transform(Image.open(f"{path}.png").convert('RGB'))
+        case DiskMode.CV2:
+            # Load the image with CV2
+            img = cv2.imread(f"{path}.png", cv2.IMREAD_UNCHANGED)
+            # Convert BGR to RGB
+            rgb_image = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+            return transform(rgb_image)
+        case DiskMode.PT:
+            # Load the pytorch pt tensor
+            return torch.load(f"{path}.pt")
+        case DiskMode.NPZ:
+            # Load the compressed numpy .npz file to tensor
+            img = np.load(f"{path}.png")
+            return torch.from_numpy(next(iter(img.values())))
+        case _:
+            raise ValueError(f"The mode {mode} is not a valid mode with {path}!")
 
 
 class SingleImagePair(Dataset):
@@ -74,20 +105,13 @@ class SingleImagePair(Dataset):
     def __getitem__(self, idx: int) -> (torch.Tensor, torch.Tensor):
         common_filename = self.filenames[idx]
         if self.pattern:
-            lr_path = os.path.join(self.root_lr, common_filename + self.pattern + ".pt")
+            lr_path = os.path.join(self.root_lr, common_filename + self.pattern)
         else:
-            lr_path = os.path.join(self.root_lr, common_filename + ".pt")
-        hr_path = os.path.join(self.root_hr, common_filename + ".pt")
+            lr_path = os.path.join(self.root_lr, common_filename)
+        hr_path = os.path.join(self.root_hr, common_filename)
 
-        # Load from npz file
-        # lr_image = np.load(lr_path)
-        # lr_image = torch.from_numpy(next(iter(lr_image.values())))
-        # hr_image = np.load(hr_path)
-        # hr_image = torch.from_numpy(next(iter(hr_image.values())))
-
-        # Load from pt file
-        lr_image = torch.load(lr_path)
-        hr_image = torch.load(hr_path)
+        lr_image = load_image_from_disk(DiskMode.PT, lr_path, self.transform)
+        hr_image = load_image_from_disk(DiskMode.PT, hr_path, self.transform)
 
         # Randomly crop image
         if self.crop_size:
@@ -180,8 +204,8 @@ class MultiImagePair(Dataset):
             # Generate right file name pattern
             file = f"{file:0{self.digits}d}"  # Ensure 4/8 digit format
             # Put folder and file name back together and load the tensor
-            file = f"{self.root_lr}/{folder}/{file}.png"
-            file = self.transform(Image.open(file).convert('RGB'))
+            file = f"{self.root_lr}/{folder}/{file}"
+            file = load_image_from_disk(DiskMode.CV2, file, self.transform)
             lr_frames.append(file)
 
         # hr frames = [current, current + 1, ..., current + n], where n = # of frames / 2
@@ -192,8 +216,8 @@ class MultiImagePair(Dataset):
             # Generate right file name pattern
             file = f"{file:0{self.digits}d}"  # Ensure 4/8 digit format
             # Put folder and file name back together and load the tensor
-            file = f"{self.root_hr}/{folder}/{file}.png"
-            file = self.transform(Image.open(file).convert('RGB'))
+            file = f"{self.root_hr}/{folder}/{file}"
+            file = load_image_from_disk(DiskMode.CV2, file, self.transform)
             hr_frames.append(file)
 
         # Randomly crop image
@@ -286,7 +310,7 @@ def main() -> None:
     reds_dataset.display_item(888)
 
     matrix_dataset = MultiImagePair(root="../dataset/matrix/train", scale=2, number_of_frames=4, last_frame_idx=1499,
-                                    crop_size=None, use_hflip=False, use_rotation=False, digits=4)
+                                    crop_size=256, use_hflip=False, use_rotation=False, digits=4)
     matrix_dataset.display_item(42)
 
 
