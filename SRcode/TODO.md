@@ -37,7 +37,10 @@ Just some notes and todos what I'd like to consider for my thesis.
 - [ ] train for far longer (roughly 20 hours) with 500.000 iterations with batch size of 32 and crop size of 64 with flips and rotations!
 - [ ] checkout the formula in BasicSR for calculating the epochs amount based on iterations/dataset.size (check if batch size influences sth here)
 - [ ] abstract config and train so it can be trained on SISR and MISR (includes Spatial SR as well as Temporal SR)
-- 
+
+### Training
+At the moment training is quite slow as we need to read 4 png images per get_item for LR (1080p) and two for HR (4k)
+- [ ] check how Eduard handled reading such big images from disk
 
 ### Timing:
 A forward pass of our network should at max take 33.3ms
@@ -148,6 +151,7 @@ Generate a dataset from the matrix scene:
 - [x] one for training
 - [x] one for testing/evaluating
 - [x] use png files for buffers and frames
+- [ ] generate very high quality renders (SSAA quality) so for 4k we need 16k for example
 Generate a higher quality dataset for matrix:
 - not sure how big we should make the dataset
 - more scenes are better than one big data set
@@ -234,6 +238,10 @@ We want to evaluate on:
 - [x] PSNR
 - [x] SSIM all channels -> mean
 - [ ] SSIM only y-channel
+- [ ] make PSNR and SSIM work with multiple output images from network to gt at once
+Calc PSNR, SSIM in Multi Image:
+- [ ] image
+- [ ] average
 
 Against:
 - [x] Bilinear
