@@ -4,25 +4,26 @@ from tqdm import tqdm
 
 
 def generate_videos(name: str) -> None:
-    path = f"../dataset/matrix/{name}"
+    path = f"../dataset/matrix/train"
     save_path = f"../videos/{name}"
 
-    generate_hr_video(path, name, save_path)
+    # generate_hr_video(path, name, save_path)
 
     generate_lr_videos(path, name, save_path)
 
 
 def generate_hr_video(path: str, name: str, save_path: str) -> None:
-    path += "/HR"
+    path += f"/HR/{name}"
     name += "_hr"
     generate_video(path, name, save_path)
 
 
 def generate_lr_videos(path: str, name, save_path: str) -> None:
-    path += "/LR"
-    sub_names = ["BaseColor", "Metallic", "NormalVector", "Roughness", "SceneDepth10k",
-                 "Velocity_01", "Velocity_001", "WorldNormal", "WorldPosition"]
-    generate_video(path, f"{name}_lr", save_path)
+    path += f"/LR/{name}"
+    sub_names = [#"basecolor", "metallic", "normal_vector", "roughness", "depth_10", "depth_log"
+                 #"velocity", "velocity_log",
+                    "world_normal", "world_position"]
+    # generate_video(path, f"{name}_lr", save_path)
 
     for sub_name in sub_names:
         generate_sub_video(path, f"{name}_{sub_name}", save_path, sub_name)
@@ -65,7 +66,7 @@ def generate_sub_video(path: str, name: str, save_path: str, sub_type: str) -> N
 
 
 def main() -> None:
-    names = ["ny_by_night", "ny_in_person"]
+    names = ["empire_state", "flat_iron", "ny_by_night", "ny_in_person"]
     for name in names:
         print(f"Videos for {name}..")
         generate_videos(name)

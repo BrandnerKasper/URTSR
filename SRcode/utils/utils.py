@@ -85,6 +85,19 @@ def calculate_ssim(img1_t: torch.Tensor, img2_t: torch.Tensor) -> float:
 
 
 def calculate_metrics(img1_t: torch.Tensor, img2_t: torch.Tensor) -> Metrics:
-    psnr_value = calculate_psnr(img1_t, img2_t)
-    ssim_value = calculate_ssim(img1_t, img2_t)
-    return Metrics(psnr_value, ssim_value)
+    # TODO check if we train on multi image
+    # -> and return a list of metrics (for each image) as well as the average maybe?
+    # -> if true we have to unstack the tensors again and iterate on the resulting list
+    assert img1_t.dim() == img2_t.dim(), f"Both tensors must have the same dimension! Tensor 1 {img1_t.dim()}, Tensor 2 {img2_t.dim()}"
+    match img1_t.dim():
+        case 3: # Single Image Pair and only Spatial SR
+            psnr_value = calculate_psnr(img1_t, img2_t)
+            ssim_value = calculate_ssim(img1_t, img2_t)
+            return Metrics(psnr_value, ssim_value)
+        case 4: # Multi Image Pair and Spatial + Temporal SR
+            img1_l = torch.unbind(img1_t)
+            img2_l = torch.unbind(img2_t)
+            for t1, t2 in img1_l, img2_l:
+                psnr_value = calculate_psnr(t1, t2)
+                ssim_value = calculate_ssim(t1, t2)
+

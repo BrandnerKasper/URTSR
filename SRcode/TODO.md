@@ -40,8 +40,9 @@ Just some notes and todos what I'd like to consider for my thesis.
 
 ### Training
 At the moment training is quite slow as we need to read 4 png images per get_item for LR (1080p) and two for HR (4k)
-- [ ] check how Eduard handled reading such big images from disk
-
+- [x] check how Eduard handled reading such big images from disk -> cv2 imread
+- [ ] cv2 still too slow, try to compress all training and val data into npz and pt files and see how much faster it would be (XTX PC!)
+- [ ] find more ways to speed up the loading from disk thing..
 ### Timing:
 A forward pass of our network should at max take 33.3ms
 
@@ -239,6 +240,7 @@ We want to evaluate on:
 - [x] SSIM all channels -> mean
 - [ ] SSIM only y-channel
 - [ ] make PSNR and SSIM work with multiple output images from network to gt at once
+
 Calc PSNR, SSIM in Multi Image:
 - [ ] image
 - [ ] average
