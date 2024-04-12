@@ -42,22 +42,57 @@ def pad_or_crop_to_target(input_t: torch.Tensor, target_t: torch.Tensor) -> Tens
 
 # Metrics
 class Metrics:
-    def __init__(self, psnr_value=0.0, ssim_value=0.0):
-        self.psnr: float = psnr_value
-        self.ssim: float = ssim_value
+    def __init__(self, psnr_values: list[float], ssim_values: list[float]):
+        self.psnr_values = psnr_values
+        self.ssim_values = ssim_values
+        self.average_psnr: float = 0
+        self.average_ssim: float = 0
+        self.calc_average()
+
+    def calc_average(self):
+        self.average_psnr = sum(self.psnr_values) / len(self.psnr_values)
+        self.average_ssim = sum(self.ssim_values) / len(self.ssim_values)
 
     def __add__(self, other):
         if not isinstance(other, Metrics):
             raise TypeError(f"Can't add type {other} to a Metric instance.")
-        return Metrics(self.psnr + other.psnr, self.ssim + other.ssim)
+
+        assert len(self.psnr_values) == len(other.psnr_values), \
+            f"Metrics have different amount of psnr values self: {len(self.psnr_values)}, other: {len(other.psnr_values)}"
+        psnr_values = []
+        for i in range(len(other.psnr_values)):
+            value = self.psnr_values[i] + other.psnr_values[i]
+            psnr_values.append(value)
+
+        assert len(self.ssim_values) == len(other.ssim_values), \
+            f"Metrics have different amount of ssim values self: {len(self.ssim_values)}, other: {len(other.ssim_values)}"
+        ssim_values = []
+        for i in range(len(other.ssim_values)):
+            value = self.ssim_values[i] + other.ssim_values[i]
+            ssim_values.append(value)
+
+        return Metrics(psnr_values, ssim_values)
 
     def __truediv__(self, divisor):
         if not isinstance(divisor, (int, float)):
             raise TypeError(f"Unsupported type for division: {type(divisor)}")
-        return Metrics(self.psnr / divisor, self.ssim / divisor)
+        psnr_values = []
+        for value in self.psnr_values:
+            psnr_values.append(value/divisor)
+        ssim_values = []
+        for value in self.ssim_values:
+            ssim_values.append(value/divisor)
+
+        return Metrics(psnr_values, ssim_values)
 
     def __str__(self):
-        return f"PSNR {self.psnr:.2f} dB | SSIM {self.ssim:.2f}"
+        psnr_values_str = ", ".join(f"{val:.2f}" for val in self.psnr_values)
+        ssim_values_str = ", ".join(f"{val:.2f}" for val in self.ssim_values)
+        return (f"Metrics:\n"
+                f"  PSNR Values: {psnr_values_str}\n"
+                f"  SSIM Values: {ssim_values_str}\n"
+                f"  Average PSNR: {self.average_psnr:.2f}\n"
+                f"  Average SSIM: {self.average_ssim:.2f}")
 
 
 def calculate_psnr(input_t: torch.Tensor, target_t: torch.Tensor, data_range: float = 1.0) -> float:
@@ -84,20 +119,37 @@ def calculate_ssim(img1_t: torch.Tensor, img2_t: torch.Tensor) -> float:
     return ssim_value
 
 
-def calculate_metrics(img1_t: torch.Tensor, img2_t: torch.Tensor) -> Metrics:
+def calculate_metrics(img_tensor1: torch.Tensor, img_tensor2: torch.Tensor) -> Metrics:
     # TODO check if we train on multi image
     # -> and return a list of metrics (for each image) as well as the average maybe?
     # -> if true we have to unstack the tensors again and iterate on the resulting list
-    assert img1_t.dim() == img2_t.dim(), f"Both tensors must have the same dimension! Tensor 1 {img1_t.dim()}, Tensor 2 {img2_t.dim()}"
-    match img1_t.dim():
+    assert img_tensor1.dim() == img_tensor2.dim(), f"Both tensors must have the same dimension! Tensor 1 {img_tensor1.dim()}, Tensor 2 {img_tensor2.dim()}"
+    match img_tensor1.dim():
         case 3: # Single Image Pair and only Spatial SR
-            psnr_value = calculate_psnr(img1_t, img2_t)
-            ssim_value = calculate_ssim(img1_t, img2_t)
+            psnr_value = calculate_psnr(img_tensor1, img_tensor2)
+            ssim_value = calculate_ssim(img_tensor1, img_tensor2)
             return Metrics(psnr_value, ssim_value)
         case 4: # Multi Image Pair and Spatial + Temporal SR
-            img1_l = torch.unbind(img1_t)
-            img2_l = torch.unbind(img2_t)
-            for t1, t2 in img1_l, img2_l:
-                psnr_value = calculate_psnr(t1, t2)
-                ssim_value = calculate_ssim(t1, t2)
+            img_tensor_list_1 = torch.unbind(img_tensor1)
+            img_tensor_list_2 = torch.unbind(img_tensor2)
+            psnr_values, ssim_values = [], []
+            for i in range(len(img_tensor_list_1)):
+                psnr_value = calculate_psnr(img_tensor_list_1[i], img_tensor_list_2[i])
+                ssim_value = calculate_ssim(img_tensor_list_1[i], img_tensor_list_2[i])
+                psnr_values.append(psnr_value)
+                ssim_values.append(ssim_value)
+            average_psnr = sum(psnr_values) / len(psnr_values)
+            average_ssim = sum(ssim_values) / len(ssim_values)
+            return Metrics(average_psnr, average_ssim)
 
+
+def main() -> None:
+    m1 = Metrics([0.3, 0.7], [0.8, 0.6])
+    m2 = Metrics([0.1, 0.2], [0.2, 0.1])
+    m3 = m1 + m2
+    m4 = m3 / 2
+    print(f"M1: {m1}\n M2: {m2}\n M3: {m3}\n M4: {m4}")
+
+
+if __name__ == "__main__":
+    main()
