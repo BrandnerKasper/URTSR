@@ -230,6 +230,7 @@ After calling evaluate.py with config.yaml we want to create a result.yaml file 
 - [x] results in form of for each dataset PSNR and SSIM value
 - [x] write a results.py script, which generates a csv file based on all result files
 - [x] add "pseudo" entry results for bilinear and bicubic (will have None for model details only name)
+- [ ] add a test script for spatial and temporal SR so that we safe the Spatial Temporal SR images from a test sequence and display it as a video
 
 ### Frame Generation
 - [x] write a script which generates a video based on pngs
@@ -242,8 +243,9 @@ We want to evaluate on:
 - [ ] make PSNR and SSIM work with multiple output images from network to gt at once
 
 Calc PSNR, SSIM in Multi Image:
-- [ ] image
-- [ ] average
+- [x] for two images
+- [x] plus the average
+- [ ] abstract the number of images based on the second dimension of the output tensor ([8, 2, 3, 1920, 1080])
 
 Against:
 - [x] Bilinear
@@ -261,7 +263,7 @@ Add Tests for:
 - [ ] test.py
 - [x] datalaoder.py
 - [ ] config.py
-- [ ] utils.py
+- [x] utils.py
 - [ ] results.py
 - [ ] size.py
 

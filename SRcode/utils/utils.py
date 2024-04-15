@@ -50,8 +50,14 @@ class Metrics:
         self.calc_average()
 
     def calc_average(self):
-        self.average_psnr = sum(self.psnr_values) / len(self.psnr_values)
-        self.average_ssim = sum(self.ssim_values) / len(self.ssim_values)
+        if len(self.psnr_values) == 0:
+            self.average_psnr = 0
+        else:
+            self.average_psnr = sum(self.psnr_values) / len(self.psnr_values)
+        if len(self.ssim_values) == 0:
+            self.ssim_values = 0
+        else:
+            self.average_ssim = sum(self.ssim_values) / len(self.ssim_values)
 
     def __add__(self, other):
         if not isinstance(other, Metrics):
@@ -62,6 +68,7 @@ class Metrics:
         psnr_values = []
         for i in range(len(other.psnr_values)):
             value = self.psnr_values[i] + other.psnr_values[i]
+            value = round(value, 2)
             psnr_values.append(value)
 
         assert len(self.ssim_values) == len(other.ssim_values), \
@@ -69,6 +76,7 @@ class Metrics:
         ssim_values = []
         for i in range(len(other.ssim_values)):
             value = self.ssim_values[i] + other.ssim_values[i]
+            value = round(value, 2)
             ssim_values.append(value)
 
         return Metrics(psnr_values, ssim_values)
@@ -85,6 +93,12 @@ class Metrics:
 
         return Metrics(psnr_values, ssim_values)
 
+    def __eq__(self, other):
+        if not isinstance(other, Metrics):
+            raise TypeError(f"Can't compare type {other} to a Metric instance.")
+        return ((self.psnr_values, self.ssim_values, self.average_psnr, self.average_ssim) ==
+                (other.psnr_values, other.ssim_values, other.average_psnr, other.average_ssim))
+
     def __str__(self):
         psnr_values_str = ", ".join(f"{val:.2f}" for val in self.psnr_values)
         ssim_values_str = ", ".join(f"{val:.2f}" for val in self.ssim_values)
@@ -92,7 +106,7 @@ class Metrics:
                 f"  PSNR Values: {psnr_values_str}\n"
                 f"  SSIM Values: {ssim_values_str}\n"
                 f"  Average PSNR: {self.average_psnr:.2f}\n"
-                f"  Average SSIM: {self.average_ssim:.2f}")
+                f"  Average SSIM: {self.average_ssim:.2f}\n")
 
 
 def calculate_psnr(input_t: torch.Tensor, target_t: torch.Tensor, data_range: float = 1.0) -> float:
@@ -120,27 +134,24 @@ def calculate_ssim(img1_t: torch.Tensor, img2_t: torch.Tensor) -> float:
 
 
 def calculate_metrics(img_tensor1: torch.Tensor, img_tensor2: torch.Tensor) -> Metrics:
-    # TODO check if we train on multi image
-    # -> and return a list of metrics (for each image) as well as the average maybe?
-    # -> if true we have to unstack the tensors again and iterate on the resulting list
     assert img_tensor1.dim() == img_tensor2.dim(), f"Both tensors must have the same dimension! Tensor 1 {img_tensor1.dim()}, Tensor 2 {img_tensor2.dim()}"
     match img_tensor1.dim():
-        case 3: # Single Image Pair and only Spatial SR
+        case 4: # Single Image Pair and only Spatial SR
             psnr_value = calculate_psnr(img_tensor1, img_tensor2)
             ssim_value = calculate_ssim(img_tensor1, img_tensor2)
-            return Metrics(psnr_value, ssim_value)
-        case 4: # Multi Image Pair and Spatial + Temporal SR
-            img_tensor_list_1 = torch.unbind(img_tensor1)
-            img_tensor_list_2 = torch.unbind(img_tensor2)
+            return Metrics([psnr_value], [ssim_value])
+        case 5: # Multi Image Pair and Spatial + Temporal SR
+            img_tensor_list_1 = torch.unbind(img_tensor1, 1) # example tensor dim (8, 2, 3, 1920, 1080)
+            img_tensor_list_2 = torch.unbind(img_tensor2, 1)
             psnr_values, ssim_values = [], []
             for i in range(len(img_tensor_list_1)):
                 psnr_value = calculate_psnr(img_tensor_list_1[i], img_tensor_list_2[i])
                 ssim_value = calculate_ssim(img_tensor_list_1[i], img_tensor_list_2[i])
                 psnr_values.append(psnr_value)
                 ssim_values.append(ssim_value)
-            average_psnr = sum(psnr_values) / len(psnr_values)
-            average_ssim = sum(ssim_values) / len(ssim_values)
-            return Metrics(average_psnr, average_ssim)
+            return Metrics(psnr_values, ssim_values)
+        case _:
+            raise Exception(f"image tensor dimension {img_tensor1.dim()} is not supported!")
 
 
 def main() -> None:

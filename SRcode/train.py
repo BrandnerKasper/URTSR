@@ -7,7 +7,7 @@ from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 
 from utils import utils
-from data.dataloader import SingleImagePair
+from data.dataloader import SingleImagePair, MultiImagePair
 from config import load_yaml_into_config
 
 
@@ -55,32 +55,37 @@ def train(filepath: str):
     # Training & Validation Loop
     for epoch in tqdm(range(epochs), desc='Train & Validate', dynamic_ncols=True):
         # train loop
-        total_loss = 0.0
-        for lr_image, hr_image in tqdm(train_loader, desc=f'Training, Epoch {epoch + 1}/{epochs}', dynamic_ncols=True):
-            lr_image, hr_image = lr_image.to(device), hr_image.to(device)
-            optimizer.zero_grad()
-            output = model(lr_image)
-            loss = criterion(output, hr_image)
-            loss.backward()
-            optimizer.step()
-
-            total_loss += loss.item()
-
-        # scheduler update if we have one
-        if scheduler is not None:
-            if epoch > start_decay_epoch:
-                scheduler.step()
-        # Loss
-        average_loss = total_loss / len(train_loader)
-        print("\n")
-        print(f"Loss: {average_loss:.4f}\n")
-        # Log loss to TensorBoard
-        writer.add_scalar('Loss/Train', average_loss, epoch)
+        # total_loss = 0.0
+        # for lr_image, hr_image in tqdm(train_loader, desc=f'Training, Epoch {epoch + 1}/{epochs}', dynamic_ncols=True):
+        #     lr_image, hr_image = lr_image.to(device), hr_image.to(device)
+        #     optimizer.zero_grad()
+        #     output = model(lr_image)
+        #     loss = criterion(output, hr_image)
+        #     loss.backward()
+        #     optimizer.step()
+        #
+        #     total_loss += loss.item()
+        #
+        # # scheduler update if we have one
+        # if scheduler is not None:
+        #     if epoch > start_decay_epoch:
+        #         scheduler.step()
+        # # Loss
+        # average_loss = total_loss / len(train_loader)
+        # print("\n")
+        # print(f"Loss: {average_loss:.4f}\n")
+        # # Log loss to TensorBoard
+        # writer.add_scalar('Loss/Train', average_loss, epoch)
 
         # val loop
-        if (epoch + 1) % 10 != 0:
+        if (epoch + 1) % 10 != 1:
             continue
-        total_metrics = utils.Metrics()
+
+        if isinstance(val_dataset, SingleImagePair):
+            total_metrics = utils.Metrics([0], [0])
+        else:
+            total_metrics = utils.Metrics([0, 0], [0, 0]) # TODO: abstract number of values based on second dim of tensor [8, 2, 3, 1920, 1080]
+
         for lr_image, hr_image in tqdm(val_loader, desc=f"Validation, Epoch {epoch + 1}/{epochs}", dynamic_ncols=True):
             lr_image, hr_image = lr_image.to(device), hr_image.to(device)
             with torch.no_grad():
@@ -92,7 +97,7 @@ def train(filepath: str):
         # PSNR & SSIM
         average_metric = total_metrics / len(val_loader)
         print("\n")
-        print(f"PSNR: {average_metric.psnr:.2f} db, SSIM: {average_metric.ssim:.4f}\n")
+        print(average_metric)
         # Log PSNR & SSIM to TensorBoard
         writer.add_scalar('PSNR/Validation', average_metric.psnr, epoch)
         writer.add_scalar('SSIM/Validation', average_metric.ssim, epoch)
