@@ -36,7 +36,7 @@ Just some notes and todos what I'd like to consider for my thesis.
 - [x] add a 'how often is the image divided' number to every model so it can be abstracted for train, evaluate and test
 - [ ] train for far longer (roughly 20 hours) with 500.000 iterations with batch size of 32 and crop size of 64 with flips and rotations!
 - [ ] checkout the formula in BasicSR for calculating the epochs amount based on iterations/dataset.size (check if batch size influences sth here)
-- [ ] abstract config and train so it can be trained on SISR and MISR (includes Spatial SR as well as Temporal SR)
+- [x] abstract config and train so it can be trained on SISR and MISR (includes Spatial SR as well as Temporal SR)
 
 ### Training
 At the moment training is quite slow as we need to read 4 png images per get_item for LR (1080p) and two for HR (4k)
@@ -91,17 +91,19 @@ Boost Performance by:
 - [x] add a validation to the training script
 - [x] make it easy to train with no patchsize (crop/pad if input images are not suitable for down-/up-sampling multiple times) maybe add a variable into the model files for that?
 - [ ] safe the time it took to train the model in hours:min inside the result file
-- [ ] play around with tensor board to visualize training process (loss, SSIM, PSNR)
-- [ ] abstract get item fct for loaders to either take ".png", ".pth" or ".npz"
+- [x] play around with tensor board to visualize training process (loss, SSIM, PSNR, images?)
+- [x] abstract get item fct for loaders to either take ".png", ".pth" or ".npz"
 
 ### Config
 
 ```yaml
-MODEL: ExtraNet
+MODEL: Flavr
 EPOCHS: 150
 SCALE: 2
-BATCH_SIZE: 4
+BATCH_SIZE: 8
 CROP_SIZE: 256
+USE_HFLIP: True
+USE_ROTATION: True
 NUMBER_WORKERS: 8
 LEARNING_RATE: 0.001
 CRITERION: L1
@@ -113,7 +115,7 @@ SCHEDULER:
   NAME: Cosine
   MIN_LEARNING_RATE: 1.0e-06
   START_DECAY_EPOCH: 20
-DATASET: DIV2K
+DATASET: matrix
 ```
 
 - [x] valid config file -> yaml parser -> make class called config, load from yaml
@@ -124,7 +126,7 @@ Support only certain datasets:
 - [ ] REDS
 - [x] Urban 100
 - [x] Set 5 & 14
-- [ ] Matrix
+- [x] Matrix
 
 ### Nice to know
 
@@ -158,7 +160,7 @@ Generate a higher quality dataset for matrix:
 - more scenes are better than one big data set
 - 900 frames for LR (+buffers) and HR are around 30GB
 - [ ] 8-20 training scenes
-- [ ] 2-5 test scenes
+- [x] 2-5 test scenes
 
 ### Typical render resolutions
 
@@ -214,11 +216,14 @@ HD
 - [x] Clean up evalaute.py by removing the comparison of bilinear, bicubic and the network
 - [x] Load config files into pandas dataframe
 - [x] Save dataframe into csv file
+- [ ] fix eval script to work with Multi Image Pair
+- [ ] abstract eval script to work with Single Images as well as Multi Images
 
 Single Image Super Resolution (SISR) eval:
 - [x] Set5
 - [x] Set14
 - [x] Urban100
+
 Video Image Super Resolution with frame gen eval:
 - [ ] Reds for frame generation
 - [ ] Matrix data set (our own)
@@ -234,6 +239,8 @@ After calling evaluate.py with config.yaml we want to create a result.yaml file 
 
 ### Frame Generation
 - [x] write a script which generates a video based on pngs
+- [ ] write a test script which simulates a 30 fps 1080p image flow to generate a 60 fps 4k image flow
+- [ ] abstract the test script to safe the images per sequence in sub folders beginning with the right index
 
 ### Metrics
 We want to evaluate on:
