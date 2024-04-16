@@ -75,6 +75,10 @@ def train(filepath: str):
     val_dataset = config.val_dataset
     val_loader = DataLoader(dataset=val_dataset, batch_size=1, shuffle=True, num_workers=num_workers)
 
+    writer.add_text("Model detail", f"{config}", -1)
+
+    iteration_counter = 0
+
     # Training & Validation Loop
     for epoch in tqdm(range(epochs), desc='Train & Validate', dynamic_ncols=True):
         # train loop
@@ -89,6 +93,7 @@ def train(filepath: str):
             optimizer.step()
 
             total_loss += loss.item()
+            iteration_counter += 1
 
         # scheduler update if we have one
         if scheduler is not None:
@@ -116,6 +121,7 @@ def train(filepath: str):
             with torch.no_grad():
                 output_image = model(lr_image)
                 output_image = torch.clamp(output_image, min=0.0, max=1.0)
+            iteration_counter += 1
             # Calc PSNR and SSIM
             metrics = utils.calculate_metrics(hr_image, output_image)
             total_metrics += metrics
@@ -124,9 +130,9 @@ def train(filepath: str):
                 val_counter += 1
                 continue
             if isinstance(val_dataset, MultiImagePair):
-                write_images(writer, "multi", lr_image, output_image, hr_image, epoch)
+                write_images(writer, "multi", lr_image, output_image, hr_image, iteration_counter)
             else:
-                write_images(writer, "single", lr_image, output_image, hr_image, epoch)
+                write_images(writer, "single", lr_image, output_image, hr_image, iteration_counter)
             val_counter = 0
 
         # PSNR & SSIM
@@ -135,10 +141,10 @@ def train(filepath: str):
         print(average_metric)
         # Log PSNR & SSIM to TensorBoard
         # PSNR
-        for i in range(average_metric.psnr_values):
+        for i in range(len(average_metric.psnr_values)):
             writer.add_scalar(f"Val/PSNR/image_{i}", average_metric.psnr_values[i], epoch)
         # SSIM
-        for i in range(average_metric.ssim_values):
+        for i in range(len(average_metric.ssim_values)):
             writer.add_scalar(f"Val/SSIM/image_{i}", average_metric.ssim_values[i], epoch)
 
     # End Log
