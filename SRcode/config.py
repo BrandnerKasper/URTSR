@@ -207,6 +207,13 @@ def load_yaml_into_config(file_path: str) -> Config:
                   dataset)
 
 
+def create_comment_from_config(file: Config) -> str:
+    comment = (f"e{file.epochs}.s{file.scale}.bs{file.batch_size}.cs{file.crop_size}.c{file.criterion.__class__.__name__}."
+               f"o{file.optimizer.__class__.__name__}.sch{file.scheduler.__class__.__name__ if file.scheduler else 'None'}."
+               f"d{file.dataset}")
+    return comment
+
+
 def main() -> None:
     # test_yaml_creation()
     yaml_config = load_yaml_into_config("configs/extranet.yaml")
