@@ -1,11 +1,14 @@
 import yaml
 from torchvision import transforms
 import torch
+from tqdm import tqdm
+
 from utils import utils
 import argparse
+from torch.utils.data import DataLoader
 
-from data.dataloader import SingleImagePair
-from SRcode.config import load_yaml_into_config, Config
+from data.dataloader import SingleImagePair, MultiImagePair
+from config import load_yaml_into_config, Config
 
 
 def parse_arguments() -> argparse.Namespace:
@@ -29,6 +32,17 @@ def save_results(results: dict, name: str) -> None:
 
 
 def evaluate(pretrained_model_path: str) -> None:
+    model_name = pretrained_model_path.split('/')[-1].split('.')[0]
+    config = get_config_from_pretrained_model(model_name)
+
+    # decide if Single Image or Multi Image Pair
+    if isinstance(config.val_dataset, SingleImagePair):
+        evaluate_single_image_dataset(pretrained_model_path)
+    else:
+        evaluate_multi_image_dataset(pretrained_model_path)
+
+
+def evaluate_single_image_dataset(pretrained_model_path: str) -> None:
     # Setup
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Device: {device}")
@@ -39,7 +53,7 @@ def evaluate(pretrained_model_path: str) -> None:
         results: dict = yaml.safe_load(file)
 
     # Datasets to evaluate:
-    datasets = ["Set5", "Set14", "Urban100"]
+    datasets = ["Set5", "Set14", "Urban100"]  # this is additional for SISR!
 
     # Loading model
     model = config.model.to(device)
@@ -52,7 +66,7 @@ def evaluate(pretrained_model_path: str) -> None:
         evaluate_dataset = SingleImagePair(root=dataset_path, pattern="")
 
         # Evaluate
-        total = utils.Metrics()
+        total = utils.Metrics([], [])
         for i in range(len(evaluate_dataset)):
             filename = evaluate_dataset.get_filename(i)
             lr_image, hr_image = evaluate_dataset.__getitem__(i)
@@ -81,13 +95,65 @@ def evaluate(pretrained_model_path: str) -> None:
 
         # Generate result
         results[dataset] = {
-            "PSNR": round(average.psnr, 2),
-            "SSIM": round(average.ssim, 2),
+            "PSNR": round(average.average_psnr, 2),
+            "SSIM": round(average.average_ssim, 2),
         }
 
     save_results(results, model_name)
 
 
+def evaluate_multi_image_dataset(pretrained_model_path: str) -> None:
+    # Setup
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    print(f"Device: {device}")
+    model_name = pretrained_model_path.split('/')[-1].split('.')[0]
+    config = get_config_from_pretrained_model(model_name)
+    print(config)
+
+    with open(f"configs/{model_name}.yaml", "r") as file:
+        results: dict = yaml.safe_load(file)
+
+    # Loading model
+    model = config.model.to(device)
+    model.load_state_dict(torch.load(pretrained_model_path))
+    model.eval()
+
+    val_loader = DataLoader(dataset=config.val_dataset, batch_size=1, shuffle=False, num_workers=config.number_workers)
+
+    total_metrics = utils.Metrics([0, 0], [0, 0])  # TODO: abstract number of values based on second dim of tensor [8, 2, 3, 1920, 1080]
+
+    for lr_image, hr_image in tqdm(val_loader, desc=f"Evaluating on {config.dataset}", dynamic_ncols=True):
+        lr_image, hr_image = lr_image.to(device), hr_image.to(device)
+        with torch.no_grad():
+            output_image = model(lr_image)
+            output_image = torch.clamp(output_image, min=0.0, max=1.0)
+        # Calc PSNR and SSIM
+        metrics = utils.calculate_metrics(hr_image, output_image)
+        total_metrics += metrics
+
+    # PSNR & SSIM
+    average_metric = total_metrics / len(val_loader)
+    print("\n")
+    print(average_metric)
+
+    # Write results
+    # TODO: abstract number of values based on number of frames
+    results["PSNR"] = {
+        "Frame_0": average_metric.psnr_values[0],
+        "Frame_1": average_metric.psnr_values[1],
+        "Average": average_metric.average_psnr
+    }
+    results["SSIM"] = {
+        "Frame_0": average_metric.ssim_values[0],
+        "Frame_1": average_metric.ssim_values[1],
+        "Average": average_metric.average_ssim
+    }
+
+    # Save results
+    save_results(results, model_name)
+
+
+# TODO: Rework
 def evaluate_trad(config_path: str) -> None:
     # Setup
     name = config_path.split('/')[-1].split('.')[0]
