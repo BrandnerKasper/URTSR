@@ -163,7 +163,7 @@ class SingleImagePair(Dataset):
 class MultiImagePair(Dataset):
     def __init__(self, root: str, number_of_frames: int = 4, last_frame_idx: int = 100,
                  transform=transforms.ToTensor(), crop_size: int = None, scale: int = 4,
-                 use_hflip: bool = False, use_rotation: bool = False, digits: int = 4):
+                 use_hflip: bool = False, use_rotation: bool = False, digits: int = 4, disk_mode=DiskMode.CV2):
         self.root_hr = os.path.join(root, "HR")
         self.root_lr = os.path.join(root, "LR")
         self.number_of_frames = number_of_frames
@@ -174,6 +174,7 @@ class MultiImagePair(Dataset):
         self.use_hflip = use_hflip
         self.use_rotation = use_rotation
         self.digits = digits
+        self.disk_mode = disk_mode
         self.filenames = self.init_filenames()
 
     def init_filenames(self) -> list[str]:
@@ -205,7 +206,7 @@ class MultiImagePair(Dataset):
             file = f"{file:0{self.digits}d}"  # Ensure 4/8 digit format
             # Put folder and file name back together and load the tensor
             file = f"{self.root_lr}/{folder}/{file}"
-            file = load_image_from_disk(DiskMode.CV2, file, self.transform)
+            file = load_image_from_disk(self.disk_mode, file, self.transform)
             lr_frames.append(file)
 
         # hr frames = [current, current + 1, ..., current + n], where n = # of frames / 2
@@ -217,7 +218,7 @@ class MultiImagePair(Dataset):
             file = f"{file:0{self.digits}d}"  # Ensure 4/8 digit format
             # Put folder and file name back together and load the tensor
             file = f"{self.root_hr}/{folder}/{file}"
-            file = load_image_from_disk(DiskMode.CV2, file, self.transform)
+            file = load_image_from_disk(DiskMode.PT, file, self.transform)
             hr_frames.append(file)
 
         # Randomly crop image

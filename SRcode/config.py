@@ -14,7 +14,7 @@ from models.subpixel import SubPixelNN
 from models.extraNet import ExtraNet
 from models.flavr import Flavr
 
-from data.dataloader import SingleImagePair, MultiImagePair
+from data.dataloader import SingleImagePair, MultiImagePair, DiskMode
 
 
 def create_yaml(filename: str, model: str, epochs: int, scale: int, batch_size: int,
@@ -106,7 +106,7 @@ def init_dataset(name: str, crop_size: int, use_hflip: bool, use_rotation: bool)
         case "Reds": #TODO abstract number_of_frames
             train = MultiImagePair(root=f"{root}/train", number_of_frames=4, last_frame_idx=100,
                                   transform=transforms.ToTensor(), crop_size=crop_size, scale=4,
-                                  use_hflip=use_hflip, use_rotation=use_rotation)
+                                  use_hflip=use_hflip, use_rotation=use_rotation, digits=8, disk_mode=DiskMode.CV2)
             val = MultiImagePair(root=f"{root}/val", number_of_frames=4, last_frame_idx=100,
                                   transform=transforms.ToTensor(), crop_size=None, scale=4,
                                   use_hflip=False, use_rotation=False, digits=8)
@@ -114,10 +114,18 @@ def init_dataset(name: str, crop_size: int, use_hflip: bool, use_rotation: bool)
         case "matrix":
             train = MultiImagePair(root=f"{root}/train", number_of_frames=4, last_frame_idx=1499,
                                    transform=transforms.ToTensor(), crop_size=crop_size, scale=2,
-                                   use_hflip=use_hflip, use_rotation=use_rotation)
+                                   use_hflip=use_hflip, use_rotation=use_rotation, digits=4, disk_mode=DiskMode.CV2)
             val = MultiImagePair(root=f"{root}/val", number_of_frames=4, last_frame_idx=599,
                                    transform=transforms.ToTensor(), crop_size=crop_size, scale=2,
-                                   use_hflip=use_hflip, use_rotation=use_rotation, digits=4)
+                                   use_hflip=use_hflip, use_rotation=use_rotation, digits=4, disk_mode=DiskMode.CV2)
+            return train, val
+        case "matrix_pt":
+            train = MultiImagePair(root=f"{root}/train", number_of_frames=4, last_frame_idx=1499,
+                                   transform=transforms.ToTensor(), crop_size=crop_size, scale=2,
+                                   use_hflip=use_hflip, use_rotation=use_rotation, digits=4, disk_mode=DiskMode.PT)
+            val = MultiImagePair(root=f"{root}/val", number_of_frames=4, last_frame_idx=599,
+                                 transform=transforms.ToTensor(), crop_size=crop_size, scale=2,
+                                 use_hflip=use_hflip, use_rotation=use_rotation, digits=4, disk_mode=DiskMode.PT)
             return train, val
         case _:
             raise ValueError(f"The dataset '{name}' is not a valid dataset.")
