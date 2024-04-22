@@ -2,6 +2,7 @@ import argparse
 import os
 import sys
 
+import cv2
 import numpy as np
 import torch
 from PIL import Image
@@ -13,46 +14,58 @@ def parse_arguments() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Preprocess dataset .png files into sub-images by factor and converting into .pt files.")
 
-    parser.add_argument('--folder_path', type=str, default='dataset/DIV2K/train/LR',
+    parser.add_argument('--folder_path', type=str, default='../dataset/matrix/train/LR/empire_state',
                         help="Path to the dataset folder containing .png files")
-    parser.add_argument('--factor', type=int, default=2,
+    parser.add_argument('--factor', type=int, default=1,
                         help="Dividing the images into sub-images by factor times 2. "
                              "Ex: factor 2 = 4 sub-images, 3 = 9 sub-images..")
-    parser.add_argument('--safe_folder_path', type=str, default='dataset/pre',
+    parser.add_argument('--safe_folder_path', type=str, default='../dataset/matrix_npz/train/LR/empire_state',
                         help="Path to the folder in which the sub-images should be saved")
-    parser.add_argument('--file_format', choices=['pt', 'npz'], default='pt',
+    parser.add_argument('--file_format', choices=['pt', 'npz'], default='npz',
                         help="Output file format ('pt' or 'npz').")
 
     args = parser.parse_args()
     return args
 
 
-def convert_image_to_pt_file(path: str) -> None:
+def convert_image_to_pt_file(path: str, filename: str, safe_folder_path: str) -> None:
+    splits = filename.split(".")
+    if len(splits) > 2:
+        return
     transform = transforms.ToTensor()
-    img = Image.open(path).convert('RGB')
-    img_tensor = transform(img)
-    pt_path = path.split(".")[0]
-    torch.save(img_tensor, f"{pt_path}.pt")
+    # Load the image with CV2
+    img = cv2.imread(path, cv2.IMREAD_UNCHANGED)
+    # Convert BGR to RGB
+    rgb_image = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+    img_tensor = transform(rgb_image)
+    filename = filename.replace(".png", "")
+    torch.save(img_tensor, f"{safe_folder_path}/{filename}.pt")
 
 
-def convert_image_to_npz_file(path: str) -> None:
+def convert_image_to_npz_file(path: str, filename: str, safe_folder_path: str) -> None:
+    splits = filename.split(".")
+    if len(splits) > 2:
+        return
     transform = transforms.ToTensor()
-    img = Image.open(path).convert('RGB')
-    img_tensor = transform(img).numpy()
-    np_path = path.split(".")[0]
-    np.savez_compressed(f"{np_path}.npz", img_tensor)
+    # Load the image with CV2
+    img = cv2.imread(path, cv2.IMREAD_UNCHANGED)
+    # Convert BGR to RGB
+    rgb_image = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+    img_tensor = transform(rgb_image).numpy()
+    filename = filename.replace(".png", "")
+    np.savez_compressed(f"{safe_folder_path}/{filename}.npz", img_tensor)
 
 
-def create_pt_files(folder_path: str) -> None:
+def create_pt_files(folder_path: str, safe_folder_path: str) -> None:
     for filename in tqdm(os.listdir(folder_path), "Preprocessing.."):
         if filename.endswith(".png"):
-            convert_image_to_pt_file(f"{folder_path}/{filename}")
+            convert_image_to_pt_file(f"{folder_path}/{filename}", filename, safe_folder_path)
 
 
-def create_compressed_npz_files(folder_path: str) -> None:
+def create_compressed_npz_files(folder_path: str, safe_folder_path: str) -> None:
     for filename in tqdm(os.listdir(folder_path), "Preprocessing.."):
         if filename.endswith(".png"):
-            convert_image_to_npz_file(f"{folder_path}/{filename}")
+            convert_image_to_npz_file(f"{folder_path}/{filename}", filename, safe_folder_path)
 
 
 def create_sub_images(folder_path: str, factor: int, safe_path: str) -> None:
@@ -117,9 +130,9 @@ def main() -> None:
     # Create pt or npz files
     match file_format:
         case 'pt':
-            create_pt_files(safe_folder_path)
+            create_pt_files(folder_path, safe_folder_path)
         case 'npz':
-            create_compressed_npz_files(safe_folder_path)
+            create_compressed_npz_files(folder_path, safe_folder_path)
 
 
 if __name__ == "__main__":
