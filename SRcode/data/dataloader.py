@@ -218,7 +218,7 @@ class MultiImagePair(Dataset):
             file = f"{file:0{self.digits}d}"  # Ensure 4/8 digit format
             # Put folder and file name back together and load the tensor
             file = f"{self.root_hr}/{folder}/{file}"
-            file = load_image_from_disk(DiskMode.PT, file, self.transform)
+            file = load_image_from_disk(self.disk_mode, file, self.transform)
             hr_frames.append(file)
 
         # Randomly crop image
@@ -236,6 +236,9 @@ class MultiImagePair(Dataset):
         filename = path.split("/")[-1]
         filename = filename.split(".")[0]
         return filename
+
+    def get_path(self, idx: int) -> str:
+        return self.filenames[idx]
 
     def display_item(self, idx: int) -> None:
         lr_frames, hr_frames = self.__getitem__(idx)
