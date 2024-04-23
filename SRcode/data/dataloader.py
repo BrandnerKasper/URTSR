@@ -60,7 +60,7 @@ def load_image_from_disk(mode: DiskMode, path: str, transform: transforms.ToTens
             return torch.load(f"{path}.pt")
         case DiskMode.NPZ:
             # Load the compressed numpy .npz file to tensor
-            img = np.load(f"{path}.png")
+            img = np.load(f"{path}.npz")
             return torch.from_numpy(next(iter(img.values())))
         case _:
             raise ValueError(f"The mode {mode} is not a valid mode with {path}!")
