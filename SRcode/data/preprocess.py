@@ -30,7 +30,7 @@ def parse_arguments() -> argparse.Namespace:
 
 def convert_image_to_pt_file(path: str, filename: str, safe_folder_path: str) -> None:
     splits = filename.split(".")
-    if len(splits) > 2:
+    if len(splits) > 2: # idea for now ignore buffer files
         return
     transform = transforms.ToTensor()
     # Load the image with CV2
@@ -44,7 +44,7 @@ def convert_image_to_pt_file(path: str, filename: str, safe_folder_path: str) ->
 
 def convert_image_to_npz_file(path: str, filename: str, safe_folder_path: str) -> None:
     splits = filename.split(".")
-    if len(splits) > 2:
+    if len(splits) > 2: # idea for now ignore buffer files
         return
     transform = transforms.ToTensor()
     # Load the image with CV2
@@ -107,6 +107,13 @@ def create_sub_images(folder_path: str, factor: int, safe_path: str) -> None:
                     # Save the file in the new folder
                     subimage.save(f"{safe_path}/{name}.png", format='PNG')
                     n += 1
+
+
+def delete_buffers(path: str) -> None:
+    for filename in tqdm(os.listdir(path), "Deleting..."):
+        splits = filename.split(".")
+        if len(splits) > 2:  # idea for now ignore buffer files
+            os.remove(os.path.join(path, filename))
 
 
 def main() -> None:
