@@ -13,7 +13,7 @@ from config import load_yaml_into_config, create_comment_from_config
 
 def parse_arguments() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Train a SR network based on a config file.")
-    parser.add_argument('file_path', type=str, nargs='?', default='configs/flavr.yaml', help="Path to the config file")
+    parser.add_argument('file_path', type=str, nargs='?', default='configs/flavr_original.yaml', help="Path to the config file")
     args = parser.parse_args()
     return args
 
@@ -85,9 +85,12 @@ def train(filepath: str):
         total_loss = 0.0
 
         for lr_image, hr_image in tqdm(train_loader, desc=f'Training, Epoch {epoch + 1}/{epochs}', dynamic_ncols=True):
-            lr_image, hr_image = lr_image.to(device), hr_image.to(device)
+            lr_image = [img.to(device) for img in lr_image]
+            hr_image = [img.to(device) for img in hr_image]
             optimizer.zero_grad()
             output = model(lr_image)
+            hr_image = torch.cat(hr_image)
+            output = torch.cat(output)
             loss = criterion(output, hr_image)
             loss.backward()
             optimizer.step()

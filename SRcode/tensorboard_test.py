@@ -24,7 +24,7 @@ root = "dataset/matrix/val"
 matrix_dataset = MultiImagePair(root=root, scale=2, number_of_frames=4,
                                         last_frame_idx=1499,
                                         crop_size=256, use_hflip=False, use_rotation=False, digits=4)
-matrix_dataloader = DataLoader(dataset=matrix_dataset, batch_size=8, shuffle=False, num_workers=8)
+matrix_dataloader = DataLoader(dataset=matrix_dataset, batch_size=1, shuffle=False, num_workers=8)
 
 counter = 0
 print("Entering loop")
@@ -35,7 +35,8 @@ for lr_image, hr_image in matrix_dataloader:
     lr_list = torch.unbind(lr_image, 1)
     hr_list = torch.unbind(hr_image, 1)
     for i in range(len(lr_list)):
-        writer.add_images(f"Images/lr/{i}", lr_list[i], 0)
+        writer.add_images(f"Val/Input/Time_{-i}", lr_list[i], 0)
     for i in range(len(hr_list)):
-        writer.add_images(f"Images/hr/{i}", hr_list[i], 0)
+        writer.add_images(f"Val/Ground Truth/Time_{i}", hr_list[i], 0)
     break
+writer.close()

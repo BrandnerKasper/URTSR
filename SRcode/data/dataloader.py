@@ -227,8 +227,6 @@ class MultiImagePair(Dataset):
         # Augment image by h and v flip and rot by 90
         lr_frames, hr_frames = self.augment(lr_frames, hr_frames)
 
-        lr_frames, hr_frames = torch.stack(lr_frames), torch.stack(hr_frames)
-
         return lr_frames, hr_frames
 
     def get_filename(self, idx: int) -> str:
@@ -306,12 +304,12 @@ class MultiImagePair(Dataset):
 
 
 def main() -> None:
-    div2k_dataset = SingleImagePair(root="../dataset/DIV2K/train", pattern="x2")
-    div2k_dataset.display_item(0)
-
-    reds_dataset = MultiImagePair(root="../dataset/Reds/train", scale=4,
-                                  crop_size=96, use_hflip=True, use_rotation=True, digits=8)
-    reds_dataset.display_item(888)
+    # div2k_dataset = SingleImagePair(root="../dataset/DIV2K/train", pattern="x2")
+    # div2k_dataset.display_item(0)
+    #
+    # reds_dataset = MultiImagePair(root="../dataset/Reds/train", scale=4,
+    #                               crop_size=96, use_hflip=True, use_rotation=True, digits=8)
+    # reds_dataset.display_item(888)
 
     matrix_dataset = MultiImagePair(root="../dataset/matrix/train", scale=2, number_of_frames=4, last_frame_idx=1499,
                                     crop_size=256, use_hflip=False, use_rotation=False, digits=4)

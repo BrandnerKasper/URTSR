@@ -13,6 +13,7 @@ from models.srcnn import SRCNN
 from models.subpixel import SubPixelNN
 from models.extraNet import ExtraNet
 from models.flavr import Flavr
+from models.flavr_original import Flavr_Original
 
 from data.dataloader import SingleImagePair, MultiImagePair, DiskMode
 
@@ -56,6 +57,8 @@ def init_model(model_name: str, scale: int) -> BaseModel:
             return ExtraNet(scale=scale)
         case "Flavr":
             return Flavr(scale=scale)
+        case "Flavr_Original":
+            return Flavr_Original(scale=scale)
         case _:
             raise ValueError(f"The model '{model_name}' is not a valid model.")
 
