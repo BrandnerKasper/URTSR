@@ -1,3 +1,5 @@
+from typing import Union
+
 import torch
 import torchvision.transforms.functional as FV
 import torch.nn as nn
@@ -133,15 +135,14 @@ def calculate_ssim(img1_t: torch.Tensor, img2_t: torch.Tensor) -> float:
     return ssim_value
 
 
-def calculate_metrics(img_tensor1: torch.Tensor, img_tensor2: torch.Tensor, mode: str) -> Metrics:
+# If we calculate the metrics for frame extrapolation we get a list of tensors!
+def calculate_metrics(img_tensor1: Union[torch.Tensor, list[torch.Tensor]], img_tensor2: Union[torch.Tensor, list[torch.Tensor]], mode: str) -> Metrics:
     match mode:
         case "single":  # Single Image Pair and only Spatial SR
             psnr_value = calculate_psnr(img_tensor1, img_tensor2)
             ssim_value = calculate_ssim(img_tensor1, img_tensor2)
             return Metrics([psnr_value], [ssim_value])
         case "multi":  # Multi Image Pair and Spatial + Temporal SR
-            # img_tensor_list_1 = torch.unbind(img_tensor1, 1) # example tensor dim (8, 2, 3, 1920, 1080)
-            # img_tensor_list_2 = torch.unbind(img_tensor2, 1)
             psnr_values, ssim_values = [], []
             for i in range(len(img_tensor1)):
                 psnr_value = calculate_psnr(img_tensor1[i], img_tensor2[i])

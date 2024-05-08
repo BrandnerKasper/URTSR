@@ -1,4 +1,6 @@
 import argparse
+from typing import Union
+
 from tqdm import tqdm
 import torch
 import torch.nn as nn
@@ -23,7 +25,7 @@ def save_model(filename: str, model: nn.Module) -> None:
     torch.save(model.state_dict(), model_path)
 
 
-def write_images(writer: SummaryWriter, mode: str, input_t: torch.Tensor, output_t: torch.Tensor, gt_t: torch.Tensor, step: int) -> None:
+def write_images(writer: SummaryWriter, mode: str, input_t: Union[torch.Tensor, list[torch.Tensor]], output_t: Union[torch.Tensor, list[torch.Tensor]], gt_t: Union[torch.Tensor, list[torch.Tensor]], step: int) -> None:
     match mode:
         case "single": # -> for Spatial SR
             # Display input tensors
@@ -44,7 +46,112 @@ def write_images(writer: SummaryWriter, mode: str, input_t: torch.Tensor, output
                 writer.add_images(f"Images/GT_t{i}", gt_t[i], step)
 
 
-def train(filepath: str):
+def train(filepath: str) -> None:
+    config = load_yaml_into_config(filepath)
+    # based on which dataset we train, we decide if its SISR or STSS
+    dataset_type = config.train_dataset
+    if isinstance(dataset_type, SingleImagePair):
+        train_single(filepath)
+    else:
+        train_multi(filepath)
+
+
+def train_single(filepath: str) -> None:
+    # Setup
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    print(f"Device: {device}")
+    config = load_yaml_into_config(filepath)
+    print(config)
+    filename = config.filename.split('.')[0]
+    writer = SummaryWriter(filename_suffix=create_comment_from_config(config), comment=filename)  # log_dir="runs"
+    # Hyperparameters
+    batch_size = config.batch_size
+    epochs = config.epochs
+    num_workers = config.number_workers
+    start_decay_epoch = config.start_decay_epoch
+
+    # Model details
+    model = config.model.to(device)
+    criterion = config.criterion
+    optimizer = config.optimizer
+    scheduler = config.scheduler
+
+    # Loading and preparing data
+    # train data
+    train_dataset = config.train_dataset
+    train_loader = DataLoader(dataset=train_dataset, batch_size=batch_size, num_workers=num_workers, shuffle=True)
+    # val data
+    val_dataset = config.val_dataset
+    val_loader = DataLoader(dataset=val_dataset, batch_size=1, shuffle=True, num_workers=num_workers)
+
+    writer.add_text("Model detail", f"{config}", -1)
+
+    iteration_counter = 0
+
+    # Training & Validation Loop
+    for epoch in tqdm(range(epochs), desc='Train & Validate', dynamic_ncols=True):
+        # train loop
+        total_loss = 0.0
+
+        for lr_image, hr_image in tqdm(train_loader, desc=f'Training, Epoch {epoch + 1}/{epochs}', dynamic_ncols=True):
+            lr_image, hr_image = lr_image.to(device), hr_image.to(device)
+            optimizer.zero_grad()
+            output = model(lr_image)
+            loss = criterion(output, hr_image)
+            loss.backward()
+            optimizer.step()
+
+            total_loss += loss.item()
+            iteration_counter += 1
+
+        # scheduler update if we have one
+        if scheduler is not None:
+            if epoch > start_decay_epoch:
+                scheduler.step()
+        # Loss
+        average_loss = total_loss / len(train_loader)
+        print("\n")
+        print(f"Loss: {average_loss:.4f}\n")
+        # Log loss to TensorBoard
+        writer.add_scalar('Train/Loss', average_loss, epoch)
+
+        # val loop
+        if (epoch + 1) % 5 != 1:
+            continue
+        total_metrics = utils.Metrics([0], [0])
+
+        val_counter = 0
+        for lr_image, hr_image in tqdm(val_loader, desc=f"Validation, Epoch {epoch + 1}/{epochs}", dynamic_ncols=True):
+            lr_image, hr_image = lr_image.to(device), hr_image.to(device)
+            with torch.no_grad():
+                output_image = model(lr_image)
+                output_image = torch.clamp(output_image, min=0.0, max=1.0)
+            # Calc PSNR and SSIM
+            metrics = utils.calculate_metrics(hr_image, output_image, "single")
+            total_metrics += metrics
+            # Display the val process in tensorboard
+            if val_counter != 0:
+                continue
+            write_images(writer, "single", lr_image, output_image, hr_image, iteration_counter)
+            val_counter += 1
+
+        # PSNR & SSIM
+        average_metric = total_metrics / len(val_loader)
+        print("\n")
+        print(average_metric)
+        # Log PSNR & SSIM to TensorBoard
+        # PSNR
+        writer.add_scalar(f"Val/PSNR", average_metric.average_psnr, epoch)
+        # SSIM
+        writer.add_scalar(f"Val/SSIM", average_metric.average_ssim, epoch)
+
+    # End Log
+    writer.close()
+    # Save trained models
+    save_model(filename, model)
+
+
+def train_multi(filepath: str):
     # Setup
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Device: {device}")
@@ -82,12 +189,9 @@ def train(filepath: str):
         total_loss = 0.0
 
         for lr_image, hr_image in tqdm(train_loader, desc=f'Training, Epoch {epoch + 1}/{epochs}', dynamic_ncols=True):
-            if isinstance(val_dataset, SingleImagePair):
-                lr_image, hr_image = lr_image.to(device), hr_image.to(device)
-            else:
-                lr_image = [img.to(device) for img in lr_image]
-                hr_image = [img.to(device) for img in hr_image]
-                lr_image = torch.stack(lr_image, dim=2)
+            lr_image = [img.to(device) for img in lr_image]
+            hr_image = [img.to(device) for img in hr_image]
+            lr_image = torch.stack(lr_image, dim=2)
             optimizer.zero_grad()
             output = model(lr_image)
             hr_image = torch.cat(hr_image)
@@ -113,19 +217,13 @@ def train(filepath: str):
         # val loop
         if (epoch + 1) % 5 != 1:
             continue
-        if isinstance(val_dataset, SingleImagePair):
-            total_metrics = utils.Metrics([0], [0])
-        else:
-            total_metrics = utils.Metrics([0, 0], [0, 0]) # TODO: abstract number of values based on second dim of tensor [8, 2, 3, 1920, 1080]
+        total_metrics = utils.Metrics([0, 0], [0, 0]) # TODO: abstract number of values based on second dim of tensor [8, 2, 3, 1920, 1080]
 
         val_counter = 0
         for lr_image, hr_image in tqdm(val_loader, desc=f"Validation, Epoch {epoch + 1}/{epochs}", dynamic_ncols=True):
-            if isinstance(val_dataset, SingleImagePair):
-                lr_image, hr_image = lr_image.to(device), hr_image.to(device)
-            else:
-                lr_image = [img.to(device) for img in lr_image]
-                hr_image = [img.to(device) for img in hr_image]
-                lr_image = torch.stack(lr_image, dim=2)
+            lr_image = [img.to(device) for img in lr_image]
+            hr_image = [img.to(device) for img in hr_image]
+            lr_image = torch.stack(lr_image, dim=2)
             with torch.no_grad():
                 output_image = model(lr_image)
                 # output_image = torch.clamp(output_image, min=0.0, max=1.0)
@@ -135,10 +233,7 @@ def train(filepath: str):
             # Display the val process in tensorboard
             if val_counter != 0:
                 continue
-            if isinstance(val_dataset, MultiImagePair):
-                write_images(writer, "multi", lr_image, output_image, hr_image, iteration_counter)
-            else:
-                write_images(writer, "single", lr_image, output_image, hr_image, iteration_counter)
+            write_images(writer, "multi", lr_image, output_image, hr_image, iteration_counter)
             val_counter += 1
 
         # PSNR & SSIM
@@ -149,9 +244,11 @@ def train(filepath: str):
         # PSNR
         for i in range(len(average_metric.psnr_values)):
             writer.add_scalar(f"Val/PSNR/image_{i}", average_metric.psnr_values[i], epoch)
+            writer.add_scalar("Val/PSRN/average", average_metric.average_psnr, epoch)
         # SSIM
         for i in range(len(average_metric.ssim_values)):
             writer.add_scalar(f"Val/SSIM/image_{i}", average_metric.ssim_values[i], epoch)
+            writer.add_scalar("Val/SSIM/average", average_metric.average_ssim, epoch)
 
     # End Log
     writer.close()
