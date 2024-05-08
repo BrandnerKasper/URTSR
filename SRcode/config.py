@@ -115,10 +115,10 @@ def init_dataset(name: str, crop_size: int, use_hflip: bool, use_rotation: bool)
                                   use_hflip=False, use_rotation=False, digits=8)
             return train, val
         case "matrix":
-            train = MultiImagePair(root=f"{root}/train", number_of_frames=4, last_frame_idx=1499,
+            train = MultiImagePair(root=f"{root}/train", number_of_frames=4, last_frame_idx=100,
                                    transform=transforms.ToTensor(), crop_size=crop_size, scale=2,
                                    use_hflip=use_hflip, use_rotation=use_rotation, digits=4, disk_mode=DiskMode.CV2)
-            val = MultiImagePair(root=f"{root}/val", number_of_frames=4, last_frame_idx=599,
+            val = MultiImagePair(root=f"{root}/val", number_of_frames=4, last_frame_idx=100,
                                    transform=transforms.ToTensor(), crop_size=crop_size, scale=2,
                                    use_hflip=use_hflip, use_rotation=use_rotation, digits=4, disk_mode=DiskMode.CV2)
             return train, val

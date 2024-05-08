@@ -34,17 +34,14 @@ def write_images(writer: SummaryWriter, mode: str, input_t: torch.Tensor, output
             writer.add_image(f"Images/GT", gt_t, step)
         case "multi": # -> for Temporal SR
             # Display input tensors
-            input_images = torch.unbind(input_t, 1)
-            for i in range(len(input_images)):
-                writer.add_images(f"Images/Input_t{-i}", input_images[i], step)
+            for i in range(len(input_t)):
+                writer.add_images(f"Images/Input_t{-i}", input_t[i], step)
             # Display output tensors
-            output_images = torch.unbind(output_t, 1)
-            for i in range(len(output_images)):
-                writer.add_images(f"Images/Output_t{i}", output_images[i], step)
+            for i in range(len(output_t)):
+                writer.add_images(f"Images/Output_t{i}", output_t[i], step)
             # Display ground truth images
-            gt_images = torch.unbind(gt_t, 1)
-            for i in range(len(gt_images)):
-                writer.add_images(f"Images/GT_t{i}", gt_images[i], step)
+            for i in range(len(gt_t)):
+                writer.add_images(f"Images/GT_t{i}", gt_t[i], step)
 
 
 def train(filepath: str):
@@ -85,8 +82,12 @@ def train(filepath: str):
         total_loss = 0.0
 
         for lr_image, hr_image in tqdm(train_loader, desc=f'Training, Epoch {epoch + 1}/{epochs}', dynamic_ncols=True):
-            lr_image = [img.to(device) for img in lr_image]
-            hr_image = [img.to(device) for img in hr_image]
+            if isinstance(val_dataset, SingleImagePair):
+                lr_image, hr_image = lr_image.to(device), hr_image.to(device)
+            else:
+                lr_image = [img.to(device) for img in lr_image]
+                hr_image = [img.to(device) for img in hr_image]
+                lr_image = torch.stack(lr_image, dim=2)
             optimizer.zero_grad()
             output = model(lr_image)
             hr_image = torch.cat(hr_image)
@@ -110,33 +111,35 @@ def train(filepath: str):
         writer.add_scalar('Train/Loss', average_loss, epoch)
 
         # val loop
-        if (epoch + 1) % 10 != 0:
+        if (epoch + 1) % 5 != 1:
             continue
-        val_threshold = 300
-        val_counter = 0
         if isinstance(val_dataset, SingleImagePair):
             total_metrics = utils.Metrics([0], [0])
         else:
             total_metrics = utils.Metrics([0, 0], [0, 0]) # TODO: abstract number of values based on second dim of tensor [8, 2, 3, 1920, 1080]
 
+        val_counter = 0
         for lr_image, hr_image in tqdm(val_loader, desc=f"Validation, Epoch {epoch + 1}/{epochs}", dynamic_ncols=True):
-            lr_image, hr_image = lr_image.to(device), hr_image.to(device)
+            if isinstance(val_dataset, SingleImagePair):
+                lr_image, hr_image = lr_image.to(device), hr_image.to(device)
+            else:
+                lr_image = [img.to(device) for img in lr_image]
+                hr_image = [img.to(device) for img in hr_image]
+                lr_image = torch.stack(lr_image, dim=2)
             with torch.no_grad():
                 output_image = model(lr_image)
-                output_image = torch.clamp(output_image, min=0.0, max=1.0)
-            iteration_counter += 1
+                # output_image = torch.clamp(output_image, min=0.0, max=1.0)
             # Calc PSNR and SSIM
-            metrics = utils.calculate_metrics(hr_image, output_image)
+            metrics = utils.calculate_metrics(hr_image, output_image, "multi")
             total_metrics += metrics
             # Display the val process in tensorboard
-            if val_counter != val_threshold:
-                val_counter += 1
+            if val_counter != 0:
                 continue
             if isinstance(val_dataset, MultiImagePair):
                 write_images(writer, "multi", lr_image, output_image, hr_image, iteration_counter)
             else:
                 write_images(writer, "single", lr_image, output_image, hr_image, iteration_counter)
-            val_counter = 0
+            val_counter += 1
 
         # PSNR & SSIM
         average_metric = total_metrics / len(val_loader)

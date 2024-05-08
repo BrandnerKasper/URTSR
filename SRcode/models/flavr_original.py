@@ -98,7 +98,7 @@ class Flavr_Original(BaseModel):
         )
 
     def forward(self, x):
-        x = torch.stack(x, dim=2)
+        # x = torch.stack(x, dim=2)
         x1 = self.conv_in(x)
         x1 = self.gate_in(x1)
 
