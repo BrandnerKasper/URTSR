@@ -215,7 +215,7 @@ def train_multi(filepath: str):
         writer.add_scalar('Train/Loss', average_loss, epoch)
 
         # val loop
-        if (epoch + 1) % 5 != 1:
+        if (epoch + 1) % 5 != 0:
             continue
         total_metrics = utils.Metrics([0, 0], [0, 0]) # TODO: abstract number of values based on second dim of tensor [8, 2, 3, 1920, 1080]
 
@@ -223,10 +223,10 @@ def train_multi(filepath: str):
         for lr_image, hr_image in tqdm(val_loader, desc=f"Validation, Epoch {epoch + 1}/{epochs}", dynamic_ncols=True):
             lr_image = [img.to(device) for img in lr_image]
             hr_image = [img.to(device) for img in hr_image]
-            lr_image = torch.stack(lr_image, dim=2)
+            lr_img = torch.stack(lr_image, dim=2)
             with torch.no_grad():
-                output_image = model(lr_image)
-                # output_image = torch.clamp(output_image, min=0.0, max=1.0)
+                output_image = model(lr_img)
+                output_image = [torch.clamp(img, min=0.0, max=1.0) for img in output_image]
             # Calc PSNR and SSIM
             metrics = utils.calculate_metrics(hr_image, output_image, "multi")
             total_metrics += metrics
