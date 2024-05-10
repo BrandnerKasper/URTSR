@@ -52,14 +52,14 @@ def test() -> None:
         # print(f"Filename: {filename}\n")
         lr_image, hr_image = test_dataset.__getitem__(idx)
         with torch.no_grad():
-            lr_image = lr_image.unsqueeze(0)
-            lr_image = lr_image.to(device)
+            lr_image = [img.unsqueeze(0) for img in lr_image]
+            lr_image = [img.to(device) for img in lr_image]
+            lr_image = torch.stack(lr_image, dim=2)
             output_image = model(lr_image)
-            output_image = torch.clamp(output_image, min=0.0, max=1.0)
+            output_image = [torch.clamp(img, min=0.0, max=1.0) for img in output_image]
         # Safe generated images into a folder
-        output_images = torch.unbind(output_image, 1)
-        for i in range(len(output_images)):
-            frame = F.to_pil_image(output_images[i].squeeze(0))
+        for i in range(len(output_image)):
+            frame = F.to_pil_image(output_image[i].squeeze(0))
             # generate the right filename
             filename = int(filename) + i
             # print(f"Save file at {save_path}/{subfolder}/{filename:04d}.png")
