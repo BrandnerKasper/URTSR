@@ -244,11 +244,11 @@ def train_multi(filepath: str):
         # PSNR
         for i in range(len(average_metric.psnr_values)):
             writer.add_scalar(f"Val/PSNR/image_{i}", average_metric.psnr_values[i], epoch)
-            writer.add_scalar("Val/PSRN/average", average_metric.average_psnr, epoch)
+        writer.add_scalar("Val/PSRN/average", average_metric.average_psnr, epoch)
         # SSIM
         for i in range(len(average_metric.ssim_values)):
             writer.add_scalar(f"Val/SSIM/image_{i}", average_metric.ssim_values[i], epoch)
-            writer.add_scalar("Val/SSIM/average", average_metric.average_ssim, epoch)
+        writer.add_scalar("Val/SSIM/average", average_metric.average_ssim, epoch)
 
     # End Log
     writer.close()

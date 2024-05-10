@@ -5,7 +5,7 @@ from tqdm import tqdm
 import torchvision.transforms.functional as F
 
 from data.dataloader import SingleImagePair, MultiImagePair, DiskMode
-from SRcode.config import load_yaml_into_config, Config
+from config import load_yaml_into_config, Config
 
 
 def get_config_from_pretrained_model(name: str) -> Config:
@@ -20,7 +20,7 @@ def generate_directory(path):
 
 
 def test() -> None:
-    pretrained_model_path = "pretrained_models/flavr.pth"
+    pretrained_model_path = "pretrained_models/flavr_original.pth"
     save_path = "results/test"
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -33,9 +33,9 @@ def test() -> None:
     model = config.model.to(device)
     model.load_state_dict(torch.load(pretrained_model_path))
     model.eval()
-    path = "dataset/matrix/val"
+    path = "dataset/ue_data/test"
 
-    test_dataset = MultiImagePair(root=path, number_of_frames=4, last_frame_idx=599,
+    test_dataset = MultiImagePair(root=path, number_of_frames=4, last_frame_idx=299,
                          transform=transforms.ToTensor(), crop_size=None, scale=2,
                          use_hflip=False, use_rotation=False, digits=4, disk_mode=DiskMode.CV2)
 

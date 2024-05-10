@@ -13,7 +13,7 @@ from config import load_yaml_into_config, Config
 
 def parse_arguments() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Evaluate a trained SR network based on a pretrained model file.")
-    parser.add_argument('file_path', type=str, nargs='?', default='pretrained_models/flavr.pth',
+    parser.add_argument('file_path', type=str, nargs='?', default='pretrained_models/flavr_original.pth',
                         help="Path to the pretrained model .pth file")
     args = parser.parse_args()
     return args
@@ -123,12 +123,14 @@ def evaluate_multi_image_dataset(pretrained_model_path: str) -> None:
     total_metrics = utils.Metrics([0, 0], [0, 0])  # TODO: abstract number of values based on second dim of tensor [8, 2, 3, 1920, 1080]
 
     for lr_image, hr_image in tqdm(val_loader, desc=f"Evaluating on {config.dataset}", dynamic_ncols=True):
-        lr_image, hr_image = lr_image.to(device), hr_image.to(device)
+        lr_image = [img.to(device) for img in lr_image]
+        hr_image = [img.to(device) for img in hr_image]
+        lr_image = torch.stack(lr_image, dim=2)
         with torch.no_grad():
             output_image = model(lr_image)
-            output_image = torch.clamp(output_image, min=0.0, max=1.0)
+            output_image = [torch.clamp(img, min=0.0, max=1.0) for img in output_image]
         # Calc PSNR and SSIM
-        metrics = utils.calculate_metrics(hr_image, output_image)
+        metrics = utils.calculate_metrics(hr_image, output_image, "multi")
         total_metrics += metrics
 
     # PSNR & SSIM
@@ -139,14 +141,14 @@ def evaluate_multi_image_dataset(pretrained_model_path: str) -> None:
     # Write results
     # TODO: abstract number of values based on number of frames
     results["PSNR"] = {
-        "Frame_0": average_metric.psnr_values[0],
-        "Frame_1": average_metric.psnr_values[1],
-        "Average": average_metric.average_psnr
+        "Frame_0": round(average_metric.psnr_values[0], 2),
+        "Frame_1": round(average_metric.psnr_values[1], 2),
+        "Average": round(average_metric.average_psnr, 2)
     }
     results["SSIM"] = {
-        "Frame_0": average_metric.ssim_values[0],
-        "Frame_1": average_metric.ssim_values[1],
-        "Average": average_metric.average_ssim
+        "Frame_0": round(average_metric.ssim_values[0], 2),
+        "Frame_1": round(average_metric.ssim_values[1], 2),
+        "Average": round(average_metric.average_ssim, 2)
     }
 
     # Save results
