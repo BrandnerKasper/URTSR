@@ -184,7 +184,7 @@ class MultiImagePair(Dataset):
                 file = os.path.splitext(file)[0]
                 # we want a list of images for which # of frames is always possible to retrieve
                 # therefore the first (and last) couple of frames need to be excluded
-                if self.number_of_frames - 2 < int(file) < self.last_frame_idx - int(self.number_of_frames / 2):
+                if self.number_of_frames - 2 < int(file) < self.last_frame_idx:
                     filenames.append(os.path.join(directory, file))
         return sorted(set(filenames))
 
@@ -251,13 +251,13 @@ class MultiImagePair(Dataset):
         for i, lr_frame in enumerate(lr_frames):
             lr_image = F.to_pil_image(lr_frame)
             axes[i].imshow(lr_image)
-            axes[i].set_title(f'LR image {-i}')
+            axes[i].set_title(f'LR image {self.get_filename(idx-i)}')
 
         # Display HR frames
         for i, hr_frame in enumerate(hr_frames):
             hr_image = F.to_pil_image(hr_frame)
             axes[num_lr_frames + i].imshow(hr_image)
-            axes[num_lr_frames + i].set_title(f'HR image {i}')
+            axes[num_lr_frames + i].set_title(f'HR image {self.get_filename(idx+i)}')
 
         plt.tight_layout()
         plt.show()
@@ -311,8 +311,8 @@ def main() -> None:
     #                               crop_size=96, use_hflip=True, use_rotation=True, digits=8)
     # reds_dataset.display_item(888)
 
-    matrix_dataset = MultiImagePair(root="../dataset/matrix/train", scale=2, number_of_frames=4, last_frame_idx=1499,
-                                    crop_size=256, use_hflip=False, use_rotation=False, digits=4)
+    matrix_dataset = MultiImagePair(root="../dataset/ue_data/train", scale=2, number_of_frames=4, last_frame_idx=299,
+                                    crop_size=None, use_hflip=False, use_rotation=False, digits=4)
     matrix_dataset.display_item(42)
 
 
