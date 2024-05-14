@@ -34,6 +34,7 @@ def generate_video(path: str, name: str, save_path: str) -> None:
 
     # Define video codec and create VideoWriter object
     fourcc = cv2.VideoWriter.fourcc(*'mp4v')  # Adjust codec as needed
+    generate_directory(save_path)
     video = cv2.VideoWriter(os.path.join(save_path, f"{name}.mp4"), fourcc, 60, (width, height))
 
     for img in tqdm(images, desc=f"Generating video.."):
@@ -63,21 +64,21 @@ def generate_sub_video(path: str, name: str, save_path: str, sub_type: str) -> N
 
 def generate_network_videos() -> None:
     path = "../results/test"
-    names = ["01", "02", "03", "04"]
+    names = ["01", "02", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12"]
     for name in names:
         print(f"Videos for {name}..")
-        generate_video(path, name, "../videos")
+        generate_video(path, name, f"../videos/{name}")
 
 
-def generate_matrix_val_videos() -> None:
-    path = "../dataset/matrix/val_test"
-    names = ["01", "02", "03", "04"]
+def generate_train_videos() -> None:
+    path = "../dataset/ue_data/train"
+    names = ["01", "02", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12"]
     for name in names:
         print(f"Generate video for {name}..")
-        # generate_hr_video(path, name, "../videos")
+        generate_hr_video(path, name, f"../videos/HR/{name}")
 
         # 30 fps video
-        generate_lr_30_video(name, path, "../videos")
+        generate_lr_30_video(name, path, f"../videos/LR/{name}")
 
 
 def generate_lr_30_video(name, path, save_path: str) -> None:
@@ -88,6 +89,7 @@ def generate_lr_30_video(name, path, save_path: str) -> None:
     print(f"Height {height}, Width {width} and Layers {layers}")
     # Define video codec and create VideoWriter object
     fourcc = cv2.VideoWriter.fourcc(*'mp4v')  # Adjust codec as needed
+    generate_directory(save_path)
     video = cv2.VideoWriter(os.path.join(save_path, f"{name}.mp4"), fourcc, 30, (width, height))
     counter = 0
     for img in tqdm(images, desc=f"Generating video.."):
@@ -98,8 +100,14 @@ def generate_lr_30_video(name, path, save_path: str) -> None:
     video.release()
 
 
+def generate_directory(path):
+    # Create the directory if it doesn't exist
+    if not os.path.exists(path):
+        os.makedirs(path)
+
+
 def main() -> None:
-    generate_matrix_val_videos()
+    generate_train_videos()
 
 
 if __name__ == "__main__":
