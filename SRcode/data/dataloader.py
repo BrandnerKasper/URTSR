@@ -303,6 +303,141 @@ class MultiImagePair(Dataset):
         return lr_frames, hr_frames
 
 
+class STSSImagePair(Dataset):
+    def __init__(self, root: str, history: int = 4, last_frame_idx: int = 299,
+                 transform=transforms.ToTensor(), crop_size: int = None, scale: int = 2,
+                 use_hflip: bool = False, use_rotation: bool = False, digits: int = 4, disk_mode=DiskMode.CV2):
+        self.root_hr = os.path.join(root, "HR")
+        self.root_lr = os.path.join(root, "LR")
+        self.history = history
+        self.last_frame_idx = last_frame_idx
+        self.transform = transform
+        self.crop_size = crop_size
+        self.scale = scale
+        self.use_hflip = use_hflip
+        self.use_rotation = use_rotation
+        self.digits = digits
+        self.disk_mode = disk_mode
+        self.filenames = self.init_filenames()
+        self.feature_names = []
+        self.history_names = []
+
+    def init_filenames(self) -> list[str]:
+        filenames = []
+        for directory in os.listdir(self.root_hr):
+            for file in os.listdir(os.path.join(self.root_hr, directory)):
+                file = os.path.splitext(file)[0]
+                # we want a list of images for which # of frames is always possible to retrieve
+                # therefore the first (and last) couple of frames need to be excluded
+                if self.history - 1 < int(file) < self.last_frame_idx:
+                    filenames.append(os.path.join(directory, file))
+        return sorted(set(filenames))
+
+    def __len__(self) -> int:
+        return len(self.filenames)
+
+    def __getitem__(self, idx: int) -> (torch.Tensor, list[torch.Tensor], list[torch.Tensor], torch.Tensor):
+        path = self.filenames[idx]
+        folder = path.split("/")[0]
+        filename = path.split("/")[-1]
+
+        # lr frame
+        file = f"{self.root_lr}/{folder}/{filename}"
+        lr_frame = load_image_from_disk(self.disk_mode, file, self.transform)
+
+        # features: basecolor, metallic, roughness, depth, normal, velocity
+        feature_frames = []
+        file = f"{self.root_lr}/{folder}/{filename}.basecolor"
+        self.feature_names.append(f"{filename}.basecolor")
+        file = load_image_from_disk(self.disk_mode, file, self.transform)
+        feature_frames.append(file)
+        file = f"{self.root_lr}/{folder}/{filename}.metallic"
+        self.feature_names.append(f"{filename}.metallic")
+        file = cv2.imread(f"{file}.png", cv2.IMREAD_GRAYSCALE)
+        file = self.transform(file)
+        feature_frames.append(file)
+        file = f"{self.root_lr}/{folder}/{filename}.roughness"
+        self.feature_names.append(f"{filename}.roughness")
+        file = cv2.imread(f"{file}.png", cv2.IMREAD_GRAYSCALE)
+        file = self.transform(file)
+        feature_frames.append(file)
+        file = f"{self.root_lr}/{folder}/{filename}.depth_10"
+        self.feature_names.append(f"{filename}.depth_10")
+        file = cv2.imread(f"{file}.png", cv2.IMREAD_GRAYSCALE)
+        file = self.transform(file)
+        feature_frames.append(file)
+        file = f"{self.root_lr}/{folder}/{filename}.normal_vector"
+        self.feature_names.append(f"{filename}.normal_vector")
+        file = cv2.imread(f"{file}.png", cv2.IMREAD_GRAYSCALE)
+        file = self.transform(file)
+        feature_frames.append(file)
+        file = f"{self.root_lr}/{folder}/{filename}.velocity_log"
+        self.feature_names.append(f"{filename}.velocity_log")
+        file = load_image_from_disk(self.disk_mode, file, self.transform)
+        # file = file[0:2]
+        feature_frames.append(file)
+
+        # 3 previous history frames [current - 2, current -4, current -6]
+        history_frames = []
+        for i in range(self.history):
+            # Extract the numeric part
+            file = int(filename) - (i + 1) * 2
+            # Generate right file name pattern
+            file = f"{file:0{self.digits}d}"  # Ensure 4/8 digit format
+            self.history_names.append(file)
+            # Put folder and file name back together and load the tensor
+            file = f"{self.root_lr}/{folder}/{file}"
+            file = load_image_from_disk(self.disk_mode, file, self.transform)
+            history_frames.append(file)
+
+        # hr frame
+        file = f"{self.root_hr}/{folder}/{filename}"
+        hr_frame = load_image_from_disk(self.disk_mode, file, self.transform)
+
+        return lr_frame, feature_frames, history_frames, hr_frame
+
+    def get_filename(self, idx: int) -> str:
+        path = self.filenames[idx]
+        filename = path.split("/")[-1]
+        filename = filename.split(".")[0]
+        return filename
+
+    def get_path(self, idx: int) -> str:
+        return self.filenames[idx]
+
+    def display_item(self, idx: int) -> None:
+        lr_frame, feature_frames, history_frames, hr_frame = self.__getitem__(idx)
+
+        # Create a single plot with LR images on the left and HR images on the right
+        fig, axes = plt.subplots(2, 6, figsize=(20, 12))
+        axes = axes.flatten()
+
+        # Display LR frame
+        lr_image = F.to_pil_image(lr_frame)
+        axes[0].imshow(lr_image)
+        axes[0].set_title(f"LR frame {self.get_filename(idx)}")
+
+        # Display feature frames
+        for i, feature_frame in enumerate(feature_frames):
+            feature_frame = F.to_pil_image(feature_frame)
+            axes[i+1].imshow(feature_frame)
+            axes[i+1].set_title(f'Feature frame {self.feature_names[i]}')
+
+        # Display feature frames
+        for i, history_frame in enumerate(history_frames):
+            history_frame = F.to_pil_image(history_frame)
+            axes[i + 7].imshow(history_frame)
+            axes[i + 7].set_title(f'History frame {self.history_names[i]}')
+
+        # Display HR frame
+        hr_image = F.to_pil_image(hr_frame)
+        axes[10].imshow(hr_image)
+        axes[10].set_title(f"HR frame {self.get_filename(idx)}")
+
+        plt.tight_layout()
+        plt.show()
+
+
 def main() -> None:
     # div2k_dataset = SingleImagePair(root="../dataset/DIV2K/train", pattern="x2")
     # div2k_dataset.display_item(0)
@@ -311,9 +446,13 @@ def main() -> None:
     #                               crop_size=96, use_hflip=True, use_rotation=True, digits=8)
     # reds_dataset.display_item(888)
 
-    matrix_dataset = MultiImagePair(root="../dataset/ue_data/train", scale=2, number_of_frames=4, last_frame_idx=299,
-                                    crop_size=None, use_hflip=False, use_rotation=False, digits=4)
-    matrix_dataset.display_item(42)
+    # matrix_dataset = MultiImagePair(root="../dataset/ue_data/train", scale=2, number_of_frames=4, last_frame_idx=299,
+    #                                 crop_size=None, use_hflip=False, use_rotation=False, digits=4)
+    # matrix_dataset.display_item(42)
+
+    stss_data = STSSImagePair(root="../dataset/ue_data/train", scale=2, history=3, last_frame_idx=299,
+                              crop_size=None, use_hflip=False, use_rotation=False, digits=4)
+    stss_data.display_item(1560)
 
 
 if __name__ == '__main__':
