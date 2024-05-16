@@ -84,8 +84,33 @@ class Stss(BaseModel):
         self.down_1 = DownLWGated(24, 24)
         self.down_2 = DownLWGated(24, 32)
         self.down_3 = DownLWGated(32, 32)
+
+        self.his_1 = nn.Sequential(
+            nn.Conv2d(12, 24, kernel_size=3, stride=2, padding=1),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(24, 24, kernel_size=3, stride=1, padding=1),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(24, 24, kernel_size=3, stride=1, padding=1),
+            nn.ReLU(inplace=True)
+        )
+        self.his_2 = nn.Sequential(
+            nn.Conv2d(24, 32, kernel_size=3, stride=2, padding=1),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(32, 32, kernel_size=3, stride=1, padding=1),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(32, 32, kernel_size=3, stride=1, padding=1),
+            nn.ReLU(inplace=True)
+        )
+        self.his_3 = nn.Sequential(
+            nn.Conv2d(32, 32, kernel_size=3, stride=2, padding=1),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(32, 32, kernel_size=3, stride=1, padding=1),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(32, 32, kernel_size=3, stride=1, padding=1),
+            nn.ReLU(inplace=True)
+        )
         
-        self.up_1 = Up(64, 32)
+        self.up_1 = Up(64 + 32, 32)
         self.up_2 = Up(56, 24)
         self.up_3 = Up(48, 24)
 
@@ -94,11 +119,19 @@ class Stss(BaseModel):
             nn.PixelShuffle(scale)
         )
 
-    def forward(self, x):
+    def forward(self, x, his):
         x1 = self.conv_in(x)
         x2 = self.down_1(x1)
         x3 = self.down_2(x2)
         x4 = self.down_3(x3)
+
+        his = torch.cat(torch.unbind(his, 1), 1)
+        his = self.his_1(his)
+        his = self.his_2(his)
+        his = self.his_3(his)
+
+        x4 = torch.cat([x4, his], 1)
+
         x = self.up_1(x4, x3)
         x = self.up_2(x, x2)
         x = self.up_3(x, x1)
@@ -111,7 +144,9 @@ def main() -> None:
 
     model = Stss(scale=2).to(device)
     batch_size = 1
-    input_size = (batch_size, 3, 1920, 1080)
+    input = (batch_size, 3, 1920, 1080)
+    his = (batch_size, 3, 4, 1920, 1080)
+    input_size = (input, his)
 
     model.summary(input_size)
     model.measure_inference_time(input_size)
