@@ -13,6 +13,7 @@ Just some notes and todos what I'd like to consider for my thesis.
 - [ ] Spatial SR for Single Image Super Resolution (SISR)
 - [ ] Spatial SR for Real-Time Super Resolution (RTSR) -> multiple input frames
 - [ ] Temporal SR
+- [ ] maybe other dataloader since only 1 frame is generated per forward pass
 
 ### Space-time Supersampling (STSS):
 - [ ] Spatial SR for Single Image Super Resolution (SISR)
@@ -21,8 +22,8 @@ Just some notes and todos what I'd like to consider for my thesis.
 
 ### Flow-Agnostic Video Representations for Fast Frame Interpolation (FLAVR)
 - [ ] Spatial SR for Single Image Super Resolution (SISR)
-- [ ] Spatial SR for Real-Time Super Resolution (RTSR) -> multiple input frames
-- [ ] Temporal SR
+- [x] Spatial SR for Real-Time Super Resolution (RTSR) -> multiple input frames
+- [x] Temporal SR
 
 ### Efficient Video Restoration (EVRNet)
 - [ ] Spatial SR for Single Image Super Resolution (SISR)
@@ -155,12 +156,26 @@ Generate a dataset from the matrix scene:
 - [x] one for testing/evaluating
 - [x] use png files for buffers and frames
 - [ ] generate very high quality renders (SSAA quality) so for 4k we need 16k for example
+
 Generate a higher quality dataset for matrix:
 - not sure how big we should make the dataset
 - more scenes are better than one big data set
 - 900 frames for LR (+buffers) and HR are around 30GB
 - [ ] 8-20 training scenes
 - [x] 2-5 test scenes
+
+Generate a more divers datasaet:
+- [x] matrix
+- [x] electric dreams env
+- [ ] electric dreams lighting issue LR and HR not identical!
+- [x] hillside
+- [x] ancient valley
+- 12 sequences for training, 4 for val
+- each sequence around 300 frames with 60 fps -> 5 sec
+
+For testing:
+- [x] stylized content (asian village, medieval)
+- 4 sequences
 
 ### Typical render resolutions
 
