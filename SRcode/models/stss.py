@@ -75,7 +75,7 @@ class Stss(BaseModel):
         super(Stss, self).__init__(scale=scale)
 
         self.conv_in = nn.Sequential(
-            LWGatedConv2D(3, 24, kernel=3, stride=1, pad=1),
+            LWGatedConv2D(3 + 10, 24, kernel=3, stride=1, pad=1),
             nn.ReLU(inplace=True),
             LWGatedConv2D(24, 24, kernel=3, stride=1, pad=1),
             nn.ReLU(inplace=True)
@@ -119,7 +119,8 @@ class Stss(BaseModel):
             nn.PixelShuffle(scale)
         )
 
-    def forward(self, x, his):
+    def forward(self, x, feature, his):
+        x = torch.cat([x, feature], 1)
         x1 = self.conv_in(x)
         x2 = self.down_1(x1)
         x3 = self.down_2(x2)
@@ -144,9 +145,10 @@ def main() -> None:
 
     model = Stss(scale=2).to(device)
     batch_size = 1
-    input = (batch_size, 3, 1920, 1080)
+    input_data = (batch_size, 3, 1920, 1080)
+    feature = (batch_size, 10, 1920, 1080)
     his = (batch_size, 3, 4, 1920, 1080)
-    input_size = (input, his)
+    input_size = (input_data, feature, his)
 
     model.summary(input_size)
     model.measure_inference_time(input_size)
