@@ -374,7 +374,7 @@ class STSSImagePair(Dataset):
         file = f"{self.root_lr}/{folder}/{filename}.velocity_log"
         self.feature_names.append(f"{filename}.velocity_log")
         file = load_image_from_disk(self.disk_mode, file, self.transform)
-        # file = file[0:2]
+        file = file[0:2]
         feature_frames.append(file)
 
         # 3 previous history frames [current - 2, current -4, current -6]
@@ -393,6 +393,13 @@ class STSSImagePair(Dataset):
         # hr frame
         file = f"{self.root_hr}/{folder}/{filename}"
         hr_frame = load_image_from_disk(self.disk_mode, file, self.transform)
+
+        # Randomly crop the images
+        if self.crop_size:
+            lr_frame, feature_frames, history_frames, hr_frame = self.get_random_crop_pair(lr_frame, feature_frames, history_frames, hr_frame)
+
+        # Augment images
+        lr_frame, feature_frames, history_frames, hr_frame = self.augment(lr_frame, feature_frames, history_frames, hr_frame)
 
         return lr_frame, feature_frames, history_frames, hr_frame
 
@@ -437,6 +444,74 @@ class STSSImagePair(Dataset):
         plt.tight_layout()
         plt.show()
 
+    def get_random_crop_pair(self, lr_frame: torch.Tensor, feature_frames: list[torch.Tensor],
+                             history_frames: list[torch.Tensor], hr_frame: torch.Tensor) \
+            -> (torch.Tensor, list[torch.Tensor], list[torch.Tensor], torch.Tensor):
+        lr_i, lr_j, lr_h, lr_w = transforms.RandomCrop.get_params(lr_frame, output_size=(self.crop_size, self.crop_size))
+        hr_i, hr_j, hr_h, hr_w = lr_i * self.scale, lr_j * self.scale, lr_h * self.scale, lr_w * self.scale
+
+        # crop lr frame
+        lr_frame = F.crop(lr_frame, lr_i, lr_j, lr_h, lr_w)
+
+        # crop features
+        for i, feature_frame in enumerate(feature_frames):
+            feature_frames[i] = F.crop(feature_frame, lr_i, lr_j, lr_h, lr_w)
+
+        # crop history frames
+        for i, history_frame in enumerate(history_frames):
+            history_frames[i] = F.crop(history_frame, lr_i, lr_j, lr_h, lr_w)
+
+        # crop hr frame
+        hr_frame = F.crop(hr_frame, hr_i, hr_j, hr_h, hr_w)
+
+        return lr_frame, feature_frames, history_frames, hr_frame
+
+    def augment(self, lr_frame: torch.Tensor, feature_frames: list[torch.Tensor],
+                history_frames: list[torch.Tensor], hr_frame: torch.Tensor) \
+            -> (torch.Tensor, list[torch.Tensor], list[torch.Tensor], torch.Tensor):
+        # Apply random horizontal flip
+        if self.use_hflip:
+            if random.random() > 0.5:
+                # hflip lr frame
+                lr_frame = flip_image_horizontal(lr_frame)
+                # hflip feature frames
+                for i, feature_frame in enumerate(feature_frames):
+                    feature_frames[i] = flip_image_horizontal(feature_frame)
+                # hflip history frames
+                for i, history_frame in enumerate(history_frames):
+                    history_frames[i] = flip_image_horizontal(history_frame)
+                # hflip hr frame
+                hr_frame = flip_image_horizontal(hr_frame)
+
+        # Apply random rotation by v flipping and rot of 90
+        if self.use_rotation:
+            if random.random() > 0.5:
+                # vflip lr frame
+                lr_frame = flip_image_vertical(lr_frame)
+                # vflip feature frames
+                for i, feature_frame in enumerate(feature_frames):
+                    feature_frames[i] = flip_image_vertical(feature_frame)
+                # vflip history frames
+                for i, history_frame in enumerate(history_frames):
+                    history_frames[i] = flip_image_vertical(history_frame)
+                # vflip hr frame
+                hr_frame = flip_image_vertical(hr_frame)
+        if self.use_rotation:
+            if random.random() > 0.5:
+                angle = -90  # for clockwise rotation like BasicSR
+                # rotate lr frame
+                lr_frame = rotate_image(lr_frame, angle)
+                # rotate feature frames
+                for i, feature_frame in enumerate(feature_frames):
+                    feature_frames[i] = rotate_image(feature_frame, angle)
+                # rotate history frames
+                for i, history_frame in enumerate(history_frames):
+                    history_frames[i] = rotate_image(history_frame, angle)
+                # rotate hr frame
+                hr_frame = rotate_image(hr_frame, angle)
+
+        return lr_frame, feature_frames, history_frames, hr_frame
+
 
 def main() -> None:
     # div2k_dataset = SingleImagePair(root="../dataset/DIV2K/train", pattern="x2")
@@ -451,8 +526,8 @@ def main() -> None:
     # matrix_dataset.display_item(42)
 
     stss_data = STSSImagePair(root="../dataset/ue_data/train", scale=2, history=3, last_frame_idx=299,
-                              crop_size=None, use_hflip=False, use_rotation=False, digits=4)
-    stss_data.display_item(1560)
+                              crop_size=512, use_hflip=True, use_rotation=True, digits=4)
+    stss_data.display_item(42)
 
 
 if __name__ == '__main__':
