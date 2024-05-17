@@ -372,7 +372,7 @@ class STSSImagePair(Dataset):
                 file = os.path.splitext(file)[0]
                 # we want a list of images for which # of frames is always possible to retrieve
                 # therefore the first (and last) couple of frames need to be excluded
-                if self.history - 1 < int(file) < self.last_frame_idx:
+                if self.history * 2 - 1 < int(file) < self.last_frame_idx:
                     filenames.append(os.path.join(directory, file))
         return sorted(set(filenames))
 
@@ -623,7 +623,7 @@ def main() -> None:
 
     stss_data = STSSImagePair(root="../dataset/ue_data/train", scale=2, history=3, last_frame_idx=299,
                               crop_size=512, use_hflip=True, use_rotation=True, digits=4)
-    stss_data.display_item(42)
+    stss_data.display_item(0)
 
 
 if __name__ == '__main__':

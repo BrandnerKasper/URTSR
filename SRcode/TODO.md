@@ -78,8 +78,8 @@ Boost Performance by:
 Make a similiar data loader to STSS
 - [x] data loader loads lr frame, features, history frames and hr frame
 - [x] crop and augment all of these files
-- [ ] regarding training of STSS we want to load the data for SS frame and ESS frame together but make two seperate forward passes
-
+- [x] regarding training of STSS we want to load the data for SS frame and ESS frame together but make two seperate forward passes
+- [x] mind the 30 fps for history data when init filenames!
 
 ### Video
 - [ ] Load and process the [Reds](https://seungjunnah.github.io/Datasets/reds.html) dataset with x4 for simplicity
