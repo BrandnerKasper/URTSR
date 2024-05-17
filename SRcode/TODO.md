@@ -19,6 +19,8 @@ Just some notes and todos what I'd like to consider for my thesis.
 - [ ] Spatial SR for Single Image Super Resolution (SISR)
 - [ ] Spatial SR for Real-Time Super Resolution (RTSR) -> multiple input frames
 - [ ] Temporal SR
+- [ ] find out how to train STSS correctly (two forward passes: 1. SS frame, 2. ESS frame)
+- [ ] implement their loss
 
 ### Flow-Agnostic Video Representations for Fast Frame Interpolation (FLAVR)
 - [ ] Spatial SR for Single Image Super Resolution (SISR)
@@ -72,6 +74,12 @@ Boost Performance by:
 - [x] preprocessing the image pairs as tensor in one .pt file and load them
 - [x] use a similiar logic like BasicSR by using a Custom Data Sampler
 - [x] use Prefetcher to load data while processing data (again similiar to BasicSR)
+
+Make a similiar data loader to STSS
+- [x] data loader loads lr frame, features, history frames and hr frame
+- [x] crop and augment all of these files
+- [ ] regarding training of STSS we want to load the data for SS frame and ESS frame together but make two seperate forward passes
+
 
 ### Video
 - [ ] Load and process the [Reds](https://seungjunnah.github.io/Datasets/reds.html) dataset with x4 for simplicity
@@ -168,6 +176,8 @@ Generate a more divers datasaet:
 - [x] matrix
 - [x] electric dreams env
 - [ ] electric dreams lighting issue LR and HR not identical!
+- [x] light issue fixed (post process + very high lumen value of directional light)
+- [ ] redo electric dreams env sequences!!!
 - [x] hillside
 - [x] ancient valley
 - 12 sequences for training, 4 for val
