@@ -15,7 +15,7 @@ from config import load_yaml_into_config, create_comment_from_config
 
 def parse_arguments() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Train a SR network based on a config file.")
-    parser.add_argument('file_path', type=str, nargs='?', default='configs/flavr_original.yaml', help="Path to the config file")
+    parser.add_argument('file_path', type=str, nargs='?', default='configs/stss.yaml', help="Path to the config file")
     args = parser.parse_args()
     return args
 
@@ -52,8 +52,10 @@ def train(filepath: str) -> None:
     dataset_type = config.train_dataset
     if isinstance(dataset_type, SingleImagePair):
         train_single(filepath)
-    else:
+    elif isinstance(dataset_type, MultiImagePair):
         train_multi(filepath)
+    else:
+        train_stss(filepath)
 
 
 def train_single(filepath: str) -> None:
@@ -151,7 +153,7 @@ def train_single(filepath: str) -> None:
     save_model(filename, model)
 
 
-def train_multi(filepath: str):
+def train_multi(filepath: str) -> None:
     # Setup
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Device: {device}")
@@ -218,6 +220,127 @@ def train_multi(filepath: str):
         if (epoch + 1) % 5 != 0:
             continue
         total_metrics = utils.Metrics([0, 0], [0, 0]) # TODO: abstract number of values based on second dim of tensor [8, 2, 3, 1920, 1080]
+
+        val_counter = 0
+        for lr_image, hr_image in tqdm(val_loader, desc=f"Validation, Epoch {epoch + 1}/{epochs}", dynamic_ncols=True):
+            lr_image = [img.to(device) for img in lr_image]
+            hr_image = [img.to(device) for img in hr_image]
+            lr_img = torch.stack(lr_image, dim=2)
+            with torch.no_grad():
+                output_image = model(lr_img)
+                output_image = [torch.clamp(img, min=0.0, max=1.0) for img in output_image]
+            # Calc PSNR and SSIM
+            metrics = utils.calculate_metrics(hr_image, output_image, "multi")
+            total_metrics += metrics
+            # Display the val process in tensorboard
+            if val_counter != 0:
+                continue
+            write_images(writer, "multi", lr_image, output_image, hr_image, iteration_counter)
+            val_counter += 1
+
+        # PSNR & SSIM
+        average_metric = total_metrics / len(val_loader)
+        print("\n")
+        print(average_metric)
+        # Log PSNR & SSIM to TensorBoard
+        # PSNR
+        for i in range(len(average_metric.psnr_values)):
+            writer.add_scalar(f"Val/PSNR/image_{i}", average_metric.psnr_values[i], epoch)
+        writer.add_scalar("Val/PSRN/average", average_metric.average_psnr, epoch)
+        # SSIM
+        for i in range(len(average_metric.ssim_values)):
+            writer.add_scalar(f"Val/SSIM/image_{i}", average_metric.ssim_values[i], epoch)
+        writer.add_scalar("Val/SSIM/average", average_metric.average_ssim, epoch)
+
+    # End Log
+    writer.close()
+    # Save trained models
+    save_model(filename, model)
+
+
+def train_stss(filepath: str) -> None:
+    # Setup
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    print(f"Device: {device}")
+    config = load_yaml_into_config(filepath)
+    print(config)
+    filename = config.filename.split('.')[0]
+    writer = SummaryWriter(filename_suffix=create_comment_from_config(config), comment=filename)  # log_dir="runs"
+    # Hyperparameters
+    batch_size = config.batch_size
+    epochs = config.epochs
+    num_workers = config.number_workers
+    start_decay_epoch = config.start_decay_epoch
+
+    # Model details
+    model = config.model.to(device)
+    criterion = config.criterion
+    optimizer = config.optimizer
+    scheduler = config.scheduler
+
+    # Loading and preparing data
+    # train data
+    train_dataset = config.train_dataset
+    train_loader = DataLoader(dataset=train_dataset, batch_size=batch_size, num_workers=num_workers, shuffle=False)
+    # val data
+    val_dataset = config.val_dataset
+    val_loader = DataLoader(dataset=val_dataset, batch_size=1, shuffle=True, num_workers=num_workers)
+
+    writer.add_text("Model detail", f"{config}", -1)
+
+    iteration_counter = 0
+
+    # Training & Validation Loop
+    for epoch in tqdm(range(epochs), desc='Train & Validate', dynamic_ncols=True):
+        # train loop
+        total_loss = 0.0
+
+        # We do a double strategy here: Two forward passes, one for SS, one for ESS frame
+        for ss, ess in tqdm(train_loader, desc=f'Training, Epoch {epoch + 1}/{epochs}', dynamic_ncols=True):
+            # setup
+            optimizer.zero_grad()
+
+            # forward pass for SS
+            lr_image = ss.lr_frame.to(device) # shared
+            ss_feature_images = [img.to(device) for img in ss.feature_frames]
+            ss_feature_images = torch.stack(ss_feature_images, dim=2)
+            history_images = [img.to(device) for img in ss.history_frames]
+            history_images = torch.stack(history_images, dim=2) # shared
+            ss_hr_image = ss.hr_frame.to(device)
+            ss_output = model(lr_image, ss_feature_images, history_images, ss_hr_image)
+            ss_loss = criterion(ss_output, ss_hr_image)
+
+            # forward pass for ESS
+            ess_feature_images = [img.to(device) for img in ess.feature_frames]
+            ess_feature_images = torch.stack(ess_feature_images, dim=2)
+            ess_hr_image = ess.hr_frame.to(device)
+            ess_output = model(lr_image, ess_feature_images, history_images, ess_hr_image)
+            ess_loss = criterion(ess_output, ess_hr_image)
+
+            # New loss
+            loss = ss_loss + ess_loss
+            loss.backward()
+            optimizer.step()
+
+            total_loss += loss.item()
+            iteration_counter += 1
+
+        # scheduler update if we have one
+        if scheduler is not None:
+            if epoch > start_decay_epoch:
+                scheduler.step()
+        # Loss
+        average_loss = total_loss / len(train_loader)
+        print("\n")
+        print(f"Loss: {average_loss:.4f}\n")
+        # Log loss to TensorBoard
+        writer.add_scalar('Train/Loss', average_loss, epoch)
+
+        # val loop
+        if (epoch + 1) % 5 != 0:
+            continue
+        total_metrics = utils.Metrics([0, 0], [0,
+                                               0])  # TODO: abstract number of values based on second dim of tensor [8, 2, 3, 1920, 1080]
 
         val_counter = 0
         for lr_image, hr_image in tqdm(val_loader, desc=f"Validation, Epoch {epoch + 1}/{epochs}", dynamic_ncols=True):
