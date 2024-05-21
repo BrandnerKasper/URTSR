@@ -46,6 +46,46 @@ def write_images(writer: SummaryWriter, mode: str, input_t: Union[torch.Tensor, 
                 writer.add_images(f"Images/GT_t{i}", gt_t[i], step)
 
 
+def write_stss_images(writer: SummaryWriter, step: int,
+                      input_t0: list[torch.Tensor], output_t0: torch.Tensor, gt_t0: torch.Tensor,
+                      input_t1: list[torch.Tensor], output_t1: torch.Tensor, gt_t1: torch.Tensor) -> None:
+    # SS
+    # LR
+    writer.add_images("SS/LR", input_t0[0], step)
+    # Features
+    writer.add_images("SS/Basecolor", input_t0[1][0], step)
+    writer.add_images("SS/metallic", input_t0[1][1], step)
+    writer.add_images("SS/roughness", input_t0[1][2], step)
+    writer.add_images("SS/depth", input_t0[1][3], step)
+    writer.add_images("SS/nov", input_t0[1][4], step)
+    writer.add_images("SS/velocity", input_t0[1][5], step)
+    # History
+    for i in range(len(input_t0[2])):
+        writer.add_images(f"SS/History_t{-1-2*i}", input_t0[2][i], step)
+    # Output
+    writer.add_images("SS/Output", output_t0, step)
+    # GT
+    writer.add_images("SS/GT", gt_t0, step)
+
+    # ESS
+    # LR
+    writer.add_images("ESS/LR", input_t1[0], step)
+    # Features
+    writer.add_images("ESS/Basecolor", input_t1[1][0], step)
+    writer.add_images("ESS/metallic", input_t1[1][1], step)
+    writer.add_images("ESS/roughness", input_t1[1][2], step)
+    writer.add_images("ESS/depth", input_t1[1][3], step)
+    writer.add_images("ESS/nov", input_t1[1][4], step)
+    writer.add_images("ESS/velocity", input_t1[1][5], step)
+    # History
+    for i in range(len(input_t1[2])):
+        writer.add_images(f"ESS/History_t{-2 - 2 * i}", input_t1[2][i], step)
+    # Output
+    writer.add_images("ESS/Output", output_t1, step)
+    # GT
+    writer.add_images("ESS/GT", gt_t1, step)
+
+
 def train(filepath: str) -> None:
     config = load_yaml_into_config(filepath)
     # based on which dataset we train, we decide if its SISR or STSS
@@ -293,6 +333,8 @@ def train_stss(filepath: str) -> None:
     # Training & Validation Loop
     for epoch in tqdm(range(epochs), desc='Train & Validate', dynamic_ncols=True):
         # train loop
+        ss_total_loss = 0.0
+        ess_total_loss = 0.0
         total_loss = 0.0
 
         # We do a double strategy here: Two forward passes, one for SS, one for ESS frame
@@ -301,20 +343,18 @@ def train_stss(filepath: str) -> None:
             optimizer.zero_grad()
 
             # forward pass for SS
-            lr_image = ss.lr_frame.to(device) # shared
-            ss_feature_images = [img.to(device) for img in ss.feature_frames]
-            ss_feature_images = torch.stack(ss_feature_images, dim=2)
-            history_images = [img.to(device) for img in ss.history_frames]
+            lr_image = ss[0].to(device) # shared
+            ss_feature_images = ss[1].to(device)
+            history_images = [img.to(device) for img in ss[2]]
             history_images = torch.stack(history_images, dim=2) # shared
-            ss_hr_image = ss.hr_frame.to(device)
-            ss_output = model(lr_image, ss_feature_images, history_images, ss_hr_image)
+            ss_hr_image = ss[3].to(device)
+            ss_output = model(lr_image, ss_feature_images, history_images)
             ss_loss = criterion(ss_output, ss_hr_image)
 
             # forward pass for ESS
-            ess_feature_images = [img.to(device) for img in ess.feature_frames]
-            ess_feature_images = torch.stack(ess_feature_images, dim=2)
-            ess_hr_image = ess.hr_frame.to(device)
-            ess_output = model(lr_image, ess_feature_images, history_images, ess_hr_image)
+            ess_feature_images = ess[1].to(device)
+            ess_hr_image = ess[3].to(device)
+            ess_output = model(lr_image, ess_feature_images, history_images)
             ess_loss = criterion(ess_output, ess_hr_image)
 
             # New loss
@@ -322,6 +362,8 @@ def train_stss(filepath: str) -> None:
             loss.backward()
             optimizer.step()
 
+            ss_total_loss += ss_loss.item()
+            ess_total_loss += ess_loss.item()
             total_loss += loss.item()
             iteration_counter += 1
 
@@ -330,48 +372,76 @@ def train_stss(filepath: str) -> None:
             if epoch > start_decay_epoch:
                 scheduler.step()
         # Loss
+        average_ss_loss = ss_total_loss / len(train_loader)
+        average_ess_loss = ess_total_loss / len(train_loader)
         average_loss = total_loss / len(train_loader)
         print("\n")
-        print(f"Loss: {average_loss:.4f}\n")
+        print(f"SS Loss: {average_ss_loss:.4f}, ESS Loss: {average_ess_loss:.4f}, Loss: {average_loss:.4f}\n")
         # Log loss to TensorBoard
-        writer.add_scalar('Train/Loss', average_loss, epoch)
+        writer.add_scalar('Train/SS Loss', average_ss_loss, epoch)
+        writer.add_scalar('Train/ESS Loss', average_ess_loss, epoch)
+        writer.add_scalar('Train/Combined Loss', average_loss, epoch)
 
         # val loop
-        if (epoch + 1) % 5 != 0:
+        if (epoch + 1) % 5 != 1:
             continue
-        total_metrics = utils.Metrics([0, 0], [0,
-                                               0])  # TODO: abstract number of values based on second dim of tensor [8, 2, 3, 1920, 1080]
+        total_ss_metrics = utils.Metrics([0], [0])  # TODO: abstract number of values based on second dim of tensor [8, 2, 3, 1920, 1080]
+        total_ess_metrics = utils.Metrics([0], [0])
 
         val_counter = 0
-        for lr_image, hr_image in tqdm(val_loader, desc=f"Validation, Epoch {epoch + 1}/{epochs}", dynamic_ncols=True):
-            lr_image = [img.to(device) for img in lr_image]
-            hr_image = [img.to(device) for img in hr_image]
-            lr_img = torch.stack(lr_image, dim=2)
+        for ss, ess in tqdm(val_loader, desc=f"Validation, Epoch {epoch + 1}/{epochs}", dynamic_ncols=True):
+            # forward pass for SS
+            lr_image = ss[0].to(device) # shared
+            ss_feature_images = ss[1].to(device)
+            history_images = [img.to(device) for img in ss[2]]
+            history_images = torch.stack(history_images, dim=2)  # shared
+            ss_hr_image = ss[3].to(device)
+
+            # forward pass for ESS
+            ess_feature_images = ess[1].to(device)
+            ess_hr_image = ess[3].to(device)
+
             with torch.no_grad():
-                output_image = model(lr_img)
-                output_image = [torch.clamp(img, min=0.0, max=1.0) for img in output_image]
+                # SS frame
+                ss_output = model(lr_image, ss_feature_images, history_images)
+                ss_output = torch.clamp(ss_output, min=0.0, max=1.0)
+                # ESS frame
+                ess_output = model(lr_image, ess_feature_images, history_images)
+                ess_output = torch.clamp(ess_output, min=0.0, max=1.0)
+
             # Calc PSNR and SSIM
-            metrics = utils.calculate_metrics(hr_image, output_image, "multi")
-            total_metrics += metrics
+            # SS frame
+            ss_metric = utils.calculate_metrics(ss_hr_image, ss_output, "single")
+            total_ss_metrics += ss_metric
+            # ESS frame
+            ess_metric = utils.calculate_metrics(ess_hr_image, ess_output, "single")
+            total_ess_metrics += ess_metric
+
             # Display the val process in tensorboard
             if val_counter != 0:
                 continue
-            write_images(writer, "multi", lr_image, output_image, hr_image, iteration_counter)
+            write_stss_images(writer, iteration_counter, ss, ss_output, ss_hr_image, ess, ess_output, ess_hr_image)
             val_counter += 1
 
         # PSNR & SSIM
-        average_metric = total_metrics / len(val_loader)
-        print("\n")
+        average_ss_metric = total_ss_metrics / len(val_loader)
+        average_ess_metric = total_ess_metrics / len(val_loader)
+        average_metric = (average_ss_metric + average_ess_metric) / 2
+        print("SS\n")
+        print(average_ss_metric)
+        print("ESS\n")
+        print(average_ess_metric)
+        print("Total\n")
         print(average_metric)
         # Log PSNR & SSIM to TensorBoard
         # PSNR
-        for i in range(len(average_metric.psnr_values)):
-            writer.add_scalar(f"Val/PSNR/image_{i}", average_metric.psnr_values[i], epoch)
-        writer.add_scalar("Val/PSRN/average", average_metric.average_psnr, epoch)
+        writer.add_scalar("Val/PSNR/SS", average_ss_metric.average_psnr)
+        writer.add_scalar("Val/PSNR/ESS", average_ess_metric.average_psnr)
+        writer.add_scalar("Val/PSNR/Average", average_metric.average_psnr)
         # SSIM
-        for i in range(len(average_metric.ssim_values)):
-            writer.add_scalar(f"Val/SSIM/image_{i}", average_metric.ssim_values[i], epoch)
-        writer.add_scalar("Val/SSIM/average", average_metric.average_ssim, epoch)
+        writer.add_scalar("Val/SSIM/SS", average_ss_metric.average_ssim)
+        writer.add_scalar("Val/SSIM/ESS", average_ess_metric.average_ssim)
+        writer.add_scalar("Val/SSIM/Average", average_metric.average_ssim)
 
     # End Log
     writer.close()

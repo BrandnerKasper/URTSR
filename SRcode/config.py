@@ -92,6 +92,10 @@ def init_scheduler(scheduler_data: dict, optimizer: optim.Optimizer, epochs: int
         case "Cosine":
             min_learning_rate = scheduler_data["MIN_LEARNING_RATE"]
             return lr_scheduler.CosineAnnealingLR(optimizer=optimizer, T_max=epochs, eta_min=min_learning_rate)
+        case "StepLR":
+            step_size = scheduler_data["STEP_SIZE"]
+            gamma = scheduler_data["GAMMA"]
+            return lr_scheduler.StepLR(optimizer=optimizer, step_size=step_size, gamma=gamma)
         case None:
             return None
         case _:
@@ -149,19 +153,19 @@ def init_dataset(name: str, crop_size: int, use_hflip: bool, use_rotation: bool)
                                  transform=transforms.ToTensor(), crop_size=crop_size, scale=2,
                                  use_hflip=use_hflip, use_rotation=use_rotation, digits=4, disk_mode=DiskMode.NPZ)
             return train, val
-        # case "ue_data":
-        #     train = MultiImagePair(root=f"{root}/train", number_of_frames=4, last_frame_idx=299,
-        #                            transform=transforms.ToTensor(), crop_size=crop_size, scale=2,
-        #                            use_hflip=use_hflip, use_rotation=use_rotation, digits=4, disk_mode=DiskMode.CV2)
-        #     val = MultiImagePair(root=f"{root}/val", number_of_frames=4, last_frame_idx=299,
-        #                          transform=transforms.ToTensor(), crop_size=crop_size, scale=2,
-        #                          use_hflip=use_hflip, use_rotation=use_rotation, digits=4, disk_mode=DiskMode.CV2)
-        #     return train, val
         case "ue_data":
+            train = MultiImagePair(root=f"{root}/train", number_of_frames=4, last_frame_idx=299,
+                                   transform=transforms.ToTensor(), crop_size=crop_size, scale=2,
+                                   use_hflip=use_hflip, use_rotation=use_rotation, digits=4, disk_mode=DiskMode.CV2)
+            val = MultiImagePair(root=f"{root}/val", number_of_frames=4, last_frame_idx=299,
+                                 transform=transforms.ToTensor(), crop_size=crop_size, scale=2,
+                                 use_hflip=use_hflip, use_rotation=use_rotation, digits=4, disk_mode=DiskMode.CV2)
+            return train, val
+        case "ue_data_npz":
             train = STSSImagePair(root=f"{root}/train", scale=2, history=3, last_frame_idx=299, crop_size=crop_size,
-                                  use_hflip=use_hflip, use_rotation=use_rotation, digits=4, disk_mode=DiskMode.CV2)
+                                  use_hflip=use_hflip, use_rotation=use_rotation, digits=4, disk_mode=DiskMode.NPZ)
             val = STSSImagePair(root=f"{root}/val", scale=2, history=3, last_frame_idx=299, crop_size=crop_size,
-                                use_hflip=use_hflip, use_rotation=use_rotation, digits=4, disk_mode=DiskMode.CV2)
+                                use_hflip=use_hflip, use_rotation=use_rotation, digits=4, disk_mode=DiskMode.NPZ)
             return train, val
         case _:
             raise ValueError(f"The dataset '{name}' is not a valid dataset.")
