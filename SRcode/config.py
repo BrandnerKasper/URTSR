@@ -153,20 +153,26 @@ def init_dataset(name: str, crop_size: int, use_hflip: bool, use_rotation: bool)
                                  transform=transforms.ToTensor(), crop_size=crop_size, scale=2,
                                  use_hflip=use_hflip, use_rotation=use_rotation, digits=4, disk_mode=DiskMode.NPZ)
             return train, val
+        # case "ue_data":
+        #     train = MultiImagePair(root=f"{root}/train", number_of_frames=4, last_frame_idx=299,
+        #                            transform=transforms.ToTensor(), crop_size=crop_size, scale=2,
+        #                            use_hflip=use_hflip, use_rotation=use_rotation, digits=4, disk_mode=DiskMode.CV2)
+        #     val = MultiImagePair(root=f"{root}/val", number_of_frames=4, last_frame_idx=299,
+        #                          transform=transforms.ToTensor(), crop_size=crop_size, scale=2,
+        #                          use_hflip=use_hflip, use_rotation=use_rotation, digits=4, disk_mode=DiskMode.CV2)
+        #     return train, val
         case "ue_data":
-            train = MultiImagePair(root=f"{root}/train", number_of_frames=4, last_frame_idx=299,
-                                   transform=transforms.ToTensor(), crop_size=crop_size, scale=2,
-                                   use_hflip=use_hflip, use_rotation=use_rotation, digits=4, disk_mode=DiskMode.CV2)
-            val = MultiImagePair(root=f"{root}/val", number_of_frames=4, last_frame_idx=299,
-                                 transform=transforms.ToTensor(), crop_size=crop_size, scale=2,
-                                 use_hflip=use_hflip, use_rotation=use_rotation, digits=4, disk_mode=DiskMode.CV2)
-            return train, val
-        case "ue_data_npz":
             train = STSSImagePair(root=f"{root}/train", scale=2, history=3, last_frame_idx=299, crop_size=crop_size,
-                                  use_hflip=use_hflip, use_rotation=use_rotation, digits=4, disk_mode=DiskMode.NPZ)
+                                  use_hflip=use_hflip, use_rotation=use_rotation, digits=4)
             val = STSSImagePair(root=f"{root}/val", scale=2, history=3, last_frame_idx=299, crop_size=crop_size,
-                                use_hflip=use_hflip, use_rotation=use_rotation, digits=4, disk_mode=DiskMode.NPZ)
+                                use_hflip=use_hflip, use_rotation=use_rotation, digits=4)
             return train, val
+        # case "ue_data_npz":
+        #     train = STSSImagePair(root=f"{root}/train", scale=2, history=3, last_frame_idx=299, crop_size=crop_size,
+        #                           use_hflip=use_hflip, use_rotation=use_rotation, digits=4, disk_mode=DiskMode.NPZ)
+        #     val = STSSImagePair(root=f"{root}/val", scale=2, history=3, last_frame_idx=299, crop_size=crop_size,
+        #                         use_hflip=use_hflip, use_rotation=use_rotation, digits=4, disk_mode=DiskMode.NPZ)
+        #     return train, val
         case _:
             raise ValueError(f"The dataset '{name}' is not a valid dataset.")
 

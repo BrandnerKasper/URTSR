@@ -381,7 +381,7 @@ class STSSImagePair(Dataset):
     def __len__(self) -> int:
         return len(self.filenames)
 
-    def __getitem__(self, idx: int) -> (list[torch.Tensor], list[torch.Tensor]):
+    def get_item_npz(self, idx: int) -> (list[torch.Tensor], list[torch.Tensor]):
         path = self.filenames[idx]
         folder = path.split("/")[0]
         filename = path.split("/")[-1]
@@ -396,8 +396,7 @@ class STSSImagePair(Dataset):
         # features basecolor, depth, metallic, normal, roughness, velocity
         feature_frames = ss_npz_file[3:13]
         feature_frames_names = [f"{filename}.basecolor", f"{filename}.depth", f"{filename}.metallic",
-                                f"{filename}.normal", f"{filename}.roughness", f"{filename}.velocity",
-                                f"{filename}.basecolor"]
+                                f"{filename}.normal", f"{filename}.roughness", f"{filename}.velocity"]
 
 
         # 3 previous history frames [current - 2, current -4, current -6]
@@ -435,8 +434,7 @@ class STSSImagePair(Dataset):
         # features basecolor, depth, metallic, normal, roughness, velocity
         feature_frames = ess_npz_file[3:13]
         feature_frames_names = [f"{ess_filename}.basecolor", f"{ess_filename}.depth", f"{ess_filename}.metallic",
-                                f"{ess_filename}.normal", f"{ess_filename}.roughness", f"{ess_filename}.velocity",
-                                f"{ess_filename}.basecolor"]
+                                f"{ess_filename}.normal", f"{ess_filename}.roughness", f"{ess_filename}.velocity"]
 
 
         # history frames -> for now use same history frames as the SS frame
@@ -458,7 +456,7 @@ class STSSImagePair(Dataset):
 
         return ss, ess
 
-    def get_item_png(self, idx: int) -> (list[torch.Tensor], list[torch.Tensor]):
+    def __getitem__(self, idx: int) -> (list[torch.Tensor], list[torch.Tensor]):
         path = self.filenames[idx]
         folder = path.split("/")[0]
         filename = path.split("/")[-1]
@@ -469,38 +467,46 @@ class STSSImagePair(Dataset):
         lr_frame_name = filename
         lr_frame = load_image_from_disk(self.disk_mode, file, self.transform)
 
-        # features: basecolor, metallic, roughness, depth, normal, velocity
+        # features: basecolor, depth, metallic, nov, roughness, velocity
         feature_frames = []
         feature_frames_names = []
+        # basecolor
         file = f"{self.root_lr}/{folder}/{filename}.basecolor"
         feature_frames_names.append(f"{filename}.basecolor")
         file = load_image_from_disk(self.disk_mode, file, self.transform)
         feature_frames.append(file)
-        file = f"{self.root_lr}/{folder}/{filename}.metallic"
-        feature_frames_names.append(f"{filename}.metallic")
-        file = cv2.imread(f"{file}.png", cv2.IMREAD_GRAYSCALE)
-        file = self.transform(file)
-        feature_frames.append(file)
-        file = f"{self.root_lr}/{folder}/{filename}.roughness"
-        feature_frames_names.append(f"{filename}.roughness")
-        file = cv2.imread(f"{file}.png", cv2.IMREAD_GRAYSCALE)
-        file = self.transform(file)
-        feature_frames.append(file)
+        # depth
         file = f"{self.root_lr}/{folder}/{filename}.depth_log"
         feature_frames_names.append(f"{filename}.depth_log")
         file = cv2.imread(f"{file}.png", cv2.IMREAD_GRAYSCALE)
         file = self.transform(file)
         feature_frames.append(file)
+        # metallic
+        file = f"{self.root_lr}/{folder}/{filename}.metallic"
+        feature_frames_names.append(f"{filename}.metallic")
+        file = cv2.imread(f"{file}.png", cv2.IMREAD_GRAYSCALE)
+        file = self.transform(file)
+        feature_frames.append(file)
+        # normal vec
         file = f"{self.root_lr}/{folder}/{filename}.normal_vector"
         feature_frames_names.append(f"{filename}.normal_vector")
         file = cv2.imread(f"{file}.png", cv2.IMREAD_GRAYSCALE)
         file = self.transform(file)
         feature_frames.append(file)
+        # roughness
+        file = f"{self.root_lr}/{folder}/{filename}.roughness"
+        feature_frames_names.append(f"{filename}.roughness")
+        file = cv2.imread(f"{file}.png", cv2.IMREAD_GRAYSCALE)
+        file = self.transform(file)
+        feature_frames.append(file)
+        # velocity
         file = f"{self.root_lr}/{folder}/{filename}.velocity_log"
         feature_frames_names.append(f"{filename}.velocity_log")
         file = load_image_from_disk(self.disk_mode, file, self.transform)
         # file = file[0:2]
         feature_frames.append(file)
+        # cat feature frames
+        feature_frames = torch.cat(feature_frames, dim=0)
 
         # 3 previous history frames [current - 2, current -4, current -6]
         history_frames = []
@@ -533,38 +539,46 @@ class STSSImagePair(Dataset):
         ess_filename = int(filename) + 1
         ess_filename = f"{ess_filename:0{self.digits}d}"  # Ensure 4/8 digit format
 
-        # features: basecolor, metallic, roughness, depth, normal, velocity
+        # features: basecolor, depth, metallic, nov, roughness, velocity
         feature_frames = []
         feature_frames_names = []
+        # basecolor
         file = f"{self.root_lr}/{folder}/{ess_filename}.basecolor"
         feature_frames_names.append(f"{ess_filename}.basecolor")
         file = load_image_from_disk(self.disk_mode, file, self.transform)
         feature_frames.append(file)
-        file = f"{self.root_lr}/{folder}/{ess_filename}.metallic"
-        feature_frames_names.append(f"{ess_filename}.metallic")
-        file = cv2.imread(f"{file}.png", cv2.IMREAD_GRAYSCALE)
-        file = self.transform(file)
-        feature_frames.append(file)
-        file = f"{self.root_lr}/{folder}/{ess_filename}.roughness"
-        feature_frames_names.append(f"{ess_filename}.roughness")
-        file = cv2.imread(f"{file}.png", cv2.IMREAD_GRAYSCALE)
-        file = self.transform(file)
-        feature_frames.append(file)
+        # depth
         file = f"{self.root_lr}/{folder}/{ess_filename}.depth_log"
         feature_frames_names.append(f"{ess_filename}.depth_log")
         file = cv2.imread(f"{file}.png", cv2.IMREAD_GRAYSCALE)
         file = self.transform(file)
         feature_frames.append(file)
+        # metallic
+        file = f"{self.root_lr}/{folder}/{ess_filename}.metallic"
+        feature_frames_names.append(f"{ess_filename}.metallic")
+        file = cv2.imread(f"{file}.png", cv2.IMREAD_GRAYSCALE)
+        file = self.transform(file)
+        feature_frames.append(file)
+        # normal vec
         file = f"{self.root_lr}/{folder}/{ess_filename}.normal_vector"
         feature_frames_names.append(f"{ess_filename}.normal_vector")
         file = cv2.imread(f"{file}.png", cv2.IMREAD_GRAYSCALE)
         file = self.transform(file)
         feature_frames.append(file)
+        # roughness
+        file = f"{self.root_lr}/{folder}/{ess_filename}.roughness"
+        feature_frames_names.append(f"{ess_filename}.roughness")
+        file = cv2.imread(f"{file}.png", cv2.IMREAD_GRAYSCALE)
+        file = self.transform(file)
+        feature_frames.append(file)
+        # velocity
         file = f"{self.root_lr}/{folder}/{ess_filename}.velocity_log"
         feature_frames_names.append(f"{ess_filename}.velocity_log")
         file = load_image_from_disk(self.disk_mode, file, self.transform)
         # file = file[0:2]
         feature_frames.append(file)
+        # cat feature frames
+        feature_frames = torch.cat(feature_frames, dim=0)
 
         # history frames -> for now use same history frames as the SS frame
 
@@ -572,8 +586,7 @@ class STSSImagePair(Dataset):
         file = f"{self.root_hr}/{folder}/{ess_filename}"
         hr_frame = load_image_from_disk(self.disk_mode, file, self.transform)
         hr_frame_name = ess_filename
-        # ess = STSSItem(lr_frame, lr_frame_name, feature_frames, feature_frames_names, history_frames,
-        #                history_frames_names, hr_frame, hr_frame_name)
+
         ess = [lr_frame, feature_frames, history_frames, hr_frame]
         self.ess_names = [lr_frame_name, feature_frames_names, history_frames_names, hr_frame_name]
 
@@ -751,8 +764,8 @@ def main() -> None:
     #                                 crop_size=None, use_hflip=False, use_rotation=False, digits=4)
     # matrix_dataset.display_item(42)
 
-    stss_data = STSSImagePair(root="../dataset/ue_data_npz/train", scale=2, history=3, last_frame_idx=299,
-                              crop_size=512, use_hflip=True, use_rotation=True, digits=4, disk_mode=DiskMode.NPZ)
+    stss_data = STSSImagePair(root="../dataset/ue_data/train", scale=2, history=3, last_frame_idx=299,
+                              crop_size=512, use_hflip=True, use_rotation=True, digits=4)
     stss_data.display_item(0)
 
 
