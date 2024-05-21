@@ -86,7 +86,7 @@ class Stss(BaseModel):
         self.down_3 = DownLWGated(32, 32)
 
         self.his_1 = nn.Sequential(
-            nn.Conv2d(12, 24, kernel_size=3, stride=2, padding=1),
+            nn.Conv2d(9, 24, kernel_size=3, stride=2, padding=1),
             nn.ReLU(inplace=True),
             nn.Conv2d(24, 24, kernel_size=3, stride=1, padding=1),
             nn.ReLU(inplace=True),
@@ -147,7 +147,7 @@ def main() -> None:
     batch_size = 1
     input_data = (batch_size, 3, 1920, 1080)
     feature = (batch_size, 10, 1920, 1080)
-    his = (batch_size, 3, 4, 1920, 1080)
+    his = (batch_size, 3, 3, 1920, 1080)
     input_size = (input_data, feature, his)
 
     model.summary(input_size)
