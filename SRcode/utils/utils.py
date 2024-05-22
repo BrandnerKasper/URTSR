@@ -102,13 +102,18 @@ class Metrics:
                 (other.psnr_values, other.ssim_values, other.average_psnr, other.average_ssim))
 
     def __str__(self):
-        psnr_values_str = ", ".join(f"{val:.2f}" for val in self.psnr_values)
-        ssim_values_str = ", ".join(f"{val:.2f}" for val in self.ssim_values)
-        return (f"Metrics:\n"
-                f"  PSNR Values: {psnr_values_str}\n"
-                f"  SSIM Values: {ssim_values_str}\n"
-                f"  Average PSNR: {self.average_psnr:.2f}\n"
-                f"  Average SSIM: {self.average_ssim:.2f}\n")
+        if len(self.psnr_values) == 1 or len(self.ssim_values) == 1:
+            return (f"Metrics:\n"
+                    f"  PSNR: {self.average_psnr}\n"
+                    f"  SSIM: {self.average_ssim}\n")
+        else:
+            psnr_values_str = ", ".join(f"{val:.2f}" for val in self.psnr_values)
+            ssim_values_str = ", ".join(f"{val:.2f}" for val in self.ssim_values)
+            return (f"Metrics:\n"
+                    f"  PSNR Values: {psnr_values_str}\n"
+                    f"  SSIM Values: {ssim_values_str}\n"
+                    f"  Average PSNR: {self.average_psnr:.2f}\n"
+                    f"  Average SSIM: {self.average_ssim:.2f}\n")
 
 
 def calculate_psnr(input_t: torch.Tensor, target_t: torch.Tensor, data_range: float = 1.0) -> float:

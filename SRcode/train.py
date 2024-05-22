@@ -158,7 +158,7 @@ def train_single(filepath: str) -> None:
         writer.add_scalar('Train/Loss', average_loss, epoch)
 
         # val loop
-        if (epoch + 1) % 5 != 1:
+        if (epoch + 1) % 5 != 0:
             continue
         total_metrics = utils.Metrics([0], [0])
 
@@ -431,12 +431,10 @@ def train_stss(filepath: str) -> None:
         average_ss_metric = total_ss_metrics / len(val_loader)
         average_ess_metric = total_ess_metrics / len(val_loader)
         average_metric = (average_ss_metric + average_ess_metric) / 2
-        print("SS\n")
-        print(average_ss_metric)
-        print("ESS\n")
-        print(average_ess_metric)
-        print("Total\n")
-        print(average_metric)
+        print("\n")
+        print(f"SS {average_ss_metric}")
+        print(f"ESS {average_ess_metric}")
+        print(f"Total {average_metric}")
         # Log PSNR & SSIM to TensorBoard
         # PSNR
         writer.add_scalar("Val/PSNR/SS", average_ss_metric.average_psnr)
