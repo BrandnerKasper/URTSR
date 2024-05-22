@@ -79,7 +79,6 @@ def main() -> None:
     val = ["13", "14", "15", "16"]
     test = ["17", "18", "19", "20"]
 
-    print("Start train...")
     # train
     for fol in tqdm(train, desc='Convert train HR folders..'):
         p = f"{path}/train/HR/{fol}"
@@ -96,7 +95,6 @@ def main() -> None:
             filename = f"{i:0{4}d}.png"
             convert_lr_frames_to_npz_file(p, filename, s_p)
 
-    print("Start val...")
     # val
     for fol in tqdm(val, desc='Convert val HR folders..'):
         p = f"{path}/val/HR/{fol}"
@@ -113,7 +111,6 @@ def main() -> None:
             filename = f"{i:0{4}d}.png"
             convert_lr_frames_to_npz_file(p, filename, s_p)
 
-    print("Start test...")
     # test
     for fol in tqdm(test, desc='Convert test HR folder'):
         p = f"{path}/test/HR/{fol}"

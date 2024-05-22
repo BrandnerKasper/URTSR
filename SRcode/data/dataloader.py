@@ -45,18 +45,18 @@ class DiskMode(Enum):
     NPZ = 4
 
 
-def load_image_from_disk(mode: DiskMode, path: str, transform: transforms.ToTensor) -> torch.Tensor:
+def load_image_from_disk(mode: DiskMode, path: str, transform = transforms.ToTensor(), read_mode = cv2.IMREAD_UNCHANGED) -> torch.Tensor:
     match mode:
         case DiskMode.PIL:
             # Load with PIL Image
             return transform(Image.open(f"{path}.png").convert('RGB'))
         case DiskMode.CV2:
             # Load the image with CV2
-            # TODO add reading option for either unchanged or Greyscale, so I can further abstract!
-            img = cv2.imread(f"{path}.png", cv2.IMREAD_UNCHANGED)
+            img = cv2.imread(f"{path}.png", read_mode)
             # Convert BGR to RGB
-            rgb_image = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-            return transform(rgb_image)
+            if read_mode == cv2.IMREAD_UNCHANGED:
+                img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+            return transform(img)
         case DiskMode.PT:
             # Load the pytorch pt tensor
             return torch.load(f"{path}.pt")
@@ -306,49 +306,6 @@ class MultiImagePair(Dataset):
         return lr_frames, hr_frames
 
 
-# @dataclass
-# class STSSItem:
-#     lr_frame: torch.Tensor
-#     lr_frame_name: str
-#     feature_frames: list[torch.Tensor]
-#     feature_frames_names: list[str]
-#     history_frames: list[torch.Tensor]
-#     history_frames_names: list[str]
-#     hr_frame: torch.Tensor
-#     hr_frame_name: str
-#
-#     def display(self) -> None:
-#         # Create a plot with lr frame, feature frames, history frames and hr frame
-#         fig, axes = plt.subplots(2, 6, figsize=(20, 12))
-#         axes = axes.flatten()
-#
-#         # Display LR frame
-#         lr_image = F.to_pil_image(self.lr_frame)
-#         axes[0].imshow(lr_image)
-#         axes[0].set_title(f"LR frame {self.lr_frame_name}")
-#
-#         # Display feature frames
-#         for i, feature_frame in enumerate(self.feature_frames):
-#             feature_frame = F.to_pil_image(feature_frame)
-#             axes[i + 1].imshow(feature_frame)
-#             axes[i + 1].set_title(f'Feature frame {self.feature_frames_names[i]}')
-#
-#         # Display feature frames
-#         for i, history_frame in enumerate(self.history_frames):
-#             history_frame = F.to_pil_image(history_frame)
-#             axes[i + 7].imshow(history_frame)
-#             axes[i + 7].set_title(f'History frame {self.history_frames_names[i]}')
-#
-#         # Display HR frame
-#         hr_image = F.to_pil_image(self.hr_frame)
-#         axes[10].imshow(hr_image)
-#         axes[10].set_title(f"HR frame {self.hr_frame_name}")
-#
-#         return fig, axes
-        # plt.tight_layout()
-        # plt.show()
-
-
 class STSSImagePair(Dataset):
     def __init__(self, root: str, history: int = 4, last_frame_idx: int = 299,
                  transform=transforms.ToTensor(), crop_size: int = None, scale: int = 2,
@@ -404,25 +361,25 @@ class STSSImagePair(Dataset):
         # depth
         file = f"{self.root_lr}/{folder}/{filename}.depth_log"
         feature_frames_names.append(f"{filename}.depth_log")
-        file = cv2.imread(f"{file}.png", cv2.IMREAD_GRAYSCALE) #TODO use load image from disk fct
+        file = load_image_from_disk(self.disk_mode, file, self.transform, cv2.IMREAD_GRAYSCALE)
         file = self.transform(file)
         feature_frames.append(file)
         # metallic
         file = f"{self.root_lr}/{folder}/{filename}.metallic"
         feature_frames_names.append(f"{filename}.metallic")
-        file = cv2.imread(f"{file}.png", cv2.IMREAD_GRAYSCALE)
+        file = load_image_from_disk(self.disk_mode, file, self.transform, cv2.IMREAD_GRAYSCALE)
         file = self.transform(file)
         feature_frames.append(file)
         # normal vec
         file = f"{self.root_lr}/{folder}/{filename}.normal_vector"
         feature_frames_names.append(f"{filename}.normal_vector")
-        file = cv2.imread(f"{file}.png", cv2.IMREAD_GRAYSCALE)
+        file = load_image_from_disk(self.disk_mode, file, self.transform, cv2.IMREAD_GRAYSCALE)
         file = self.transform(file)
         feature_frames.append(file)
         # roughness
         file = f"{self.root_lr}/{folder}/{filename}.roughness"
         feature_frames_names.append(f"{filename}.roughness")
-        file = cv2.imread(f"{file}.png", cv2.IMREAD_GRAYSCALE)
+        file = load_image_from_disk(self.disk_mode, file, self.transform, cv2.IMREAD_GRAYSCALE)
         file = self.transform(file)
         feature_frames.append(file)
         # velocity
@@ -472,31 +429,31 @@ class STSSImagePair(Dataset):
         # depth
         file = f"{self.root_lr}/{folder}/{ess_filename}.depth_log"
         feature_frames_names.append(f"{ess_filename}.depth_log")
-        file = cv2.imread(f"{file}.png", cv2.IMREAD_GRAYSCALE)
+        file = load_image_from_disk(self.disk_mode, file, self.transform, cv2.IMREAD_GRAYSCALE)
         file = self.transform(file)
         feature_frames.append(file)
         # metallic
         file = f"{self.root_lr}/{folder}/{ess_filename}.metallic"
         feature_frames_names.append(f"{ess_filename}.metallic")
-        file = cv2.imread(f"{file}.png", cv2.IMREAD_GRAYSCALE)
+        file = load_image_from_disk(self.disk_mode, file, self.transform, cv2.IMREAD_GRAYSCALE)
         file = self.transform(file)
         feature_frames.append(file)
         # normal vec
         file = f"{self.root_lr}/{folder}/{ess_filename}.normal_vector"
         feature_frames_names.append(f"{ess_filename}.normal_vector")
-        file = cv2.imread(f"{file}.png", cv2.IMREAD_GRAYSCALE)
+        file = load_image_from_disk(self.disk_mode, file, self.transform, cv2.IMREAD_GRAYSCALE)
         file = self.transform(file)
         feature_frames.append(file)
         # roughness
         file = f"{self.root_lr}/{folder}/{ess_filename}.roughness"
         feature_frames_names.append(f"{ess_filename}.roughness")
-        file = cv2.imread(f"{file}.png", cv2.IMREAD_GRAYSCALE)
+        file = load_image_from_disk(self.disk_mode, file, self.transform, cv2.IMREAD_GRAYSCALE)
         file = self.transform(file)
         feature_frames.append(file)
         # velocity
         file = f"{self.root_lr}/{folder}/{ess_filename}.velocity_log"
         feature_frames_names.append(f"{ess_filename}.velocity_log")
-        file = load_image_from_disk(self.disk_mode, file, self.transform)
+        file = load_image_from_disk(self.disk_mode, file, self.transform, cv2.IMREAD_GRAYSCALE)
         # file = file[0:2]
         feature_frames.append(file)
 
