@@ -52,6 +52,7 @@ def load_image_from_disk(mode: DiskMode, path: str, transform: transforms.ToTens
             return transform(Image.open(f"{path}.png").convert('RGB'))
         case DiskMode.CV2:
             # Load the image with CV2
+            # TODO add reading option for either unchanged or Greyscale, so I can further abstract!
             img = cv2.imread(f"{path}.png", cv2.IMREAD_UNCHANGED)
             # Convert BGR to RGB
             rgb_image = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
@@ -381,81 +382,6 @@ class STSSImagePair(Dataset):
     def __len__(self) -> int:
         return len(self.filenames)
 
-    def get_item_npz(self, idx: int) -> (list[torch.Tensor], list[torch.Tensor]):
-        path = self.filenames[idx]
-        folder = path.split("/")[0]
-        filename = path.split("/")[-1]
-
-        # Generate SS frame
-        file = f"{self.root_lr}/{folder}/{filename}"
-        lr_frame_name = filename
-        ss_npz_file = load_image_from_disk(self.disk_mode, file, self.transform)
-        # lr frame
-        lr_frame = ss_npz_file[0:3]
-
-        # features basecolor, depth, metallic, normal, roughness, velocity
-        feature_frames = ss_npz_file[3:13]
-        feature_frames_names = [f"{filename}.basecolor", f"{filename}.depth", f"{filename}.metallic",
-                                f"{filename}.normal", f"{filename}.roughness", f"{filename}.velocity"]
-
-
-        # 3 previous history frames [current - 2, current -4, current -6]
-        history_frames = []
-        history_frames_names = []
-        for i in range(self.history):
-            # Extract the numeric part
-            file = int(filename) - (i + 1) * 2
-            # Generate right file name pattern
-            file = f"{file:0{self.digits}d}"  # Ensure 4/8 digit format
-            history_frames_names.append(file)
-            # Put folder and file name back together and load the tensor
-            file = f"{self.root_lr}/{folder}/{file}"
-            file = load_image_from_disk(self.disk_mode, file, self.transform)
-            file = file[0:3]
-            history_frames.append(file)
-
-        # hr frame
-        file = f"{self.root_hr}/{folder}/{filename}"
-        hr_frame_name = filename
-        hr_frame = load_image_from_disk(self.disk_mode, file, self.transform)
-
-        ss = [lr_frame, feature_frames, history_frames, hr_frame]
-        self.ss_names = [lr_frame_name, feature_frames_names, history_frames_names, hr_frame_name]
-
-        # Generate ESS frame
-        # lr frame -> we use the same as the SS frame
-
-        # get the future frames for extrapolation
-        ess_filename = int(filename) + 1
-        ess_filename = f"{ess_filename:0{self.digits}d}"  # Ensure 4/8 digit format
-        file = f"{self.root_lr}/{folder}/{ess_filename}"
-        ess_npz_file = load_image_from_disk(self.disk_mode, file, self.transform)
-
-        # features basecolor, depth, metallic, normal, roughness, velocity
-        feature_frames = ess_npz_file[3:13]
-        feature_frames_names = [f"{ess_filename}.basecolor", f"{ess_filename}.depth", f"{ess_filename}.metallic",
-                                f"{ess_filename}.normal", f"{ess_filename}.roughness", f"{ess_filename}.velocity"]
-
-
-        # history frames -> for now use same history frames as the SS frame
-
-        # hr frame
-        file = f"{self.root_hr}/{folder}/{ess_filename}"
-        hr_frame = load_image_from_disk(self.disk_mode, file, self.transform)
-        hr_frame_name = ess_filename
-
-        ess = [lr_frame, feature_frames, history_frames, hr_frame]
-        self.ess_names = [lr_frame_name, feature_frames_names, history_frames_names, hr_frame_name]
-
-        # Randomly crop the images
-        if self.crop_size:
-            self.get_random_crop_pair(ss, ess)
-
-        # # Augment images
-        self.augment(ss, ess)
-
-        return ss, ess
-
     def __getitem__(self, idx: int) -> (list[torch.Tensor], list[torch.Tensor]):
         path = self.filenames[idx]
         folder = path.split("/")[0]
@@ -478,7 +404,7 @@ class STSSImagePair(Dataset):
         # depth
         file = f"{self.root_lr}/{folder}/{filename}.depth_log"
         feature_frames_names.append(f"{filename}.depth_log")
-        file = cv2.imread(f"{file}.png", cv2.IMREAD_GRAYSCALE)
+        file = cv2.imread(f"{file}.png", cv2.IMREAD_GRAYSCALE) #TODO use load image from disk fct
         file = self.transform(file)
         feature_frames.append(file)
         # metallic
@@ -505,8 +431,6 @@ class STSSImagePair(Dataset):
         file = load_image_from_disk(self.disk_mode, file, self.transform)
         # file = file[0:2]
         feature_frames.append(file)
-        # cat feature frames
-        feature_frames = torch.cat(feature_frames, dim=0)
 
         # 3 previous history frames [current - 2, current -4, current -6]
         history_frames = []
@@ -527,8 +451,6 @@ class STSSImagePair(Dataset):
         hr_frame_name = filename
         hr_frame = load_image_from_disk(self.disk_mode, file, self.transform)
 
-        # ss = STSSItem(lr_frame, lr_frame_name, feature_frames, feature_frames_names, history_frames,
-        #               history_frames_names, hr_frame, hr_frame_name)
         ss = [lr_frame, feature_frames, history_frames, hr_frame]
         self.ss_names = [lr_frame_name, feature_frames_names, history_frames_names, hr_frame_name]
 
@@ -577,8 +499,6 @@ class STSSImagePair(Dataset):
         file = load_image_from_disk(self.disk_mode, file, self.transform)
         # file = file[0:2]
         feature_frames.append(file)
-        # cat feature frames
-        feature_frames = torch.cat(feature_frames, dim=0)
 
         # history frames -> for now use same history frames as the SS frame
 
@@ -624,9 +544,7 @@ class STSSImagePair(Dataset):
         axes_ss[0].set_title(f"LR frame {self.ss_names[0]}")
 
         # Display feature frames
-        feature_tensors = ss[1]
-        feature_frames = [feature_tensors[0:3], feature_tensors[3:4], feature_tensors[4:5], feature_tensors[5:6], feature_tensors[6:7], feature_tensors[7:10]]
-        for i, feature_frame in enumerate(feature_frames):
+        for i, feature_frame in enumerate(ss[1]):
             feature_frame = F.to_pil_image(feature_frame)
             axes_ss[i + 1].imshow(feature_frame)
             axes_ss[i + 1].set_title(f'Feature frame {self.ss_names[1][i]}')
@@ -654,9 +572,7 @@ class STSSImagePair(Dataset):
         axes_ess[0].set_title(f"LR frame {self.ess_names[0]}")
 
         # Display feature frames
-        feature_tensors = ess[1]
-        feature_frames = [feature_tensors[0:3], feature_tensors[3:4], feature_tensors[4:5], feature_tensors[5:6], feature_tensors[6:7], feature_tensors[7:10]]
-        for i, feature_frame in enumerate(feature_frames):
+        for i, feature_frame in enumerate(ess[1]):
             feature_frame = F.to_pil_image(feature_frame)
             axes_ess[i + 1].imshow(feature_frame)
             axes_ess[i + 1].set_title(f'Feature frame {self.ess_names[1][i]}')
@@ -685,7 +601,8 @@ class STSSImagePair(Dataset):
         # crop lr frame
         ss[0] = F.crop(ss[0], lr_i, lr_j, lr_h, lr_w)
         # crop features
-        ss[1] = F.crop(ss[1], lr_i, lr_j, lr_h, lr_w)
+        for i, feature_frame in enumerate(ss[1]):
+            ss[1][i] = F.crop(feature_frame, lr_i, lr_j, lr_h, lr_w)
         # crop history frames
         for i, history_frame in enumerate(ss[2]):
             ss[2][i] = F.crop(history_frame, lr_i, lr_j, lr_h, lr_w)
@@ -696,7 +613,8 @@ class STSSImagePair(Dataset):
         # crop lr frame
         ess[0] = F.crop(ess[0], lr_i, lr_j, lr_h, lr_w)
         # crop features
-        ess[1] = F.crop(ess[1], lr_i, lr_j, lr_h, lr_w)
+        for i, feature_frame in enumerate(ess[1]):
+            ess[1][i] = F.crop(feature_frame, lr_i, lr_j, lr_h, lr_w)
         # crop history frames -> shared
         # crop hr frame
         ess[3] = F.crop(ess[3], hr_i, hr_j, hr_h, hr_w)
@@ -711,8 +629,10 @@ class STSSImagePair(Dataset):
                 ss[0] = flip_image_horizontal(ss[0])
                 ess[0] = flip_image_horizontal(ess[0])
                 # hflip ss, ess feature frames
-                ss[1] = flip_image_horizontal(ss[1])
-                ess[1] = flip_image_horizontal(ess[1])
+                for i, feature_frame in enumerate(ss[1]):
+                    ss[1][i] = flip_image_horizontal(feature_frame)
+                for i, feature_frame in enumerate(ess[1]):
+                    ess[1][i] = flip_image_horizontal(feature_frame)
                 # hflip ss history frames -> ess shared
                 for i, history_frame in enumerate(ss[2]):
                     ss[2][i] = flip_image_horizontal(history_frame)
@@ -727,8 +647,10 @@ class STSSImagePair(Dataset):
                 ss[0] = flip_image_vertical(ss[0])
                 ess[0] = flip_image_vertical(ess[0])
                 # vflip ss, ess feature frames
-                ss[1] = flip_image_vertical(ss[1])
-                ess[1] = flip_image_vertical(ess[1])
+                for i, feature_frame in enumerate(ss[1]):
+                    ss[1][i] = flip_image_vertical(feature_frame)
+                for i, feature_frame in enumerate(ess[1]):
+                    ess[1][i] = flip_image_vertical(feature_frame)
                 # vflip ss history frames -> ess shared
                 for i, history_frame in enumerate(ss[2]):
                     ss[2][i] = flip_image_vertical(history_frame)
@@ -742,8 +664,10 @@ class STSSImagePair(Dataset):
                 ss[0] = rotate_image(ss[0], angle)
                 ess[0] = rotate_image(ess[0], angle)
                 # rotate ss, ess feature frames
-                ss[1] = rotate_image(ss[1], angle)
-                ess[1] = rotate_image(ess[1], angle)
+                for i, feature_frame in enumerate(ss[1]):
+                    ss[1][i] = rotate_image(feature_frame, angle)
+                for i, feature_frame in enumerate(ess[1]):
+                    ess[1][i] = rotate_image(feature_frame, angle)
                 # rotate ss history frames -> ess shared
                 for i, history_frame in enumerate(ss[2]):
                     ss[2][i] = rotate_image(history_frame, angle)

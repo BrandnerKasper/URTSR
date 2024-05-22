@@ -53,15 +53,12 @@ def write_stss_images(writer: SummaryWriter, step: int,
     # LR
     writer.add_images("SS/LR", input_t0[0], step)
     # Features
-    feature_tensors = input_t0[1].squeeze(0)
-    feature_frames = [feature_tensors[0:3], feature_tensors[3:4], feature_tensors[4:5], feature_tensors[5:6],
-                      feature_tensors[6:7], feature_tensors[7:10]]
-    writer.add_images("SS/Basecolor", feature_frames[0], step)
-    writer.add_images("SS/depth", feature_frames[1], step)
-    writer.add_images("SS/metallic", feature_frames[2], step)
-    writer.add_images("SS/nov", feature_frames[3], step)
-    writer.add_images("SS/roughness", feature_frames[4], step)
-    writer.add_images("SS/velocity", feature_frames[5], step)
+    writer.add_images("SS/Basecolor", input_t0[1][0], step)
+    writer.add_images("SS/depth", input_t0[1][1], step)
+    writer.add_images("SS/metallic", input_t0[1][2], step)
+    writer.add_images("SS/nov", input_t0[1][3], step)
+    writer.add_images("SS/roughness", input_t0[1][4], step)
+    writer.add_images("SS/velocity", input_t0[1][5], step)
     # History
     for i in range(len(input_t0[2])):
         writer.add_images(f"SS/History_t{-1-2*i}", input_t0[2][i], step)
@@ -74,15 +71,12 @@ def write_stss_images(writer: SummaryWriter, step: int,
     # LR
     writer.add_images("ESS/LR", input_t1[0], step)
     # Features
-    feature_tensors = input_t1[1].squeeze(0)
-    feature_frames = [feature_tensors[0:3], feature_tensors[3:4], feature_tensors[4:5], feature_tensors[5:6],
-                      feature_tensors[6:7], feature_tensors[7:10]]
-    writer.add_images("ESS/Basecolor", feature_frames[0], step)
-    writer.add_images("ESS/depth", feature_frames[1], step)
-    writer.add_images("ESS/metallic", feature_frames[2], step)
-    writer.add_images("ESS/nov", feature_frames[3], step)
-    writer.add_images("ESS/roughness", feature_frames[4], step)
-    writer.add_images("ESS/velocity", feature_frames[5], step)
+    writer.add_images("ESS/Basecolor", input_t1[1][0], step)
+    writer.add_images("ESS/depth", input_t1[1][1], step)
+    writer.add_images("ESS/metallic", input_t1[1][2], step)
+    writer.add_images("ESS/nov", input_t1[1][3], step)
+    writer.add_images("ESS/roughness", input_t1[1][4], step)
+    writer.add_images("ESS/velocity", input_t1[1][5], step)
     # History
     for i in range(len(input_t1[2])):
         writer.add_images(f"ESS/History_t{-2 - 2 * i}", input_t1[2][i], step)
@@ -350,7 +344,8 @@ def train_stss(filepath: str) -> None:
 
             # forward pass for SS
             lr_image = ss[0].to(device) # shared
-            ss_feature_images = ss[1].to(device)
+            ss_feature_images = [img.to(device) for img in ss[1]]
+            ss_feature_images = torch.cat(ss_feature_images, dim=1)
             history_images = [img.to(device) for img in ss[2]]
             history_images = torch.stack(history_images, dim=2) # shared
             ss_hr_image = ss[3].to(device)
@@ -358,7 +353,8 @@ def train_stss(filepath: str) -> None:
             ss_loss = criterion(ss_output, ss_hr_image)
 
             # forward pass for ESS
-            ess_feature_images = ess[1].to(device)
+            ess_feature_images = [img.to(device) for img in ess[1]]
+            ess_feature_images = torch.cat(ess_feature_images, dim=1)
             ess_hr_image = ess[3].to(device)
             ess_output = model(lr_image, ess_feature_images, history_images)
             ess_loss = criterion(ess_output, ess_hr_image)
@@ -398,13 +394,15 @@ def train_stss(filepath: str) -> None:
         for ss, ess in tqdm(val_loader, desc=f"Validation, Epoch {epoch + 1}/{epochs}", dynamic_ncols=True):
             # forward pass for SS
             lr_image = ss[0].to(device) # shared
-            ss_feature_images = ss[1].to(device)
+            ss_feature_images = [img.to(device) for img in ss[1]]
+            ss_feature_images = torch.cat(ss_feature_images, dim=1)
             history_images = [img.to(device) for img in ss[2]]
             history_images = torch.stack(history_images, dim=2)  # shared
             ss_hr_image = ss[3].to(device)
 
             # forward pass for ESS
-            ess_feature_images = ess[1].to(device)
+            ess_feature_images = [img.to(device) for img in ess[1]]
+            ess_feature_images = torch.cat(ess_feature_images, dim=1)
             ess_hr_image = ess[3].to(device)
 
             with torch.no_grad():
