@@ -3,6 +3,7 @@ import torch
 from torchvision import transforms
 import numpy as np
 import os
+from tqdm import tqdm
 
 
 def convert_hr_frame_to_npz_file(path: str, filename: str, safe_path: str) -> None:
@@ -80,14 +81,14 @@ def main() -> None:
 
     print("Start train...")
     # train
-    for fol in train:
+    for fol in tqdm(train, desc='Convert train HR folders..'):
         p = f"{path}/train/HR/{fol}"
         s_p = f"{safe_path}/train/HR/{fol}"
         create_folder_if_not_exists(s_p)
         for i in range(300):
             filename = f"{i:0{4}d}.png"
             convert_hr_frame_to_npz_file(p, filename, s_p)
-    for fol in train:
+    for fol in tqdm(train, desc='Convert train LR folders..'):
         p = f"{path}/train/LR/{fol}"
         s_p = f"{safe_path}/train/LR/{fol}"
         create_folder_if_not_exists(s_p)
@@ -97,14 +98,14 @@ def main() -> None:
 
     print("Start val...")
     # val
-    for fol in val:
+    for fol in tqdm(val, desc='Convert val HR folders..'):
         p = f"{path}/val/HR/{fol}"
         s_p = f"{safe_path}/val/HR/{fol}"
         create_folder_if_not_exists(s_p)
         for i in range(300):
             filename = f"{i:0{4}d}.png"
             convert_hr_frame_to_npz_file(p, filename, s_p)
-    for fol in val:
+    for fol in tqdm(val, desc='Convert val LR folders..'):
         p = f"{path}/val/LR/{fol}"
         s_p = f"{safe_path}/val/LR/{fol}"
         create_folder_if_not_exists(s_p)
@@ -114,14 +115,14 @@ def main() -> None:
 
     print("Start test...")
     # test
-    for fol in test:
+    for fol in tqdm(test, desc='Convert test HR folder'):
         p = f"{path}/test/HR/{fol}"
         s_p = f"{safe_path}/test/HR/{fol}"
         create_folder_if_not_exists(s_p)
         for i in range(300):
             filename = f"{i:0{4}d}.png"
             convert_hr_frame_to_npz_file(p, filename, s_p)
-    for fol in test:
+    for fol in tqdm(test, desc='Convert test LR folder'):
         p = f"{path}/test/LR/{fol}"
         s_p = f"{safe_path}/test/LR/{fol}"
         create_folder_if_not_exists(s_p)
