@@ -362,25 +362,21 @@ class STSSImagePair(Dataset):
         file = f"{self.root_lr}/{folder}/{filename}.depth_log"
         feature_frames_names.append(f"{filename}.depth_log")
         file = load_image_from_disk(self.disk_mode, file, self.transform, cv2.IMREAD_GRAYSCALE)
-        file = self.transform(file)
         feature_frames.append(file)
         # metallic
         file = f"{self.root_lr}/{folder}/{filename}.metallic"
         feature_frames_names.append(f"{filename}.metallic")
         file = load_image_from_disk(self.disk_mode, file, self.transform, cv2.IMREAD_GRAYSCALE)
-        file = self.transform(file)
         feature_frames.append(file)
         # normal vec
         file = f"{self.root_lr}/{folder}/{filename}.normal_vector"
         feature_frames_names.append(f"{filename}.normal_vector")
         file = load_image_from_disk(self.disk_mode, file, self.transform, cv2.IMREAD_GRAYSCALE)
-        file = self.transform(file)
         feature_frames.append(file)
         # roughness
         file = f"{self.root_lr}/{folder}/{filename}.roughness"
         feature_frames_names.append(f"{filename}.roughness")
         file = load_image_from_disk(self.disk_mode, file, self.transform, cv2.IMREAD_GRAYSCALE)
-        file = self.transform(file)
         feature_frames.append(file)
         # velocity
         file = f"{self.root_lr}/{folder}/{filename}.velocity_log"
@@ -430,25 +426,21 @@ class STSSImagePair(Dataset):
         file = f"{self.root_lr}/{folder}/{ess_filename}.depth_log"
         feature_frames_names.append(f"{ess_filename}.depth_log")
         file = load_image_from_disk(self.disk_mode, file, self.transform, cv2.IMREAD_GRAYSCALE)
-        file = self.transform(file)
         feature_frames.append(file)
         # metallic
         file = f"{self.root_lr}/{folder}/{ess_filename}.metallic"
         feature_frames_names.append(f"{ess_filename}.metallic")
         file = load_image_from_disk(self.disk_mode, file, self.transform, cv2.IMREAD_GRAYSCALE)
-        file = self.transform(file)
         feature_frames.append(file)
         # normal vec
         file = f"{self.root_lr}/{folder}/{ess_filename}.normal_vector"
         feature_frames_names.append(f"{ess_filename}.normal_vector")
         file = load_image_from_disk(self.disk_mode, file, self.transform, cv2.IMREAD_GRAYSCALE)
-        file = self.transform(file)
         feature_frames.append(file)
         # roughness
         file = f"{self.root_lr}/{folder}/{ess_filename}.roughness"
         feature_frames_names.append(f"{ess_filename}.roughness")
         file = load_image_from_disk(self.disk_mode, file, self.transform, cv2.IMREAD_GRAYSCALE)
-        file = self.transform(file)
         feature_frames.append(file)
         # velocity
         file = f"{self.root_lr}/{folder}/{ess_filename}.velocity_log"
@@ -645,8 +637,8 @@ def main() -> None:
     #                                 crop_size=None, use_hflip=False, use_rotation=False, digits=4)
     # matrix_dataset.display_item(42)
 
-    stss_data = STSSImagePair(root="../dataset/ue_data/train", scale=2, history=3, last_frame_idx=299,
-                              crop_size=512, use_hflip=True, use_rotation=True, digits=4)
+    stss_data = STSSImagePair(root="../dataset/ue_data_npz/train", scale=2, history=3, last_frame_idx=299,
+                              crop_size=512, use_hflip=True, use_rotation=True, digits=4, disk_mode=DiskMode.NPZ)
     stss_data.display_item(0)
 
 
