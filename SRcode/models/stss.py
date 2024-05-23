@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 
 try:
     from basemodel import BaseModel
@@ -109,6 +110,23 @@ class Stss(BaseModel):
             nn.Conv2d(32, 32, kernel_size=3, stride=1, padding=1),
             nn.ReLU(inplace=True)
         )
+
+        # for now we don't use it because we don't have the same warped image out the custom engine:
+        # https://github.com/fuxihao66/UnrealEngine/tree/5.1
+        self.latentEncoder = nn.Sequential(
+            nn.Conv2d(32 + 10, 64, kernel_size=3, stride=1, padding=1),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(64, 64, kernel_size=3, stride=1, padding=1),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(64, 64, kernel_size=3, stride=1, dilation=1, padding=1, bias=True)
+        )
+        self.KEncoder = nn.Sequential(
+            nn.Conv2d(10, 32, kernel_size=3, stride=1, padding=1),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(32, 32, kernel_size=3, stride=1, padding=1),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(32, 32, kernel_size=3, stride=1, dilation=1, padding=1, bias=True)
+        )
         
         self.up_1 = Up(64 + 32, 32)
         self.up_2 = Up(56, 24)
@@ -131,6 +149,8 @@ class Stss(BaseModel):
         his = self.his_2(his)
         his = self.his_3(his)
 
+        # inpaint_feature = self.hole_inpaint(x4, mask=?, feature)
+
         x4 = torch.cat([x4, his], 1)
 
         x = self.up_1(x4, x3)
@@ -138,6 +158,28 @@ class Stss(BaseModel):
         x = self.up_3(x, x1)
         x = self.conv_out(x)
         return x
+
+    def hole_inpaint(self, x, mask, feature):
+        x_down = x
+        mask_down = F.interpolate(mask, scale_factor=0.125, mode='bilinear')
+        feature_down = F.interpolate(feature, scale_factor=0.125, mode='bilinear')
+
+        latent_code = self.latentEncoder(torch.cat([x_down, feature_down], dim=1)) * mask_down
+        K_map = F.normalize(self.KEncoder(feature_down), p=2, dim=1)
+
+        b, c, h, w = list(K_map.size())
+        md = 2
+        f1 = F.unfold(K_map * mask_down, kernel_size=(2 * md + 1, 2 * md + 1), padding=(md, md), stride=(1, 1))
+        f1 = f1.view([b, c, -1, h, w])
+        f2 = K_map.view([b, c, 1, h, w])
+        weight_k = torch.relu((f1 * f2).sum(dim=1, keepdim=True))
+
+        b, c, h, w = list(latent_code.size())
+        v = F.unfold(latent_code, kernel_size=(2 * md + 1, 2 * md + 1), padding=(md, md), stride=(1, 1))
+        v = v.view([b, c, -1, h, w])
+
+        agg_latent = (v * weight_k).sum(dim=2) / (weight_k.sum(dim=2).clamp_min(1e-6))
+        return agg_latent
 
 
 def main() -> None:
