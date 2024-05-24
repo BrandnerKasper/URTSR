@@ -445,7 +445,7 @@ class STSSImagePair(Dataset):
         # velocity
         file = f"{self.root_lr}/{folder}/{ess_filename}.velocity_log"
         feature_frames_names.append(f"{ess_filename}.velocity_log")
-        file = load_image_from_disk(self.disk_mode, file, self.transform, cv2.IMREAD_GRAYSCALE)
+        file = load_image_from_disk(self.disk_mode, file, self.transform)
         # file = file[0:2]
         feature_frames.append(file)
 
@@ -637,8 +637,8 @@ def main() -> None:
     #                                 crop_size=None, use_hflip=False, use_rotation=False, digits=4)
     # matrix_dataset.display_item(42)
 
-    stss_data = STSSImagePair(root="../dataset/ue_data_npz/train", scale=2, history=3, last_frame_idx=299,
-                              crop_size=512, use_hflip=True, use_rotation=True, digits=4, disk_mode=DiskMode.NPZ)
+    stss_data = STSSImagePair(root="../dataset/ue_data/train", scale=2, history=3, last_frame_idx=299,
+                              crop_size=512, use_hflip=True, use_rotation=True, digits=4, disk_mode=DiskMode.CV2)
     stss_data.display_item(0)
 
 

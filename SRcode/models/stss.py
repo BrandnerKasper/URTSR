@@ -113,20 +113,20 @@ class Stss(BaseModel):
 
         # for now we don't use it because we don't have the same warped image out the custom engine:
         # https://github.com/fuxihao66/UnrealEngine/tree/5.1
-        self.latentEncoder = nn.Sequential(
-            nn.Conv2d(32 + 10, 64, kernel_size=3, stride=1, padding=1),
-            nn.ReLU(inplace=True),
-            nn.Conv2d(64, 64, kernel_size=3, stride=1, padding=1),
-            nn.ReLU(inplace=True),
-            nn.Conv2d(64, 64, kernel_size=3, stride=1, dilation=1, padding=1, bias=True)
-        )
-        self.KEncoder = nn.Sequential(
-            nn.Conv2d(10, 32, kernel_size=3, stride=1, padding=1),
-            nn.ReLU(inplace=True),
-            nn.Conv2d(32, 32, kernel_size=3, stride=1, padding=1),
-            nn.ReLU(inplace=True),
-            nn.Conv2d(32, 32, kernel_size=3, stride=1, dilation=1, padding=1, bias=True)
-        )
+        # self.latentEncoder = nn.Sequential(
+        #     nn.Conv2d(32 + 10, 64, kernel_size=3, stride=1, padding=1),
+        #     nn.ReLU(inplace=True),
+        #     nn.Conv2d(64, 64, kernel_size=3, stride=1, padding=1),
+        #     nn.ReLU(inplace=True),
+        #     nn.Conv2d(64, 64, kernel_size=3, stride=1, dilation=1, padding=1, bias=True)
+        # )
+        # self.KEncoder = nn.Sequential(
+        #     nn.Conv2d(10, 32, kernel_size=3, stride=1, padding=1),
+        #     nn.ReLU(inplace=True),
+        #     nn.Conv2d(32, 32, kernel_size=3, stride=1, padding=1),
+        #     nn.ReLU(inplace=True),
+        #     nn.Conv2d(32, 32, kernel_size=3, stride=1, dilation=1, padding=1, bias=True)
+        # )
         
         self.up_1 = Up(64 + 32, 32)
         self.up_2 = Up(56, 24)

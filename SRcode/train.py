@@ -350,14 +350,14 @@ def train_stss(filepath: str) -> None:
             history_images = torch.stack(history_images, dim=2) # shared
             ss_hr_image = ss[3].to(device)
             ss_output = model(lr_image, ss_feature_images, history_images)
-            ss_loss = criterion(ss_output, ss_hr_image)
+            ss_loss = criterion(ss_output, ss_hr_image) # + 0.1 * lpips
 
             # forward pass for ESS
             ess_feature_images = [img.to(device) for img in ess[1]]
             ess_feature_images = torch.cat(ess_feature_images, dim=1)
             ess_hr_image = ess[3].to(device)
             ess_output = model(lr_image, ess_feature_images, history_images)
-            ess_loss = criterion(ess_output, ess_hr_image)
+            ess_loss = criterion(ess_output, ess_hr_image) # + 0.1* lpips
 
             # New loss
             loss = ss_loss + ess_loss
@@ -437,13 +437,13 @@ def train_stss(filepath: str) -> None:
         print(f"Total {average_metric}")
         # Log PSNR & SSIM to TensorBoard
         # PSNR
-        writer.add_scalar("Val/PSNR/SS", average_ss_metric.average_psnr)
-        writer.add_scalar("Val/PSNR/ESS", average_ess_metric.average_psnr)
-        writer.add_scalar("Val/PSNR/Average", average_metric.average_psnr)
+        writer.add_scalar("Val/PSNR/SS", average_ss_metric.average_psnr, epoch)
+        writer.add_scalar("Val/PSNR/ESS", average_ess_metric.average_psnr, epoch)
+        writer.add_scalar("Val/PSNR/Average", average_metric.average_psnr, epoch)
         # SSIM
-        writer.add_scalar("Val/SSIM/SS", average_ss_metric.average_ssim)
-        writer.add_scalar("Val/SSIM/ESS", average_ess_metric.average_ssim)
-        writer.add_scalar("Val/SSIM/Average", average_metric.average_ssim)
+        writer.add_scalar("Val/SSIM/SS", average_ss_metric.average_ssim, epoch)
+        writer.add_scalar("Val/SSIM/ESS", average_ess_metric.average_ssim, epoch)
+        writer.add_scalar("Val/SSIM/Average", average_metric.average_ssim, epoch)
 
     # End Log
     writer.close()
