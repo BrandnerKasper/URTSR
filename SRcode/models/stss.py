@@ -76,7 +76,7 @@ class Stss(BaseModel):
         super(Stss, self).__init__(scale=scale)
 
         self.conv_in = nn.Sequential(
-            LWGatedConv2D(3 + 10, 24, kernel=3, stride=1, pad=1),
+            LWGatedConv2D(3 + 9, 24, kernel=3, stride=1, pad=1),
             nn.ReLU(inplace=True),
             LWGatedConv2D(24, 24, kernel=3, stride=1, pad=1),
             nn.ReLU(inplace=True)
@@ -87,7 +87,7 @@ class Stss(BaseModel):
         self.down_3 = DownLWGated(32, 32)
 
         self.his_1 = nn.Sequential(
-            nn.Conv2d(9, 24, kernel_size=3, stride=2, padding=1),
+            nn.Conv2d(6, 24, kernel_size=3, stride=2, padding=1),
             nn.ReLU(inplace=True),
             nn.Conv2d(24, 24, kernel_size=3, stride=1, padding=1),
             nn.ReLU(inplace=True),
@@ -159,27 +159,27 @@ class Stss(BaseModel):
         x = self.conv_out(x)
         return x
 
-    def hole_inpaint(self, x, mask, feature):
-        x_down = x
-        mask_down = F.interpolate(mask, scale_factor=0.125, mode='bilinear')
-        feature_down = F.interpolate(feature, scale_factor=0.125, mode='bilinear')
-
-        latent_code = self.latentEncoder(torch.cat([x_down, feature_down], dim=1)) * mask_down
-        K_map = F.normalize(self.KEncoder(feature_down), p=2, dim=1)
-
-        b, c, h, w = list(K_map.size())
-        md = 2
-        f1 = F.unfold(K_map * mask_down, kernel_size=(2 * md + 1, 2 * md + 1), padding=(md, md), stride=(1, 1))
-        f1 = f1.view([b, c, -1, h, w])
-        f2 = K_map.view([b, c, 1, h, w])
-        weight_k = torch.relu((f1 * f2).sum(dim=1, keepdim=True))
-
-        b, c, h, w = list(latent_code.size())
-        v = F.unfold(latent_code, kernel_size=(2 * md + 1, 2 * md + 1), padding=(md, md), stride=(1, 1))
-        v = v.view([b, c, -1, h, w])
-
-        agg_latent = (v * weight_k).sum(dim=2) / (weight_k.sum(dim=2).clamp_min(1e-6))
-        return agg_latent
+    # def hole_inpaint(self, x, mask, feature):
+    #     x_down = x
+    #     mask_down = F.interpolate(mask, scale_factor=0.125, mode='bilinear')
+    #     feature_down = F.interpolate(feature, scale_factor=0.125, mode='bilinear')
+    #
+    #     latent_code = self.latentEncoder(torch.cat([x_down, feature_down], dim=1)) * mask_down
+    #     K_map = F.normalize(self.KEncoder(feature_down), p=2, dim=1)
+    #
+    #     b, c, h, w = list(K_map.size())
+    #     md = 2
+    #     f1 = F.unfold(K_map * mask_down, kernel_size=(2 * md + 1, 2 * md + 1), padding=(md, md), stride=(1, 1))
+    #     f1 = f1.view([b, c, -1, h, w])
+    #     f2 = K_map.view([b, c, 1, h, w])
+    #     weight_k = torch.relu((f1 * f2).sum(dim=1, keepdim=True))
+    #
+    #     b, c, h, w = list(latent_code.size())
+    #     v = F.unfold(latent_code, kernel_size=(2 * md + 1, 2 * md + 1), padding=(md, md), stride=(1, 1))
+    #     v = v.view([b, c, -1, h, w])
+    #
+    #     agg_latent = (v * weight_k).sum(dim=2) / (weight_k.sum(dim=2).clamp_min(1e-6))
+    #     return agg_latent
 
 
 def main() -> None:
@@ -188,7 +188,7 @@ def main() -> None:
     model = Stss(scale=2).to(device)
     batch_size = 1
     input_data = (batch_size, 3, 1920, 1080)
-    feature = (batch_size, 10, 1920, 1080)
+    feature = (batch_size, 9, 1920, 1080)
     his = (batch_size, 3, 3, 1920, 1080)
     input_size = (input_data, feature, his)
 

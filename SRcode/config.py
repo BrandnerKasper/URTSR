@@ -168,9 +168,9 @@ def init_dataset(name: str, crop_size: int, use_hflip: bool, use_rotation: bool)
                                 use_hflip=use_hflip, use_rotation=use_rotation, digits=4)
             return train, val
         case "ue_data_npz":
-            train = STSSImagePair(root=f"{root}/train", scale=2, history=3, last_frame_idx=299, crop_size=crop_size,
+            train = STSSImagePair(root=f"{root}/train", scale=2, history=2, last_frame_idx=299, crop_size=crop_size,
                                   use_hflip=use_hflip, use_rotation=use_rotation, digits=4, disk_mode=DiskMode.NPZ)
-            val = STSSImagePair(root=f"{root}/val", scale=2, history=3, last_frame_idx=299, crop_size=crop_size,
+            val = STSSImagePair(root=f"{root}/val", scale=2, history=2, last_frame_idx=299, crop_size=crop_size,
                                 use_hflip=use_hflip, use_rotation=use_rotation, digits=4, disk_mode=DiskMode.NPZ)
             return train, val
         case _:

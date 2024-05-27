@@ -307,7 +307,7 @@ class MultiImagePair(Dataset):
 
 
 class STSSImagePair(Dataset):
-    def __init__(self, root: str, history: int = 4, last_frame_idx: int = 299,
+    def __init__(self, root: str, history: int = 3, last_frame_idx: int = 299,
                  transform=transforms.ToTensor(), crop_size: int = None, scale: int = 2,
                  use_hflip: bool = False, use_rotation: bool = False, digits: int = 4, disk_mode=DiskMode.CV2):
         self.root_hr = os.path.join(root, "HR")
@@ -369,20 +369,25 @@ class STSSImagePair(Dataset):
         file = load_image_from_disk(self.disk_mode, file, self.transform, cv2.IMREAD_GRAYSCALE)
         feature_frames.append(file)
         # normal vec
-        file = f"{self.root_lr}/{folder}/{filename}.normal_vector"
-        feature_frames_names.append(f"{filename}.normal_vector")
-        file = load_image_from_disk(self.disk_mode, file, self.transform, cv2.IMREAD_GRAYSCALE)
-        feature_frames.append(file)
+        # file = f"{self.root_lr}/{folder}/{filename}.normal_vector"
+        # feature_frames_names.append(f"{filename}.normal_vector")
+        # file = load_image_from_disk(self.disk_mode, file, self.transform, cv2.IMREAD_GRAYSCALE)
+        # feature_frames.append(file)
         # roughness
         file = f"{self.root_lr}/{folder}/{filename}.roughness"
         feature_frames_names.append(f"{filename}.roughness")
         file = load_image_from_disk(self.disk_mode, file, self.transform, cv2.IMREAD_GRAYSCALE)
         feature_frames.append(file)
         # velocity
-        file = f"{self.root_lr}/{folder}/{filename}.velocity_log"
-        feature_frames_names.append(f"{filename}.velocity_log")
+        # file = f"{self.root_lr}/{folder}/{filename}.velocity_log"
+        # feature_frames_names.append(f"{filename}.velocity_log")
+        # file = load_image_from_disk(self.disk_mode, file, self.transform)
+        # # file = file[0:2]
+        # feature_frames.append(file)
+        # world normal
+        file = f"{self.root_lr}/{folder}/{filename}.world_normal"
+        feature_frames_names.append(f"{filename}.world_normal")
         file = load_image_from_disk(self.disk_mode, file, self.transform)
-        # file = file[0:2]
         feature_frames.append(file)
 
         # 3 previous history frames [current - 2, current -4, current -6]
@@ -433,20 +438,25 @@ class STSSImagePair(Dataset):
         file = load_image_from_disk(self.disk_mode, file, self.transform, cv2.IMREAD_GRAYSCALE)
         feature_frames.append(file)
         # normal vec
-        file = f"{self.root_lr}/{folder}/{ess_filename}.normal_vector"
-        feature_frames_names.append(f"{ess_filename}.normal_vector")
-        file = load_image_from_disk(self.disk_mode, file, self.transform, cv2.IMREAD_GRAYSCALE)
-        feature_frames.append(file)
+        # file = f"{self.root_lr}/{folder}/{ess_filename}.normal_vector"
+        # feature_frames_names.append(f"{ess_filename}.normal_vector")
+        # file = load_image_from_disk(self.disk_mode, file, self.transform, cv2.IMREAD_GRAYSCALE)
+        # feature_frames.append(file)
         # roughness
         file = f"{self.root_lr}/{folder}/{ess_filename}.roughness"
         feature_frames_names.append(f"{ess_filename}.roughness")
         file = load_image_from_disk(self.disk_mode, file, self.transform, cv2.IMREAD_GRAYSCALE)
         feature_frames.append(file)
         # velocity
-        file = f"{self.root_lr}/{folder}/{ess_filename}.velocity_log"
-        feature_frames_names.append(f"{ess_filename}.velocity_log")
+        # file = f"{self.root_lr}/{folder}/{ess_filename}.velocity_log"
+        # feature_frames_names.append(f"{ess_filename}.velocity_log")
+        # file = load_image_from_disk(self.disk_mode, file, self.transform)
+        # # file = file[0:2]
+        # feature_frames.append(file)
+        # world normal
+        file = f"{self.root_lr}/{folder}/{ess_filename}.world_normal"
+        feature_frames_names.append(f"{ess_filename}.world_normal")
         file = load_image_from_disk(self.disk_mode, file, self.transform)
-        # file = file[0:2]
         feature_frames.append(file)
 
         # history frames -> for now use same history frames as the SS frame
@@ -637,7 +647,7 @@ def main() -> None:
     #                                 crop_size=None, use_hflip=False, use_rotation=False, digits=4)
     # matrix_dataset.display_item(42)
 
-    stss_data = STSSImagePair(root="../dataset/ue_data/train", scale=2, history=3, last_frame_idx=299,
+    stss_data = STSSImagePair(root="../dataset/ue_data/train", scale=2, history=2, last_frame_idx=299,
                               crop_size=512, use_hflip=True, use_rotation=True, digits=4, disk_mode=DiskMode.CV2)
     stss_data.display_item(0)
 
