@@ -34,20 +34,22 @@ Just some notes and todos what I'd like to consider for my thesis.
 
 ### General:
 - [ ] Look into fraction based values (DLSS, XESS, FSR -> quality modes, like 1.3, 1.5, 1.7, 2.0, 3.0)
-- [ ] U-net architectures up/down-sample an image multiple times, look into what is best practice when the input image sizes are not dividable by 2^x where x the number of up/down-sampling steps
+- [x] U-net architectures up/down-sample an image multiple times, look into what is best practice when the input image sizes are not dividable by 2^x where x the number of up/down-sampling steps
 - [x] adjust training details to ExtraNet's parameter (Cosine learning rate decay, beta 1 and 2 of adam)
 - [x] add a 'how often is the image divided' number to every model so it can be abstracted for train, evaluate and test
-- [ ] train for far longer (roughly 20 hours) with 500.000 iterations with batch size of 32 and crop size of 64 with flips and rotations!
-- [ ] checkout the formula in BasicSR for calculating the epochs amount based on iterations/dataset.size (check if batch size influences sth here)
-- [x] abstract config and train so it can be trained on SISR and MISR (includes Spatial SR as well as Temporal SR)
+- [x] checkout the formula in BasicSR for calculating the epochs amount based on iterations/dataset.size (check if batch size influences sth here)
+- [ ] abstract config and train so it can be trained on SISR and MISR (includes Spatial SR as well as Temporal SR)
+- [ ] abstract code base so that networks can be trained with different amount of buffer data
 
 ### Training
 At the moment training is quite slow as we need to read 4 png images per get_item for LR (1080p) and two for HR (4k)
 - [x] check how Eduard handled reading such big images from disk -> cv2 imread
 - [ ] cv2 still too slow, try to compress all training and val data into npz and pt files and see how much faster it would be (XTX PC!)
 - [ ] find more ways to speed up the loading from disk thing..
+
 ### Timing:
-A forward pass of our network should at max take 33.3ms
+A forward pass of our network should at max take 33.3ms.
+If it takes two forward passes (one for SS, one for ESS) it only should take 16.6ms.. 
 
 | FPS       | Forward Pass Time (ms) |
 |-----------|-------------------------|
@@ -87,10 +89,16 @@ Make a similiar data loader to STSS
 ### Preprocess
 
 - [x] Divide images into sub images and save them as .png and pt/npz files
-- [ ] For the config file add a file type option, based on that the dataloader loads, .png, .pt or .npz files
+- [x] For the config file add a file type option, based on that the dataloader loads, .png, .pt or .npz files
+
+*png for size, npz for speed -> roughly 20% increase of speed to 20% increase of size*
+
 - [x] Play around with loading image data for depth for example and min/max normalize the values and safe it back into an image
 - [x] Load a motion vector image and play around if you can visualize the motion vector data (-x/-y m/s, x,y m/s) into a color range which makes negative values visible
-- [ ] for depth try to see if we can put it on a logarithmic scale
+- [x] for depth try to see if we can put it on a logarithmic scale
+
+*logaritmic scale for depth not bad, because objects don't disappear in the fog, but might lose detail, again tradeoff here*
+
 - [ ] honestly for motion vectors we can try logarithmic scale as well
 
 ## General
