@@ -73,7 +73,7 @@ class Up(nn.Module):
 
 class Stss(BaseModel):
     def __init__(self, scale: int):
-        super(Stss, self).__init__(scale=scale)
+        super(Stss, self).__init__(scale=scale, down_and_up=3)
 
         self.conv_in = nn.Sequential(
             LWGatedConv2D(3 + 9, 24, kernel=3, stride=1, pad=1),
@@ -189,7 +189,7 @@ def main() -> None:
     batch_size = 1
     input_data = (batch_size, 3, 1920, 1080)
     feature = (batch_size, 9, 1920, 1080)
-    his = (batch_size, 3, 3, 1920, 1080)
+    his = (batch_size, 3, 2, 1920, 1080)
     input_size = (input_data, feature, his)
 
     model.summary(input_size)

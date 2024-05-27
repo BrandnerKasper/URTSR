@@ -86,6 +86,44 @@ def write_stss_images(writer: SummaryWriter, step: int,
     writer.add_images("ESS/GT", gt_t1, step)
 
 
+def write_cross_stss_images(writer: SummaryWriter, step: int,
+                      input_t0: list[torch.Tensor], output_t0: torch.Tensor, gt_t0: torch.Tensor,
+                      input_t1: list[torch.Tensor], output_t1: torch.Tensor, gt_t1: torch.Tensor) -> None:
+    # SS
+    # LR
+    writer.add_images("SS/LR", input_t0[0], step)
+    # Features
+    writer.add_images("SS/Basecolor", input_t0[1][0], step)
+    writer.add_images("SS/depth", input_t0[1][1], step)
+    writer.add_images("SS/metallic", input_t0[1][2], step)
+    writer.add_images("SS/roughness", input_t0[1][3], step)
+    writer.add_images("SS/world_normal", input_t0[1][4], step)
+    # History
+    for i in range(len(input_t0[2])):
+        writer.add_images(f"SS/History_t{-1-2*i}", input_t0[2][i], step)
+    # Output
+    writer.add_images("SS/Output", output_t0, step)
+    # GT
+    writer.add_images("SS/GT", gt_t0, step)
+
+    # ESS
+    # LR
+    writer.add_images("ESS/LR", input_t1[0], step)
+    # Features
+    writer.add_images("ESS/Basecolor", input_t1[1][0], step)
+    writer.add_images("ESS/depth", input_t1[1][1], step)
+    writer.add_images("ESS/metallic", input_t1[1][2], step)
+    writer.add_images("ESS/roughness", input_t1[1][3], step)
+    writer.add_images("ESS/velocity", input_t1[1][4], step)
+    # History
+    for i in range(len(input_t1[2])):
+        writer.add_images(f"ESS/History_t{-2 - 2 * i}", input_t1[2][i], step)
+    # Output
+    writer.add_images("ESS/Output", output_t1, step)
+    # GT
+    writer.add_images("ESS/GT", gt_t1, step)
+
+
 def train(filepath: str) -> None:
     config = load_yaml_into_config(filepath)
     # based on which dataset we train, we decide if its SISR or STSS
@@ -385,7 +423,7 @@ def train_stss(filepath: str) -> None:
         writer.add_scalar('Train/Combined Loss', average_loss, epoch)
 
         # val loop
-        if (epoch + 1) % 5 != 0:
+        if (epoch + 1) % 5 != 1:
             continue
         total_ss_metrics = utils.Metrics([0], [0])  # TODO: abstract number of values based on second dim of tensor [8, 2, 3, 1920, 1080]
         total_ess_metrics = utils.Metrics([0], [0])
@@ -424,7 +462,7 @@ def train_stss(filepath: str) -> None:
             # Display the val process in tensorboard
             if val_counter != 0:
                 continue
-            write_stss_images(writer, iteration_counter, ss, ss_output, ss_hr_image, ess, ess_output, ess_hr_image)
+            write_cross_stss_images(writer, iteration_counter, ss, ss_output, ss_hr_image, ess, ess_output, ess_hr_image)
             val_counter += 1
 
         # PSNR & SSIM

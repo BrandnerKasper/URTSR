@@ -635,6 +635,334 @@ class STSSImagePair(Dataset):
                 ess[3] = rotate_image(ess[3], angle)
 
 
+class STSSCrossValidation(Dataset):
+    def __init__(self, root: str, history: int = 3,
+                 transform=transforms.ToTensor(), crop_size: int = None, scale: int = 2,
+                 use_hflip: bool = False, use_rotation: bool = False, disk_mode=DiskMode.CV2):
+        self.root_hr = os.path.join(root, "HR")
+        self.root_lr = os.path.join(root, "LR")
+        self.history = history
+        self.transform = transform
+        self.crop_size = crop_size
+        self.scale = scale
+        self.use_hflip = use_hflip
+        self.use_rotation = use_rotation
+        self.disk_mode = disk_mode
+        self.filenames = self.init_filenames()
+        self.ss_names: list[str]
+        self.ess_names: list[str]
+
+    def init_filenames(self) -> list[str]:
+        filenames = []
+        for file in os.listdir(self.root_lr):
+            file = os.path.splitext(file)[0]
+            if len(file.split(".")) < 2:
+                filenames.append(os.path.join(self.root_lr, file))
+        filenames.sort()
+        # remove the first entries for history
+        for i in range(self.history):
+            filenames.pop(0)
+        # remove last entry for ess
+        filenames.pop()
+        return filenames
+
+    def __len__(self) -> int:
+        return len(self.filenames)
+
+    def __getitem__(self, idx: int) -> (list[torch.Tensor], list[torch.Tensor]):
+        filename = self.get_filename(idx)
+
+        # Generate SS frame
+        # lr frame
+        file = f"{self.root_lr}/{filename}"
+        lr_frame_name = filename
+        lr_frame = load_image_from_disk(self.disk_mode, file, self.transform)
+
+        # features: basecolor, depth, metallic, nov, roughness, velocity
+        feature_frames = []
+        feature_frames_names = []
+        # basecolor
+        file = f"{self.root_lr}/{filename}.basecolor"
+        feature_frames_names.append(f"{filename}.basecolor")
+        file = load_image_from_disk(self.disk_mode, file, self.transform)
+        feature_frames.append(file)
+        # depth
+        file = f"{self.root_lr}/{filename}.depth_log"
+        feature_frames_names.append(f"{filename}.depth_log")
+        file = load_image_from_disk(self.disk_mode, file, self.transform, cv2.IMREAD_GRAYSCALE)
+        feature_frames.append(file)
+        # metallic
+        file = f"{self.root_lr}/{filename}.metallic"
+        feature_frames_names.append(f"{filename}.metallic")
+        file = load_image_from_disk(self.disk_mode, file, self.transform, cv2.IMREAD_GRAYSCALE)
+        feature_frames.append(file)
+        # roughness
+        file = f"{self.root_lr}/{filename}.roughness"
+        feature_frames_names.append(f"{filename}.roughness")
+        file = load_image_from_disk(self.disk_mode, file, self.transform, cv2.IMREAD_GRAYSCALE)
+        feature_frames.append(file)
+        # world normal
+        file = f"{self.root_lr}/{filename}.world_normal"
+        feature_frames_names.append(f"{filename}.world_normal")
+        file = load_image_from_disk(self.disk_mode, file, self.transform)
+        feature_frames.append(file)
+
+        # 2 previous history frames
+        history_frames = []
+        history_frames_names = []
+        # edge cases because of STSS val dataset..
+        if idx == 0:
+            # h1
+            h1_name = "0007"
+            h1 = load_image_from_disk(self.disk_mode, f"{self.root_lr}/{h1_name}", self.transform)
+            history_frames.append(h1)
+            history_frames_names.append(h1_name)
+            # h2
+            h2_name = "0005"
+            h2 = load_image_from_disk(self.disk_mode, f"{self.root_lr}/{h2_name}", self.transform)
+            history_frames.append(h2)
+            history_frames_names.append(h2_name)
+        elif idx == 1:
+            # h1
+            h1_name = self.get_filename(idx-1)
+            h1 = load_image_from_disk(self.disk_mode, f"{self.root_lr}/{h1_name}", self.transform)
+            history_frames.append(h1)
+            history_frames_names.append(h1_name)
+            # h2
+            h2_name = "0007"
+            h2 = load_image_from_disk(self.disk_mode, f"{self.root_lr}/{h2_name}", self.transform)
+            history_frames.append(h2)
+            history_frames_names.append(h2_name)
+        else:
+            for i in range(self.history):
+                file = self.get_filename(idx-(i+1))
+                history_frames_names.append(file)
+                file = f"{self.root_lr}/{file}"
+                file = load_image_from_disk(self.disk_mode, file, self.transform)
+                history_frames.append(file)
+
+        # hr frame
+        file = f"{self.root_hr}/{filename}"
+        hr_frame_name = filename
+        hr_frame = load_image_from_disk(self.disk_mode, file, self.transform)
+
+        ss = [lr_frame, feature_frames, history_frames, hr_frame]
+        self.ss_names = [lr_frame_name, feature_frames_names, history_frames_names, hr_frame_name]
+
+        # Generate ESS frame
+        # lr frame -> we use the same as the SS frame
+
+        # get the future frames for extrapolation
+        if idx == len(self.filenames)-1:
+            ess_filename = "3599"
+        else:
+            ess_filename = self.get_filename(idx+1)
+
+        # features: basecolor, depth, metallic, nov, roughness, velocity
+        feature_frames = []
+        feature_frames_names = []
+        # basecolor
+        file = f"{self.root_lr}/{ess_filename}.basecolor"
+        feature_frames_names.append(f"{ess_filename}.basecolor")
+        file = load_image_from_disk(self.disk_mode, file, self.transform)
+        feature_frames.append(file)
+        # depth
+        file = f"{self.root_lr}/{ess_filename}.depth_log"
+        feature_frames_names.append(f"{ess_filename}.depth_log")
+        file = load_image_from_disk(self.disk_mode, file, self.transform, cv2.IMREAD_GRAYSCALE)
+        feature_frames.append(file)
+        # metallic
+        file = f"{self.root_lr}/{ess_filename}.metallic"
+        feature_frames_names.append(f"{ess_filename}.metallic")
+        file = load_image_from_disk(self.disk_mode, file, self.transform, cv2.IMREAD_GRAYSCALE)
+        feature_frames.append(file)
+        # roughness
+        file = f"{self.root_lr}/{ess_filename}.roughness"
+        feature_frames_names.append(f"{ess_filename}.roughness")
+        file = load_image_from_disk(self.disk_mode, file, self.transform, cv2.IMREAD_GRAYSCALE)
+        feature_frames.append(file)
+        # world normal
+        file = f"{self.root_lr}/{ess_filename}.world_normal"
+        feature_frames_names.append(f"{ess_filename}.world_normal")
+        file = load_image_from_disk(self.disk_mode, file, self.transform)
+        feature_frames.append(file)
+
+        # history frames -> for now use same history frames as the SS frame
+
+        # hr frame
+        file = f"{self.root_hr}/{ess_filename}"
+        hr_frame = load_image_from_disk(self.disk_mode, file, self.transform)
+        hr_frame_name = ess_filename
+
+        ess = [lr_frame, feature_frames, history_frames, hr_frame]
+        self.ess_names = [lr_frame_name, feature_frames_names, history_frames_names, hr_frame_name]
+
+        # Randomly crop the images
+        if self.crop_size:
+            self.get_random_crop_pair(ss, ess)
+
+        # # Augment images
+        self.augment(ss, ess)
+
+        return ss, ess
+
+    def get_filename(self, idx: int) -> str:
+        path = self.filenames[idx]
+        filename = path.split("/")[-1]
+        filename = filename.split(".")[0]
+        return filename
+
+    def get_path(self, idx: int) -> str:
+        return self.filenames[idx]
+
+    def display_item(self, idx: int) -> None:
+        ss, ess = self.__getitem__(idx)
+
+        # Create two plots: one for the SS frame and one for the ESS frame
+        # Display SS frame
+        fig_ss, axes_ss = plt.subplots(2, 6, figsize=(20, 12))
+        fig_ss.suptitle('SS frames')
+
+        axes_ss = axes_ss.flatten()
+
+        # Display LR frame
+        lr_image = F.to_pil_image(ss[0])
+        axes_ss[0].imshow(lr_image)
+        axes_ss[0].set_title(f"LR frame {self.ss_names[0]}")
+
+        # Display feature frames
+        for i, feature_frame in enumerate(ss[1]):
+            feature_frame = F.to_pil_image(feature_frame)
+            axes_ss[i + 1].imshow(feature_frame)
+            axes_ss[i + 1].set_title(f'Feature frame {self.ss_names[1][i]}')
+
+        # Display feature frames
+        for i, history_frame in enumerate(ss[2]):
+            history_frame = F.to_pil_image(history_frame)
+            axes_ss[i + 7].imshow(history_frame)
+            axes_ss[i + 7].set_title(f'History frame {self.ss_names[2][i]}')
+
+        # Display HR frame
+        hr_image = F.to_pil_image(ss[3])
+        axes_ss[10].imshow(hr_image)
+        axes_ss[10].set_title(f"HR frame {self.ss_names[3]}")
+
+        # Display ESS frame
+        fig_ess, axes_ess = plt.subplots(2, 6, figsize=(20, 12))
+        fig_ess.suptitle('ESS frames')
+
+        axes_ess = axes_ess.flatten()
+
+        # Display LR frame
+        lr_image = F.to_pil_image(ess[0])
+        axes_ess[0].imshow(lr_image)
+        axes_ess[0].set_title(f"LR frame {self.ess_names[0]}")
+
+        # Display feature frames
+        for i, feature_frame in enumerate(ess[1]):
+            feature_frame = F.to_pil_image(feature_frame)
+            axes_ess[i + 1].imshow(feature_frame)
+            axes_ess[i + 1].set_title(f'Feature frame {self.ess_names[1][i]}')
+
+        # Display feature frames
+        for i, history_frame in enumerate(ess[2]):
+            history_frame = F.to_pil_image(history_frame)
+            axes_ess[i + 7].imshow(history_frame)
+            axes_ess[i + 7].set_title(f'History frame {self.ess_names[2][i]}')
+
+        # Display HR frame
+        hr_image = F.to_pil_image(ess[3])
+        axes_ess[10].imshow(hr_image)
+        axes_ess[10].set_title(f"HR frame {self.ess_names[3]}")
+
+        plt.tight_layout()
+        plt.show()
+
+    def get_random_crop_pair(self, ss: list[torch.Tensor], ess: list[torch.Tensor]) \
+            -> None:
+        lr_i, lr_j, lr_h, lr_w = transforms.RandomCrop.get_params(ss[0],
+                                                                  output_size=(self.crop_size, self.crop_size))
+        hr_i, hr_j, hr_h, hr_w = lr_i * self.scale, lr_j * self.scale, lr_h * self.scale, lr_w * self.scale
+
+        # Crop SS frame
+        # crop lr frame
+        ss[0] = F.crop(ss[0], lr_i, lr_j, lr_h, lr_w)
+        # crop features
+        for i, feature_frame in enumerate(ss[1]):
+            ss[1][i] = F.crop(feature_frame, lr_i, lr_j, lr_h, lr_w)
+        # crop history frames
+        for i, history_frame in enumerate(ss[2]):
+            ss[2][i] = F.crop(history_frame, lr_i, lr_j, lr_h, lr_w)
+        # crop hr frame
+        ss[3] = F.crop(ss[3], hr_i, hr_j, hr_h, hr_w)
+
+        # Crop ESS frame
+        # crop lr frame
+        ess[0] = F.crop(ess[0], lr_i, lr_j, lr_h, lr_w)
+        # crop features
+        for i, feature_frame in enumerate(ess[1]):
+            ess[1][i] = F.crop(feature_frame, lr_i, lr_j, lr_h, lr_w)
+        # crop history frames -> shared
+        # crop hr frame
+        ess[3] = F.crop(ess[3], hr_i, hr_j, hr_h, hr_w)
+
+    def augment(self, ss: list[torch.Tensor], ess: list[torch.Tensor]) \
+            -> None:
+        # Augment SS & ESS frame
+        # Apply random horizontal flip
+        if self.use_hflip:
+            if random.random() > 0.5:
+                # hflip ss, ess lr frame
+                ss[0] = flip_image_horizontal(ss[0])
+                ess[0] = flip_image_horizontal(ess[0])
+                # hflip ss, ess feature frames
+                for i, feature_frame in enumerate(ss[1]):
+                    ss[1][i] = flip_image_horizontal(feature_frame)
+                for i, feature_frame in enumerate(ess[1]):
+                    ess[1][i] = flip_image_horizontal(feature_frame)
+                # hflip ss history frames -> ess shared
+                for i, history_frame in enumerate(ss[2]):
+                    ss[2][i] = flip_image_horizontal(history_frame)
+                # hflip ss,ess hr frame
+                ss[3] = flip_image_horizontal(ss[3])
+                ess[3] = flip_image_horizontal(ess[3])
+
+        # Apply random rotation by v flipping and rot of 90
+        if self.use_rotation:
+            if random.random() > 0.5:
+                # vflip ss, ess lr frame
+                ss[0] = flip_image_vertical(ss[0])
+                ess[0] = flip_image_vertical(ess[0])
+                # vflip ss, ess feature frames
+                for i, feature_frame in enumerate(ss[1]):
+                    ss[1][i] = flip_image_vertical(feature_frame)
+                for i, feature_frame in enumerate(ess[1]):
+                    ess[1][i] = flip_image_vertical(feature_frame)
+                # vflip ss history frames -> ess shared
+                for i, history_frame in enumerate(ss[2]):
+                    ss[2][i] = flip_image_vertical(history_frame)
+                # vflip ss, ess hr frame
+                ss[3] = flip_image_vertical(ss[3])
+                ess[3] = flip_image_vertical(ess[3])
+        if self.use_rotation:
+            if random.random() > 0.5:
+                angle = -90  # for clockwise rotation like BasicSR
+                # rotate ss, ess lr frame
+                ss[0] = rotate_image(ss[0], angle)
+                ess[0] = rotate_image(ess[0], angle)
+                # rotate ss, ess feature frames
+                for i, feature_frame in enumerate(ss[1]):
+                    ss[1][i] = rotate_image(feature_frame, angle)
+                for i, feature_frame in enumerate(ess[1]):
+                    ess[1][i] = rotate_image(feature_frame, angle)
+                # rotate ss history frames -> ess shared
+                for i, history_frame in enumerate(ss[2]):
+                    ss[2][i] = rotate_image(history_frame, angle)
+                # rotate ss, ess hr frame
+                ss[3] = rotate_image(ss[3], angle)
+                ess[3] = rotate_image(ess[3], angle)
+
+
 def main() -> None:
     # div2k_dataset = SingleImagePair(root="../dataset/DIV2K/train", pattern="x2")
     # div2k_dataset.display_item(0)
@@ -647,9 +975,13 @@ def main() -> None:
     #                                 crop_size=None, use_hflip=False, use_rotation=False, digits=4)
     # matrix_dataset.display_item(42)
 
-    stss_data = STSSImagePair(root="../dataset/ue_data/train", scale=2, history=2, last_frame_idx=299,
-                              crop_size=512, use_hflip=True, use_rotation=True, digits=4, disk_mode=DiskMode.CV2)
-    stss_data.display_item(0)
+    # stss_data = STSSImagePair(root="../dataset/ue_data/train", scale=2, history=2, last_frame_idx=299,
+    #                           crop_size=512, use_hflip=True, use_rotation=True, digits=4, disk_mode=DiskMode.CV2)
+    # stss_data.display_item(0)
+
+    cross_val = STSSCrossValidation(root="../dataset/STSS_val_lewis_png", scale=2, history=2, crop_size=None,
+                                    use_hflip=False, use_rotation=False)
+    cross_val.display_item(0)
 
 
 if __name__ == '__main__':

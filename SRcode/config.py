@@ -16,7 +16,7 @@ from models.flavr import Flavr
 from models.flavr_original import Flavr_Original
 from models.stss import Stss
 
-from data.dataloader import SingleImagePair, MultiImagePair, STSSImagePair, DiskMode
+from data.dataloader import SingleImagePair, MultiImagePair, STSSImagePair, STSSCrossValidation, DiskMode
 
 
 def create_yaml(filename: str, model: str, epochs: int, scale: int, batch_size: int,
@@ -170,8 +170,10 @@ def init_dataset(name: str, crop_size: int, use_hflip: bool, use_rotation: bool)
         case "ue_data_npz":
             train = STSSImagePair(root=f"{root}/train", scale=2, history=2, last_frame_idx=299, crop_size=crop_size,
                                   use_hflip=use_hflip, use_rotation=use_rotation, digits=4, disk_mode=DiskMode.NPZ)
-            val = STSSImagePair(root=f"{root}/val", scale=2, history=2, last_frame_idx=299, crop_size=crop_size,
-                                use_hflip=use_hflip, use_rotation=use_rotation, digits=4, disk_mode=DiskMode.NPZ)
+            # val = STSSImagePair(root=f"{root}/val", scale=2, history=2, last_frame_idx=299, crop_size=crop_size,
+            #                     use_hflip=use_hflip, use_rotation=use_rotation, digits=4, disk_mode=DiskMode.NPZ)
+            val = STSSCrossValidation(root=f"dataset/STSS_val_lewis_png", scale=2, history=2, crop_size=crop_size,
+                                      use_hflip=False, use_rotation=False)
             return train, val
         case _:
             raise ValueError(f"The dataset '{name}' is not a valid dataset.")
