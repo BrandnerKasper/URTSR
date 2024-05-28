@@ -52,28 +52,89 @@ class ExtraSS(BaseModel):
 
         self.hr_input = torch.randn(1, 3, 3840, 2160) # abstract batch and crop size for this to work
 
-        self.down_1 = nn.Sequential(
-            nn.Conv2d(3 + 12, 22, kernel_size=3, stride=1, padding=1),
+        self.down_1_e0 = nn.Sequential(
+            nn.Conv2d(3, 22, kernel_size=3, stride=1, padding=1),
             nn.ReLU(inplace=True),
             nn.Conv2d(22, 22, kernel_size=3, stride=2, padding=1)
         )
-        self.down_2 = nn.Sequential(
+        self.down_2_e0 = nn.Sequential(
             nn.Conv2d(22, 32, kernel_size=3, stride=1, padding=1),
             nn.ReLU(inplace=True),
             nn.Conv2d(32, 32, kernel_size=3, stride=2, padding=1)
         )
-        self.down_3 = nn.Sequential(
+        self.down_3_e0 = nn.Sequential(
             nn.Conv2d(32, 64, kernel_size=3, stride=1, padding=1),
             nn.ReLU(inplace=True),
             nn.Conv2d(64, 64, kernel_size=3, stride=2, padding=1)
         )
-        self.down_4 = nn.Sequential(
+        self.down_4_e0 = nn.Sequential(
+            nn.Conv2d(64, 128, kernel_size=3, stride=1, padding=1),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(128, 128, kernel_size=3, stride=2, padding=1)
+        )
+        self.down_1_e1 = nn.Sequential(
+            nn.Conv2d(3 + 12, 22, kernel_size=3, stride=1, padding=1),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(22, 22, kernel_size=3, stride=2, padding=1)
+        )
+        self.down_2_e1 = nn.Sequential(
+            nn.Conv2d(22, 32, kernel_size=3, stride=1, padding=1),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(32, 32, kernel_size=3, stride=2, padding=1)
+        )
+        self.down_3_e1 = nn.Sequential(
+            nn.Conv2d(32, 64, kernel_size=3, stride=1, padding=1),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(64, 64, kernel_size=3, stride=2, padding=1)
+        )
+        self.down_4_e1 = nn.Sequential(
             nn.Conv2d(64, 128, kernel_size=3, stride=1, padding=1),
             nn.ReLU(inplace=True),
             nn.Conv2d(128, 128, kernel_size=3, stride=2, padding=1)
         )
 
-        pass
+        # two different encoders for the ss and ess forward pass
+        # self.encoder_0 = nn.Sequential(
+        #     self.down_1_e0,
+        #     self.down_2_e0,
+        #     self.down_3_e0,
+        #     self.down_4_e0
+        # )
+        # self.encoder_1 = nn.Sequential(
+        #     self.down_1_e1,
+        #     self.down_2_e1,
+        #     self.down_3_e1,
+        #     self.down_4_e1
+        # )
+
+        self.up_1 = nn.Sequential(
+            nn.Conv2d(128, 256, kernel_size=3, stride=1, padding=1),
+            nn.ReLU(inplace=True),
+            nn.ConvTranspose2d(256, 128, kernel_size=2, stride=2)
+        )
+        self.up_2 = nn.Sequential(
+            nn.Conv2d(128, 128, kernel_size=3, stride=1, padding=1),
+            nn.ReLU(inplace=True),
+            nn.ConvTranspose2d(128, 64, kernel_size=2, stride=2)
+        )
+        self.up_3 = nn.Sequential(
+            nn.Conv2d(64, 64, kernel_size=3, stride=1, padding=1),
+            nn.ReLU(inplace=True),
+            nn.ConvTranspose2d(64, 32, kernel_size=2, stride=2)
+        )
+        self.up_4 = nn.Sequential(
+            nn.Conv2d(32, 32, kernel_size=3, stride=1, padding=1),
+            nn.ReLU(inplace=True),
+            nn.ConvTranspose2d(32, 22, kernel_size=2, stride=2)
+        )
+
+        self.finish_1 = nn.Sequential(
+            nn.Conv2d(22, 46, kernel_size=3, stride=1, padding=1),
+            nn.ReLU(inplace=True),
+        )
+        self.finish_2 = nn.Sequential(
+            nn.Conv2d(58, 12, kernel_size=3, stride=1, padding=1)
+        )
 
     def forward(self, x):
         pass
