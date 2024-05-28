@@ -5,8 +5,9 @@ from tqdm import tqdm
 import torchvision.transforms.functional as F
 from torch.utils.data import DataLoader
 
-from data.dataloader import SingleImagePair, MultiImagePair, STSSImagePair, DiskMode
+from data.dataloader import SingleImagePair, MultiImagePair, STSSImagePair, DiskMode, STSSCrossValidation
 from config import load_yaml_into_config, Config
+from utils import utils
 
 
 def get_config_from_pretrained_model(name: str) -> Config:
@@ -83,8 +84,10 @@ def test_stss_image_dataset() -> None:
     model.eval()
     path = "dataset/ue_data/test"
 
-    test_dataset = STSSImagePair(root=path, scale=2, history=3, last_frame_idx=299, crop_size=None,
+    test_dataset = STSSImagePair(root=path, scale=2, history=2, last_frame_idx=299, crop_size=None,
                          use_hflip=False, use_rotation=False, digits=4)
+    # test_dataset = STSSCrossValidation(root="dataset/STSS_val_lewis_png", scale=2, history=2, crop_size=None,
+    #                                 use_hflip=False, use_rotation=False)
 
     counter = 0
     for idx in tqdm(range(len(test_dataset)), "Generating sequence.."):
@@ -100,13 +103,17 @@ def test_stss_image_dataset() -> None:
         ss, ess = test_dataset.__getitem__(idx)
         # forward pass for SS
         lr_image = ss[0].unsqueeze(0).to(device)  # shared
+        lr_image = utils.pad_to_divisible(lr_image, 2 ** model.down_and_up)
         ss_feature_images = [img.unsqueeze(0).to(device) for img in ss[1]]
+        ss_feature_images = [utils.pad_to_divisible(img, 2 ** model.down_and_up) for img in ss_feature_images]
         ss_feature_images = torch.cat(ss_feature_images, dim=1)
         history_images = [img.unsqueeze(0).to(device) for img in ss[2]]
+        history_images = [utils.pad_to_divisible(img, 2 ** model.down_and_up) for img in history_images]
         history_images = torch.stack(history_images, dim=2)  # shared
 
         # forward pass for ESS
         ess_feature_images = [img.unsqueeze(0).to(device) for img in ess[1]]
+        ess_feature_images = [utils.pad_to_divisible(img, 2 ** model.down_and_up) for img in ess_feature_images]
         ess_feature_images = torch.cat(ess_feature_images, dim=1)
 
         with torch.no_grad():
