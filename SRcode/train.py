@@ -15,7 +15,7 @@ from config import load_yaml_into_config, create_comment_from_config
 
 def parse_arguments() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Train a SR network based on a config file.")
-    parser.add_argument('file_path', type=str, nargs='?', default='configs/stss.yaml', help="Path to the config file")
+    parser.add_argument('file_path', type=str, nargs='?', default='configs/stss2.yaml', help="Path to the config file")
     args = parser.parse_args()
     return args
 
@@ -268,15 +268,16 @@ def train_multi(filepath: str) -> None:
         # train loop
         total_loss = 0.0
 
-        for lr_image, hr_image in tqdm(train_loader, desc=f'Training, Epoch {epoch + 1}/{epochs}', dynamic_ncols=True):
-            lr_image = [img.to(device) for img in lr_image]
-            hr_image = [img.to(device) for img in hr_image]
-            lr_image = torch.stack(lr_image, dim=2)
+        for lr_images, hr_images in tqdm(train_loader, desc=f'Training, Epoch {epoch + 1}/{epochs}', dynamic_ncols=True):
+            lr_images = [img.to(device) for img in lr_images]
+            lr_image = lr_images[0]
+            hr_images = [img.to(device) for img in hr_images]
+            history_images = torch.stack(lr_images, dim=2)
             optimizer.zero_grad()
-            output = model(lr_image)
-            hr_image = torch.cat(hr_image)
+            output = model(lr_image, history_images)
+            hr_images = torch.cat(hr_images)
             output = torch.cat(output)
-            loss = criterion(output, hr_image)
+            loss = criterion(output, hr_images)
             loss.backward()
             optimizer.step()
 
@@ -295,25 +296,26 @@ def train_multi(filepath: str) -> None:
         writer.add_scalar('Train/Loss', average_loss, epoch)
 
         # val loop
-        if (epoch + 1) % 5 != 0:
+        if (epoch + 1) % 5 != 1:
             continue
         total_metrics = utils.Metrics([0, 0], [0, 0]) # TODO: abstract number of values based on second dim of tensor [8, 2, 3, 1920, 1080]
 
         val_counter = 0
-        for lr_image, hr_image in tqdm(val_loader, desc=f"Validation, Epoch {epoch + 1}/{epochs}", dynamic_ncols=True):
-            lr_image = [img.to(device) for img in lr_image]
-            hr_image = [img.to(device) for img in hr_image]
-            lr_img = torch.stack(lr_image, dim=2)
+        for lr_images, hr_images in tqdm(val_loader, desc=f"Validation, Epoch {epoch + 1}/{epochs}", dynamic_ncols=True):
+            lr_images = [img.to(device) for img in lr_images]
+            lr_image = lr_images[0]
+            hr_images = [img.to(device) for img in hr_images]
+            history_images = torch.stack(lr_images, dim=2)
             with torch.no_grad():
-                output_image = model(lr_img)
+                output_image = model(lr_image, history_images)
                 output_image = [torch.clamp(img, min=0.0, max=1.0) for img in output_image]
             # Calc PSNR and SSIM
-            metrics = utils.calculate_metrics(hr_image, output_image, "multi")
+            metrics = utils.calculate_metrics(hr_images, output_image, "multi")
             total_metrics += metrics
             # Display the val process in tensorboard
             if val_counter != 0:
                 continue
-            write_images(writer, "multi", lr_image, output_image, hr_image, iteration_counter)
+            write_images(writer, "multi", lr_images, output_image, hr_images, iteration_counter)
             val_counter += 1
 
         # PSNR & SSIM
@@ -359,7 +361,7 @@ def train_stss(filepath: str) -> None:
     # Loading and preparing data
     # train data
     train_dataset = config.train_dataset
-    train_loader = DataLoader(dataset=train_dataset, batch_size=batch_size, num_workers=num_workers, shuffle=False)
+    train_loader = DataLoader(dataset=train_dataset, batch_size=batch_size, num_workers=num_workers, shuffle=True)
     # val data
     val_dataset = config.val_dataset
     val_loader = DataLoader(dataset=val_dataset, batch_size=1, shuffle=True, num_workers=num_workers)

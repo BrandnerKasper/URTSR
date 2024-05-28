@@ -1,3 +1,4 @@
+import math
 import random
 import timeit
 from dataclasses import dataclass
@@ -213,7 +214,7 @@ class MultiImagePair(Dataset):
 
         # hr frames = [current, current + 1, ..., current + n], where n = # of frames / 2
         hr_frames = []
-        for i in range(int(self.number_of_frames / 2)):
+        for i in range(math.ceil(self.number_of_frames / 2)):
             # Extract the numeric part
             file = int(filename) + i
             # Generate right file name pattern
@@ -971,17 +972,17 @@ def main() -> None:
     #                               crop_size=96, use_hflip=True, use_rotation=True, digits=8)
     # reds_dataset.display_item(888)
 
-    # matrix_dataset = MultiImagePair(root="../dataset/ue_data/train", scale=2, number_of_frames=4, last_frame_idx=299,
-    #                                 crop_size=None, use_hflip=False, use_rotation=False, digits=4)
-    # matrix_dataset.display_item(42)
+    matrix_dataset = MultiImagePair(root="../dataset/ue_data_npz/train", scale=2, number_of_frames=3, last_frame_idx=299,
+                                    crop_size=None, use_hflip=False, use_rotation=False, digits=4, disk_mode=DiskMode.NPZ)
+    matrix_dataset.display_item(42)
 
-    # stss_data = STSSImagePair(root="../dataset/ue_data/train", scale=2, history=2, last_frame_idx=299,
-    #                           crop_size=512, use_hflip=True, use_rotation=True, digits=4, disk_mode=DiskMode.CV2)
+    # stss_data = STSSImagePair(root="../dataset/ue_data_npz/train", scale=2, history=2, last_frame_idx=299,
+    #                           crop_size=512, use_hflip=True, use_rotation=True, digits=4, disk_mode=DiskMode.NPZ)
     # stss_data.display_item(0)
 
-    cross_val = STSSCrossValidation(root="../dataset/STSS_val_lewis_png", scale=2, history=2, crop_size=None,
-                                    use_hflip=False, use_rotation=False)
-    cross_val.display_item(0)
+    # cross_val = STSSCrossValidation(root="../dataset/STSS_val_lewis_png", scale=2, history=2, crop_size=None,
+    #                                 use_hflip=False, use_rotation=False)
+    # cross_val.display_item(0)
 
 
 if __name__ == '__main__':

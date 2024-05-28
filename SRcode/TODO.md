@@ -17,10 +17,14 @@ Just some notes and todos what I'd like to consider for my thesis.
 
 ### Space-time Supersampling (STSS):
 - [ ] Spatial SR for Single Image Super Resolution (SISR)
-- [ ] Spatial SR for Real-Time Super Resolution (RTSR) -> multiple input frames
+- [x] Spatial SR for Real-Time Super Resolution (RTSR) -> multiple input frames
 - [ ] Temporal SR
-- [ ] find out how to train STSS correctly (two forward passes: 1. SS frame, 2. ESS frame)
+- [x] find out how to train STSS correctly (two forward passes: 1. SS frame, 2. ESS frame)
 - [ ] implement their loss
+- [ ] for now generate two images based on one forward pass and have an output of 6
+- [ ] later try it with two different forward passes but update the weights (backward) after each forward pass and NOT together
+- [ ] instead of the hole inpaint function use a small attention layer from [here](https://github.com/swz30/Restormer/blob/main/basicsr/models/archs/restormer_arch.py)
+- [ ] train without buffers on my data set and cross validate on Lewis scene and look how good it performs
 
 ### Flow-Agnostic Video Representations for Fast Frame Interpolation (FLAVR)
 - [ ] Spatial SR for Single Image Super Resolution (SISR)
