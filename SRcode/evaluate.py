@@ -7,13 +7,13 @@ from utils import utils
 import argparse
 from torch.utils.data import DataLoader
 
-from data.dataloader import SingleImagePair, MultiImagePair
+from data.dataloader import SingleImagePair, MultiImagePair, STSSCrossValidation2
 from config import load_yaml_into_config, Config
 
 
 def parse_arguments() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Evaluate a trained SR network based on a pretrained model file.")
-    parser.add_argument('file_path', type=str, nargs='?', default='pretrained_models/stss.pth',
+    parser.add_argument('file_path', type=str, nargs='?', default='pretrained_models/stss2.pth',
                         help="Path to the pretrained model .pth file")
     args = parser.parse_args()
     return args
@@ -120,19 +120,21 @@ def evaluate_multi_image_dataset(pretrained_model_path: str) -> None:
     model.load_state_dict(torch.load(pretrained_model_path))
     model.eval()
 
-    val_loader = DataLoader(dataset=config.val_dataset, batch_size=1, shuffle=False, num_workers=config.number_workers)
+    val_dataset = STSSCrossValidation2(root="dataset/STSS_val_lewis_png", scale=2, number_of_frames=3, crop_size=256, use_hflip=False, use_rotation=False)
+    val_loader = DataLoader(dataset=val_dataset, batch_size=1, shuffle=False, num_workers=config.number_workers)
 
     total_metrics = utils.Metrics([0, 0], [0, 0])  # TODO: abstract number of values based on second dim of tensor [8, 2, 3, 1920, 1080]
 
-    for lr_image, hr_image in tqdm(val_loader, desc=f"Evaluating on {config.dataset}", dynamic_ncols=True):
-        lr_image = [img.to(device) for img in lr_image]
-        hr_image = [img.to(device) for img in hr_image]
-        lr_image = torch.stack(lr_image, dim=2)
+    for lr_images, hr_images in tqdm(val_loader, desc=f"Evaluating on {config.dataset}", dynamic_ncols=True):
+        lr_images = [img.to(device) for img in lr_images]
+        lr_image = lr_images[0]
+        hr_images = [img.to(device) for img in hr_images]
+        history_images = torch.stack(lr_images, dim=2)
         with torch.no_grad():
-            output_image = model(lr_image)
+            output_image = model(lr_image, history_images)
             output_image = [torch.clamp(img, min=0.0, max=1.0) for img in output_image]
         # Calc PSNR and SSIM
-        metrics = utils.calculate_metrics(hr_image, output_image, "multi")
+        metrics = utils.calculate_metrics(hr_images, output_image, "multi")
         total_metrics += metrics
 
     # PSNR & SSIM

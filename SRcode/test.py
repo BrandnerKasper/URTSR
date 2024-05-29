@@ -5,7 +5,8 @@ from tqdm import tqdm
 import torchvision.transforms.functional as F
 from torch.utils.data import DataLoader
 
-from data.dataloader import SingleImagePair, MultiImagePair, STSSImagePair, DiskMode, STSSCrossValidation
+from data.dataloader import SingleImagePair, MultiImagePair, STSSImagePair, DiskMode, STSSCrossValidation, \
+    STSSCrossValidation2
 from config import load_yaml_into_config, Config
 from utils import utils
 
@@ -22,8 +23,8 @@ def generate_directory(path):
 
 
 def test() -> None:
-    pretrained_model_path = "pretrained_models/flavr_original.pth"
-    save_path = "results/test"
+    pretrained_model_path = "pretrained_models/stss2.pth"
+    save_path = "results/stss2_cross"
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Device: {device}")
@@ -35,11 +36,13 @@ def test() -> None:
     model = config.model.to(device)
     model.load_state_dict(torch.load(pretrained_model_path))
     model.eval()
-    path = "dataset/ue_data/test"
+    path = "dataset/ue_data_npz/test"
 
-    test_dataset = MultiImagePair(root=path, number_of_frames=4, last_frame_idx=299,
-                         transform=transforms.ToTensor(), crop_size=None, scale=2,
-                         use_hflip=False, use_rotation=False, digits=4, disk_mode=DiskMode.CV2)
+    # test_dataset = MultiImagePair(root=path, number_of_frames=3, last_frame_idx=299,
+    #                      transform=transforms.ToTensor(), crop_size=None, scale=2,
+    #                      use_hflip=False, use_rotation=False, digits=4, disk_mode=DiskMode.NPZ)
+    test_dataset = STSSCrossValidation2(root="dataset/STSS_val_lewis_png", scale=2, number_of_frames=3, crop_size=None, use_hflip=False, use_rotation=False)
+
 
     counter = 0
     for idx in tqdm(range(len(test_dataset)), "Generating sequence.."):
@@ -52,12 +55,14 @@ def test() -> None:
         subfolder = test_dataset.get_path(idx).split("/")[0] # we want to retrieve the sub folder of the val sequences
         generate_directory(f"{save_path}/{subfolder}")
         # print(f"Filename: {filename}\n")
-        lr_image, hr_image = test_dataset.__getitem__(idx)
+        lr_images, hr_image = test_dataset.__getitem__(idx)
         with torch.no_grad():
-            lr_image = [img.unsqueeze(0) for img in lr_image]
-            lr_image = [img.to(device) for img in lr_image]
-            lr_image = torch.stack(lr_image, dim=2)
-            output_image = model(lr_image)
+            lr_images = [img.unsqueeze(0) for img in lr_images]
+            lr_images = [img.to(device) for img in lr_images]
+            lr_images = [utils.pad_to_divisible(img, 2 ** model.down_and_up) for img in lr_images]
+            lr_image = lr_images[0]
+            history_images = torch.stack(lr_images, dim=2)
+            output_image = model(lr_image, history_images)
             output_image = [torch.clamp(img, min=0.0, max=1.0) for img in output_image]
         # Safe generated images into a folder
         for i in range(len(output_image)):
@@ -132,8 +137,8 @@ def test_stss_image_dataset() -> None:
 
 
 def main() -> None:
-    # test()
-    test_stss_image_dataset()
+    test()
+    # test_stss_image_dataset()
 
 
 if __name__ == '__main__':

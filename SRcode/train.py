@@ -282,7 +282,7 @@ def train_multi(filepath: str) -> None:
             optimizer.step()
 
             total_loss += loss.item()
-            iteration_counter += 1
+            iteration_counter += 1 * batch_size
 
         # scheduler update if we have one
         if scheduler is not None:

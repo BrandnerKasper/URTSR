@@ -964,6 +964,181 @@ class STSSCrossValidation(Dataset):
                 ess[3] = rotate_image(ess[3], angle)
 
 
+class STSSCrossValidation2(Dataset):
+    def __init__(self, root: str, number_of_frames: int = 4,
+                 transform=transforms.ToTensor(), crop_size: int = None, scale: int = 4,
+                 use_hflip: bool = False, use_rotation: bool = False, digits: int = 4, disk_mode=DiskMode.CV2):
+        self.root_hr = os.path.join(root, "HR")
+        self.root_lr = os.path.join(root, "LR")
+        self.number_of_frames = number_of_frames
+        self.history = number_of_frames-1
+        self.transform = transform
+        self.crop_size = crop_size
+        self.scale = scale
+        self.use_hflip = use_hflip
+        self.use_rotation = use_rotation
+        self.digits = digits
+        self.disk_mode = disk_mode
+        self.filenames = self.init_filenames()
+
+    def init_filenames(self) -> list[str]:
+        filenames = []
+        for file in os.listdir(self.root_lr):
+            file = os.path.splitext(file)[0]
+            if len(file.split(".")) < 2:
+                filenames.append(os.path.join(self.root_lr, file))
+        filenames.sort()
+        # remove the first entries for history
+        for i in range(self.history):
+            filenames.pop(0)
+        # remove last entry for ess
+        filenames.pop()
+        return filenames
+
+    def __len__(self) -> int:
+        return len(self.filenames)
+
+    # only works for extrapolation atm
+    def __getitem__(self, idx: int) -> (list[torch.Tensor], list[torch.Tensor]):
+
+        lr_frames = []
+
+        # edge cases because of STSS val dataset..
+        if idx == 0:
+            filename = self.get_filename(idx)
+            file = f"{self.root_lr}/{filename}"
+            file = load_image_from_disk(self.disk_mode, file, self.transform)
+            lr_frames.append(file)
+            # h1
+            h1_name = "0007"
+            h1 = load_image_from_disk(self.disk_mode, f"{self.root_lr}/{h1_name}", self.transform)
+            lr_frames.append(h1)
+            # h2
+            h2_name = "0005"
+            h2 = load_image_from_disk(self.disk_mode, f"{self.root_lr}/{h2_name}", self.transform)
+            lr_frames.append(h2)
+        elif idx == 1:
+            filename = self.get_filename(idx)
+            file = f"{self.root_lr}/{filename}"
+            file = load_image_from_disk(self.disk_mode, file, self.transform)
+            lr_frames.append(file)
+            # h1
+            h1_name = self.get_filename(idx - 1)
+            h1 = load_image_from_disk(self.disk_mode, f"{self.root_lr}/{h1_name}", self.transform)
+            lr_frames.append(h1)
+            # h2
+            h2_name = "0007"
+            h2 = load_image_from_disk(self.disk_mode, f"{self.root_lr}/{h2_name}", self.transform)
+            lr_frames.append(h2)
+        else:
+            for i in range(self.number_of_frames):
+                filename = self.get_filename(idx-i)
+                file = f"{self.root_lr}/{filename}"
+                file = load_image_from_disk(self.disk_mode, file, self.transform)
+                lr_frames.append(file)
+
+        hr_frames = []
+
+        # edge case for STSS val dataset
+        if idx == len(self.filenames)-1:
+            filename = self.get_filename(idx)
+            file = f"{self.root_hr}/{filename}"
+            file = load_image_from_disk(self.disk_mode, file, self.transform)
+            hr_frames.append(file)
+            filename = "3599"
+            file = f"{self.root_hr}/{filename}"
+            file = load_image_from_disk(self.disk_mode, file, self.transform)
+            hr_frames.append(file)
+        else:
+            for i in range(math.ceil(self.number_of_frames / 2)):
+                filename = self.get_filename(idx + i)
+                file = f"{self.root_hr}/{filename}"
+                file = load_image_from_disk(self.disk_mode, file, self.transform)
+                hr_frames.append(file)
+
+        # Randomly crop image
+        if self.crop_size:
+            lr_frames, hr_frames = self.get_random_crop_pair(lr_frames, hr_frames)
+        # Augment image by h and v flip and rot by 90
+        lr_frames, hr_frames = self.augment(lr_frames, hr_frames)
+
+        return lr_frames, hr_frames
+
+    def get_filename(self, idx: int) -> str:
+        path = self.filenames[idx]
+        filename = path.split("/")[-1]
+        filename = filename.split(".")[0]
+        return filename
+
+    def get_path(self, idx: int) -> str:
+        return self.filenames[idx]
+
+    def display_item(self, idx: int) -> None:
+        lr_frames, hr_frames = self.__getitem__(idx)
+
+        num_lr_frames = len(lr_frames)
+        num_hr_frames = len(hr_frames)
+
+        # Create a single plot with LR images on the left and HR images on the right
+        fig, axes = plt.subplots(1, num_lr_frames + num_hr_frames, figsize=(15, 5))
+
+        # Display LR frames
+        for i, lr_frame in enumerate(lr_frames):
+            lr_image = F.to_pil_image(lr_frame)
+            axes[i].imshow(lr_image)
+            axes[i].set_title(f'LR image {self.get_filename(idx - i)}')
+
+        # Display HR frames
+        for i, hr_frame in enumerate(hr_frames):
+            hr_image = F.to_pil_image(hr_frame)
+            axes[num_lr_frames + i].imshow(hr_image)
+            axes[num_lr_frames + i].set_title(f'HR image {self.get_filename(idx + i)}')
+
+        plt.tight_layout()
+        plt.show()
+
+    def get_random_crop_pair(self, lr_frames: list[torch.Tensor], hr_frames: list[torch.Tensor]) \
+            -> (list[torch.Tensor], list[torch.Tensor]):
+        lr_i, lr_j, lr_h, lr_w = transforms.RandomCrop.get_params(lr_frames[0],
+                                                                  output_size=(self.crop_size, self.crop_size))
+        hr_i, hr_j, hr_h, hr_w = lr_i * self.scale, lr_j * self.scale, lr_h * self.scale, lr_w * self.scale
+
+        lr_frame_patches = []
+        for lr_frame in lr_frames:
+            lr_frame_patches.append(F.crop(lr_frame, lr_i, lr_j, lr_h, lr_w))
+        hr_frame_patches = []
+        for hr_frame in hr_frames:
+            hr_frame_patches.append(F.crop(hr_frame, hr_i, hr_j, hr_h, hr_w))
+
+        return lr_frame_patches, hr_frame_patches
+
+    def augment(self, lr_frames: list[torch.Tensor], hr_frames: list[torch.Tensor]) \
+            -> (list[torch.Tensor], list[torch.Tensor]):
+        # Apply random horizontal flip
+        if self.use_hflip:
+            if random.random() > 0.5:
+                for i in range(len(lr_frames)):
+                    lr_frames[i] = flip_image_horizontal(lr_frames[i])
+                for i in range(len(hr_frames)):
+                    hr_frames[i] = flip_image_horizontal(hr_frames[i])
+
+        # Apply random rotation by v flipping and rot of 90
+        if self.use_rotation:
+            if random.random() > 0.5:
+                for i in range(len(lr_frames)):
+                    lr_frames[i] = flip_image_vertical(lr_frames[i])
+                for i in range(len(hr_frames)):
+                    hr_frames[i] = flip_image_vertical(hr_frames[i])
+        if self.use_rotation:
+            if random.random() > 0.5:
+                angle = -90  # for clockwise rotation like BasicSR
+                for i in range(len(lr_frames)):
+                    lr_frames[i] = rotate_image(lr_frames[i], angle)
+                for i in range(len(hr_frames)):
+                    hr_frames[i] = rotate_image(hr_frames[i], angle)
+        return lr_frames, hr_frames
+
+
 def main() -> None:
     # div2k_dataset = SingleImagePair(root="../dataset/DIV2K/train", pattern="x2")
     # div2k_dataset.display_item(0)
@@ -972,9 +1147,9 @@ def main() -> None:
     #                               crop_size=96, use_hflip=True, use_rotation=True, digits=8)
     # reds_dataset.display_item(888)
 
-    matrix_dataset = MultiImagePair(root="../dataset/ue_data_npz/train", scale=2, number_of_frames=3, last_frame_idx=299,
-                                    crop_size=None, use_hflip=False, use_rotation=False, digits=4, disk_mode=DiskMode.NPZ)
-    matrix_dataset.display_item(42)
+    # matrix_dataset = MultiImagePair(root="../dataset/ue_data_npz/train", scale=2, number_of_frames=3, last_frame_idx=299,
+    #                                 crop_size=None, use_hflip=False, use_rotation=False, digits=4, disk_mode=DiskMode.NPZ)
+    # matrix_dataset.display_item(42)
 
     # stss_data = STSSImagePair(root="../dataset/ue_data_npz/train", scale=2, history=2, last_frame_idx=299,
     #                           crop_size=512, use_hflip=True, use_rotation=True, digits=4, disk_mode=DiskMode.NPZ)
@@ -983,6 +1158,10 @@ def main() -> None:
     # cross_val = STSSCrossValidation(root="../dataset/STSS_val_lewis_png", scale=2, history=2, crop_size=None,
     #                                 use_hflip=False, use_rotation=False)
     # cross_val.display_item(0)
+
+    cross_val2 = STSSCrossValidation2(root="../dataset/STSS_val_lewis_png", scale=2, number_of_frames=3, crop_size=None,
+                                      use_hflip=False, use_rotation=False)
+    cross_val2.display_item(len(cross_val2)-1)
 
 
 if __name__ == '__main__':
