@@ -391,7 +391,7 @@ def train_stss(filepath: str) -> None:
             ss_hr_image = ss[3].to(device)
             ss_output = model(lr_image, ss_feature_images, history_images)
             ss_loss = criterion(ss_output, ss_hr_image) # + 0.1 * lpips
-            ss_loss.backward() # accumulate gradients for SS
+            ss_loss.backward(retain_graph=True) # accumulate gradients for SS
 
             # forward pass for ESS
             ess_feature_images = [img.to(device) for img in ess[1]]
