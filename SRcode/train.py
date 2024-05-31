@@ -426,7 +426,7 @@ def train_stss(filepath: str) -> None:
         writer.add_scalar('Train/Combined Loss', average_loss, epoch)
 
         # val loop
-        if (epoch + 1) % 5 != 1:
+        if (epoch + 1) % 5 != 0:
             continue
         total_ss_metrics = utils.Metrics([0], [0])  # TODO: abstract number of values based on second dim of tensor [8, 2, 3, 1920, 1080]
         total_ess_metrics = utils.Metrics([0], [0])
