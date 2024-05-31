@@ -1,3 +1,5 @@
+from typing import Optional
+
 import torch
 import torch.nn as nn
 
@@ -105,10 +107,13 @@ class FRNet(nn.Module):
 
 
 class ExtraSS(BaseModel):
-    def __init__(self, scale: int):
+    def __init__(self, scale: int, batch_size: int, crop_size: Optional[int] = None):
         super(ExtraSS, self).__init__(scale=scale, down_and_up=4)
 
-        self.hr_input = torch.randn(1, 3, 3840, 2176).to(device='cuda') # abstract batch and crop size for this to work
+        if crop_size is None:
+            self.hr_input = torch.randn(batch_size, 3, 3840, 2176).to(device='cuda')
+        else:
+            self.hr_input = torch.randn(batch_size, 3, crop_size, crop_size).to(device='cuda')
         self.extra = False
         self.fr = FRNet()
 
@@ -251,12 +256,12 @@ class ExtraSS(BaseModel):
 def main() -> None:
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    model = ExtraSS(scale=2).to(device)
     batch_size = 1
     input_data = (batch_size, 3, 1920, 1088)
     feature = (batch_size, 9, 1920, 1088)
     his = (batch_size, 3, 3, 1920, 1088)
     input_size = (input_data, feature, his)
+    model = ExtraSS(scale=2, batch_size=1).to(device)
 
     model.summary(input_size)
     model.measure_inference_time(input_size)

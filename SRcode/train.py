@@ -15,7 +15,7 @@ from config import load_yaml_into_config, create_comment_from_config
 
 def parse_arguments() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Train a SR network based on a config file.")
-    parser.add_argument('file_path', type=str, nargs='?', default='configs/stss2.yaml', help="Path to the config file")
+    parser.add_argument('file_path', type=str, nargs='?', default='configs/extraSS.yaml', help="Path to the config file")
     args = parser.parse_args()
     return args
 
@@ -391,6 +391,7 @@ def train_stss(filepath: str) -> None:
             ss_hr_image = ss[3].to(device)
             ss_output = model(lr_image, ss_feature_images, history_images)
             ss_loss = criterion(ss_output, ss_hr_image) # + 0.1 * lpips
+            ss_loss.backward() # accumulate gradients for SS
 
             # forward pass for ESS
             ess_feature_images = [img.to(device) for img in ess[1]]
@@ -398,10 +399,10 @@ def train_stss(filepath: str) -> None:
             ess_hr_image = ess[3].to(device)
             ess_output = model(lr_image, ess_feature_images, history_images)
             ess_loss = criterion(ess_output, ess_hr_image) # + 0.1* lpips
+            ess_loss.backward() # accumulate gradients for ESS
 
             # New loss
-            loss = ss_loss + ess_loss
-            loss.backward()
+            loss = ss_loss + ess_loss # just for tracking
             optimizer.step()
 
             ss_total_loss += ss_loss.item()
@@ -425,7 +426,7 @@ def train_stss(filepath: str) -> None:
         writer.add_scalar('Train/Combined Loss', average_loss, epoch)
 
         # val loop
-        if (epoch + 1) % 5 != 0:
+        if (epoch + 1) % 5 != 1:
             continue
         total_ss_metrics = utils.Metrics([0], [0])  # TODO: abstract number of values based on second dim of tensor [8, 2, 3, 1920, 1080]
         total_ess_metrics = utils.Metrics([0], [0])

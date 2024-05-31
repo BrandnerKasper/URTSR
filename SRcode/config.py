@@ -16,6 +16,7 @@ from models.flavr import Flavr
 from models.flavr_original import Flavr_Original
 from models.stss import Stss
 from models.stss_2 import Stss2
+from models.extrass import ExtraSS
 
 from data.dataloader import SingleImagePair, MultiImagePair, STSSImagePair, STSSCrossValidation, DiskMode
 
@@ -49,7 +50,7 @@ def create_yaml(filename: str, model: str, epochs: int, scale: int, batch_size: 
     return yaml_text
 
 
-def init_model(model_name: str, scale: int) -> BaseModel:
+def init_model(model_name: str, scale: int, batch_size: int) -> BaseModel:
     match model_name:
         case "SRCNN":
             return SRCNN(scale=scale)
@@ -65,6 +66,8 @@ def init_model(model_name: str, scale: int) -> BaseModel:
             return Stss(scale=scale)
         case "STSS2":
             return Stss2(scale=scale)
+        case "ExtraSS":
+            return ExtraSS(scale=scale, batch_size=batch_size)
         case _:
             raise ValueError(f"The model '{model_name}' is not a valid model.")
 
@@ -156,28 +159,28 @@ def init_dataset(name: str, crop_size: int, use_hflip: bool, use_rotation: bool)
                                  transform=transforms.ToTensor(), crop_size=crop_size, scale=2,
                                  use_hflip=use_hflip, use_rotation=use_rotation, digits=4, disk_mode=DiskMode.NPZ)
             return train, val
-        case "ue_data_npz":
-            train = MultiImagePair(root=f"{root}/train", number_of_frames=3, last_frame_idx=299,
-                                   transform=transforms.ToTensor(), crop_size=crop_size, scale=2,
-                                   use_hflip=use_hflip, use_rotation=use_rotation, digits=4, disk_mode=DiskMode.NPZ)
-            val = MultiImagePair(root=f"{root}/val", number_of_frames=3, last_frame_idx=299,
-                                 transform=transforms.ToTensor(), crop_size=crop_size, scale=2,
-                                 use_hflip=use_hflip, use_rotation=use_rotation, digits=4, disk_mode=DiskMode.NPZ)
-            return train, val
+        # case "ue_data_npz":
+        #     train = MultiImagePair(root=f"{root}/train", number_of_frames=3, last_frame_idx=299,
+        #                            transform=transforms.ToTensor(), crop_size=crop_size, scale=2,
+        #                            use_hflip=use_hflip, use_rotation=use_rotation, digits=4, disk_mode=DiskMode.NPZ)
+        #     val = MultiImagePair(root=f"{root}/val", number_of_frames=3, last_frame_idx=299,
+        #                          transform=transforms.ToTensor(), crop_size=crop_size, scale=2,
+        #                          use_hflip=use_hflip, use_rotation=use_rotation, digits=4, disk_mode=DiskMode.NPZ)
+        #     return train, val
         case "ue_data":
             train = STSSImagePair(root=f"{root}/train", scale=2, history=3, last_frame_idx=299, crop_size=crop_size,
                                   use_hflip=use_hflip, use_rotation=use_rotation, digits=4)
             val = STSSImagePair(root=f"{root}/val", scale=2, history=3, last_frame_idx=299, crop_size=crop_size,
                                 use_hflip=use_hflip, use_rotation=use_rotation, digits=4)
             return train, val
-        # case "ue_data_npz":
-        #     train = STSSImagePair(root=f"{root}/train", scale=2, history=2, last_frame_idx=299, crop_size=crop_size,
-        #                           use_hflip=use_hflip, use_rotation=use_rotation, digits=4, disk_mode=DiskMode.NPZ)
-        #     val = STSSImagePair(root=f"{root}/val", scale=2, history=2, last_frame_idx=299, crop_size=crop_size,
-        #                         use_hflip=use_hflip, use_rotation=use_rotation, digits=4, disk_mode=DiskMode.NPZ)
-        #     # val = STSSCrossValidation(root=f"dataset/STSS_val_lewis_png", scale=2, history=2, crop_size=crop_size,
-        #     #                           use_hflip=False, use_rotation=False)
-        #     return train, val
+        case "ue_data_npz":
+            train = STSSImagePair(root=f"{root}/train", scale=2, history=3, last_frame_idx=299, crop_size=crop_size,
+                                  use_hflip=use_hflip, use_rotation=use_rotation, digits=4, disk_mode=DiskMode.NPZ)
+            val = STSSImagePair(root=f"{root}/val", scale=2, history=3, last_frame_idx=299, crop_size=crop_size,
+                                use_hflip=use_hflip, use_rotation=use_rotation, digits=4, disk_mode=DiskMode.NPZ)
+            # val = STSSCrossValidation(root=f"dataset/STSS_val_lewis_png", scale=2, history=2, crop_size=crop_size,
+            #                           use_hflip=False, use_rotation=False)
+            return train, val
         case _:
             raise ValueError(f"The dataset '{name}' is not a valid dataset.")
 
@@ -189,7 +192,7 @@ class Config:
                  start_decay_epoch: Optional[int],
                  dataset: str):
         self.filename: str = filename
-        self.model: BaseModel = init_model(model, scale)
+        self.model: BaseModel = init_model(model, scale, batch_size)
         self.epochs: int = epochs
         self.scale: int = scale
         self.batch_size: int = batch_size
