@@ -17,6 +17,7 @@ from models.flavr_original import Flavr_Original
 from models.stss import Stss
 from models.stss_2 import Stss2
 from models.extrass import ExtraSS
+from models.extrass2 import ExtraSS2
 
 from data.dataloader import SingleImagePair, MultiImagePair, STSSImagePair, STSSCrossValidation, DiskMode
 
@@ -68,6 +69,8 @@ def init_model(model_name: str, scale: int, batch_size: int) -> BaseModel:
             return Stss2(scale=scale)
         case "ExtraSS":
             return ExtraSS(scale=scale, batch_size=batch_size)
+        case "ExtraSS2":
+            return ExtraSS2(scale=scale, batch_size=batch_size)
         case _:
             raise ValueError(f"The model '{model_name}' is not a valid model.")
 
@@ -174,9 +177,9 @@ def init_dataset(name: str, crop_size: int, use_hflip: bool, use_rotation: bool)
                                 use_hflip=use_hflip, use_rotation=use_rotation, digits=4)
             return train, val
         case "ue_data_npz":
-            train = STSSImagePair(root=f"{root}/train", scale=2, history=3, last_frame_idx=299, crop_size=crop_size,
+            train = STSSImagePair(root=f"{root}/train", scale=2, history=4, last_frame_idx=299, crop_size=crop_size,
                                   use_hflip=use_hflip, use_rotation=use_rotation, digits=4, disk_mode=DiskMode.NPZ)
-            val = STSSImagePair(root=f"{root}/val", scale=2, history=3, last_frame_idx=299, crop_size=crop_size,
+            val = STSSImagePair(root=f"{root}/val", scale=2, history=4, last_frame_idx=299, crop_size=crop_size,
                                 use_hflip=use_hflip, use_rotation=use_rotation, digits=4, disk_mode=DiskMode.NPZ)
             # val = STSSCrossValidation(root=f"dataset/STSS_val_lewis_png", scale=2, history=2, crop_size=crop_size,
             #                           use_hflip=False, use_rotation=False)

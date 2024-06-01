@@ -11,9 +11,9 @@ Just some notes and todos what I'd like to consider for my thesis.
 
 ### ExtraSS
 - [ ] Spatial SR for Single Image Super Resolution (SISR)
-- [ ] Spatial SR for Real-Time Super Resolution (RTSR) -> multiple input frames
+- [x] Spatial SR for Real-Time Super Resolution (RTSR) -> multiple input frames
 - [ ] Temporal SR
-- [ ] maybe other dataloader since only 1 frame is generated per forward pass
+- [x] maybe other dataloader since only 1 frame is generated per forward pass
 
 ### Space-time Supersampling (STSS):
 - [ ] Spatial SR for Single Image Super Resolution (SISR)
@@ -24,7 +24,7 @@ Just some notes and todos what I'd like to consider for my thesis.
 - [x] for now generate two images based on one forward pass and have an output of 6
 - [ ] later try it with two different forward passes but update the weights (backward) after each forward pass and NOT together
 - [x] instead of the hole inpaint function use a small attention layer from [here](https://github.com/swz30/Restormer/blob/main/basicsr/models/archs/restormer_arch.py)
-- [ ] train without buffers on my data set and cross validate on Lewis scene and look how good it performs
+- [x] train without buffers on my data set and cross validate on Lewis scene and look how good it performs
 
 ### Flow-Agnostic Video Representations for Fast Frame Interpolation (FLAVR)
 - [ ] Spatial SR for Single Image Super Resolution (SISR)
@@ -86,6 +86,8 @@ Make a similiar data loader to STSS
 - [x] crop and augment all of these files
 - [x] regarding training of STSS we want to load the data for SS frame and ESS frame together but make two seperate forward passes
 - [x] mind the 30 fps for history data when init filenames!
+
+- [ ] Make multi Image dataloader as well as STSS dataloader 
 
 ### Video
 - [ ] Load and process the [Reds](https://seungjunnah.github.io/Datasets/reds.html) dataset with x4 for simplicity

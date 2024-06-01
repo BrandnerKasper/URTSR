@@ -23,8 +23,8 @@ def generate_directory(path):
 
 
 def test() -> None:
-    pretrained_model_path = "pretrained_models/stss2.pth"
-    save_path = "results/stss2_cross"
+    pretrained_model_path = "pretrained_models/extraSS.pth"
+    save_path = "results/extraSS"
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Device: {device}")
@@ -38,11 +38,12 @@ def test() -> None:
     model.eval()
     path = "dataset/ue_data_npz/test"
 
-    # test_dataset = MultiImagePair(root=path, number_of_frames=3, last_frame_idx=299,
-    #                      transform=transforms.ToTensor(), crop_size=None, scale=2,
-    #                      use_hflip=False, use_rotation=False, digits=4, disk_mode=DiskMode.NPZ)
-    test_dataset = STSSCrossValidation2(root="dataset/STSS_val_lewis_png", scale=2, number_of_frames=3, crop_size=None, use_hflip=False, use_rotation=False)
-
+    test_dataset = MultiImagePair(root=path, number_of_frames=3, last_frame_idx=299,
+                         transform=transforms.ToTensor(), crop_size=None, scale=2,
+                         use_hflip=False, use_rotation=False, digits=4, disk_mode=DiskMode.NPZ)
+    test_dataset = STSSImagePair(root=path, scale=2, history=3, last_frame_idx=299, crop_size=None,
+                                use_hflip=False, use_rotation=False, digits=4, disk_mode=DiskMode.NPZ)
+    # test_dataset = STSSCrossValidation2(root="dataset/STSS_val_lewis_png", scale=2, number_of_frames=3, crop_size=None, use_hflip=False, use_rotation=False)
 
     counter = 0
     for idx in tqdm(range(len(test_dataset)), "Generating sequence.."):
@@ -74,8 +75,8 @@ def test() -> None:
 
 
 def test_stss_image_dataset() -> None:
-    pretrained_model_path = "pretrained_models/stss.pth"
-    save_path = "results/stss"
+    pretrained_model_path = "pretrained_models/extraSS.pth"
+    save_path = "results/extraSS"
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Device: {device}")
@@ -89,7 +90,7 @@ def test_stss_image_dataset() -> None:
     model.eval()
     path = "dataset/ue_data/test"
 
-    test_dataset = STSSImagePair(root=path, scale=2, history=2, last_frame_idx=299, crop_size=None,
+    test_dataset = STSSImagePair(root=path, scale=2, history=3, last_frame_idx=299, crop_size=None,
                          use_hflip=False, use_rotation=False, digits=4)
     # test_dataset = STSSCrossValidation(root="dataset/STSS_val_lewis_png", scale=2, history=2, crop_size=None,
     #                                 use_hflip=False, use_rotation=False)
@@ -137,8 +138,8 @@ def test_stss_image_dataset() -> None:
 
 
 def main() -> None:
-    test()
-    # test_stss_image_dataset()
+    # test()
+    test_stss_image_dataset()
 
 
 if __name__ == '__main__':
