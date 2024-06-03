@@ -3,6 +3,7 @@ import random
 import timeit
 from dataclasses import dataclass
 from enum import Enum, auto
+from typing import Optional, Tuple
 
 import numpy as np
 from matplotlib import pyplot as plt
@@ -46,7 +47,8 @@ class DiskMode(Enum):
     NPZ = 4
 
 
-def load_image_from_disk(mode: DiskMode, path: str, transform = transforms.ToTensor(), read_mode = cv2.IMREAD_UNCHANGED) -> torch.Tensor:
+def load_image_from_disk(mode: DiskMode, path: str, transform=transforms.ToTensor(),
+                         read_mode=cv2.IMREAD_UNCHANGED) -> torch.Tensor:
     match mode:
         case DiskMode.PIL:
             # Load with PIL Image
@@ -308,12 +310,13 @@ class MultiImagePair(Dataset):
 
 
 class STSSImagePair(Dataset):
-    def __init__(self, root: str, history: int = 3, last_frame_idx: int = 299,
+    def __init__(self, root: str, history: int = 3, buffers: dict[str, bool] = None, last_frame_idx: int = 299,
                  transform=transforms.ToTensor(), crop_size: int = None, scale: int = 2,
                  use_hflip: bool = False, use_rotation: bool = False, digits: int = 4, disk_mode=DiskMode.CV2):
         self.root_hr = os.path.join(root, "HR")
         self.root_lr = os.path.join(root, "LR")
         self.history = history
+        self.buffers = buffers
         self.last_frame_idx = last_frame_idx
         self.transform = transform
         self.crop_size = crop_size
@@ -351,45 +354,8 @@ class STSSImagePair(Dataset):
         lr_frame_name = filename
         lr_frame = load_image_from_disk(self.disk_mode, file, self.transform)
 
-        # features: basecolor, depth, metallic, nov, roughness, velocity
-        feature_frames = []
-        feature_frames_names = []
-        # basecolor
-        file = f"{self.root_lr}/{folder}/{filename}.basecolor"
-        feature_frames_names.append(f"{filename}.basecolor")
-        file = load_image_from_disk(self.disk_mode, file, self.transform)
-        feature_frames.append(file)
-        # depth
-        file = f"{self.root_lr}/{folder}/{filename}.depth_log"
-        feature_frames_names.append(f"{filename}.depth_log")
-        file = load_image_from_disk(self.disk_mode, file, self.transform, cv2.IMREAD_GRAYSCALE)
-        feature_frames.append(file)
-        # metallic
-        file = f"{self.root_lr}/{folder}/{filename}.metallic"
-        feature_frames_names.append(f"{filename}.metallic")
-        file = load_image_from_disk(self.disk_mode, file, self.transform, cv2.IMREAD_GRAYSCALE)
-        feature_frames.append(file)
-        # normal vec
-        # file = f"{self.root_lr}/{folder}/{filename}.normal_vector"
-        # feature_frames_names.append(f"{filename}.normal_vector")
-        # file = load_image_from_disk(self.disk_mode, file, self.transform, cv2.IMREAD_GRAYSCALE)
-        # feature_frames.append(file)
-        # roughness
-        file = f"{self.root_lr}/{folder}/{filename}.roughness"
-        feature_frames_names.append(f"{filename}.roughness")
-        file = load_image_from_disk(self.disk_mode, file, self.transform, cv2.IMREAD_GRAYSCALE)
-        feature_frames.append(file)
-        # velocity
-        # file = f"{self.root_lr}/{folder}/{filename}.velocity_log"
-        # feature_frames_names.append(f"{filename}.velocity_log")
-        # file = load_image_from_disk(self.disk_mode, file, self.transform)
-        # # file = file[0:2]
-        # feature_frames.append(file)
-        # world normal
-        file = f"{self.root_lr}/{folder}/{filename}.world_normal"
-        feature_frames_names.append(f"{filename}.world_normal")
-        file = load_image_from_disk(self.disk_mode, file, self.transform)
-        feature_frames.append(file)
+        # features: basecolor, depth, metallic, nov, roughness, velocity, world normal, world position
+        feature_frames, feature_frames_names = self.load_buffers(folder, filename)
 
         # 3 previous history frames [current - 2, current -4, current -6]
         history_frames = []
@@ -420,45 +386,8 @@ class STSSImagePair(Dataset):
         ess_filename = int(filename) + 1
         ess_filename = f"{ess_filename:0{self.digits}d}"  # Ensure 4/8 digit format
 
-        # features: basecolor, depth, metallic, nov, roughness, velocity
-        feature_frames = []
-        feature_frames_names = []
-        # basecolor
-        file = f"{self.root_lr}/{folder}/{ess_filename}.basecolor"
-        feature_frames_names.append(f"{ess_filename}.basecolor")
-        file = load_image_from_disk(self.disk_mode, file, self.transform)
-        feature_frames.append(file)
-        # depth
-        file = f"{self.root_lr}/{folder}/{ess_filename}.depth_log"
-        feature_frames_names.append(f"{ess_filename}.depth_log")
-        file = load_image_from_disk(self.disk_mode, file, self.transform, cv2.IMREAD_GRAYSCALE)
-        feature_frames.append(file)
-        # metallic
-        file = f"{self.root_lr}/{folder}/{ess_filename}.metallic"
-        feature_frames_names.append(f"{ess_filename}.metallic")
-        file = load_image_from_disk(self.disk_mode, file, self.transform, cv2.IMREAD_GRAYSCALE)
-        feature_frames.append(file)
-        # normal vec
-        # file = f"{self.root_lr}/{folder}/{ess_filename}.normal_vector"
-        # feature_frames_names.append(f"{ess_filename}.normal_vector")
-        # file = load_image_from_disk(self.disk_mode, file, self.transform, cv2.IMREAD_GRAYSCALE)
-        # feature_frames.append(file)
-        # roughness
-        file = f"{self.root_lr}/{folder}/{ess_filename}.roughness"
-        feature_frames_names.append(f"{ess_filename}.roughness")
-        file = load_image_from_disk(self.disk_mode, file, self.transform, cv2.IMREAD_GRAYSCALE)
-        feature_frames.append(file)
-        # velocity
-        # file = f"{self.root_lr}/{folder}/{ess_filename}.velocity_log"
-        # feature_frames_names.append(f"{ess_filename}.velocity_log")
-        # file = load_image_from_disk(self.disk_mode, file, self.transform)
-        # # file = file[0:2]
-        # feature_frames.append(file)
-        # world normal
-        file = f"{self.root_lr}/{folder}/{ess_filename}.world_normal"
-        feature_frames_names.append(f"{ess_filename}.world_normal")
-        file = load_image_from_disk(self.disk_mode, file, self.transform)
-        feature_frames.append(file)
+        # features: basecolor, depth, metallic, nov, roughness, velocity, world normal, world position
+        feature_frames, feature_frames_names = self.load_buffers(folder, ess_filename)
 
         # history frames -> for now use same history frames as the SS frame
 
@@ -478,6 +407,55 @@ class STSSImagePair(Dataset):
         self.augment(ss, ess)
 
         return ss, ess
+
+    def load_buffers(self, folder: str, filename: str) -> Optional[Tuple[list[torch.Tensor], list[str]]]:
+        if self.buffers is None:
+            return
+        feature_frames = []
+        feature_frames_names = []
+        # features: basecolor, depth, metallic, nov, roughness, velocity, world normal, world position
+        if self.buffers["BASE_COLOR"]:
+            file = f"{self.root_lr}/{folder}/{filename}.basecolor"
+            feature_frames_names.append(f"{filename}.basecolor")
+            file = load_image_from_disk(self.disk_mode, file, self.transform)
+            feature_frames.append(file)
+        if self.buffers["DEPTH"]:  # for now we use log depth files
+            file = f"{self.root_lr}/{folder}/{filename}.depth_log"
+            feature_frames_names.append(f"{filename}.depth_log")
+            file = load_image_from_disk(self.disk_mode, file, self.transform, cv2.IMREAD_GRAYSCALE)
+            feature_frames.append(file)
+        if self.buffers["METALLIC"]:
+            file = f"{self.root_lr}/{folder}/{filename}.metallic"
+            feature_frames_names.append(f"{filename}.metallic")
+            file = load_image_from_disk(self.disk_mode, file, self.transform, cv2.IMREAD_GRAYSCALE)
+            feature_frames.append(file)
+        if self.buffers["NOV"]:
+            file = f"{self.root_lr}/{folder}/{filename}.normal_vector"
+            feature_frames_names.append(f"{filename}.normal_vector")
+            file = load_image_from_disk(self.disk_mode, file, self.transform, cv2.IMREAD_GRAYSCALE)
+            feature_frames.append(file)
+        if self.buffers["ROUGHNESS"]:
+            file = f"{self.root_lr}/{folder}/{filename}.roughness"
+            feature_frames_names.append(f"{filename}.roughness")
+            file = load_image_from_disk(self.disk_mode, file, self.transform, cv2.IMREAD_GRAYSCALE)
+            feature_frames.append(file)
+        if self.buffers["VELOCITY"]:  # we use velocity log for now
+            file = f"{self.root_lr}/{folder}/{filename}.velocity_log"
+            feature_frames_names.append(f"{filename}.velocity_log")
+            file = load_image_from_disk(self.disk_mode, file, self.transform)
+            # file = file[0:2] # actually we only need R and G from this buffer, but for now we use RGB
+            feature_frames.append(file)
+        if self.buffers["WORLD_NORMAL"]:
+            file = f"{self.root_lr}/{folder}/{filename}.world_normal"
+            feature_frames_names.append(f"{filename}.world_normal")
+            file = load_image_from_disk(self.disk_mode, file, self.transform)
+            feature_frames.append(file)
+        if self.buffers["WORLD_POSITION"]:
+            file = f"{self.root_lr}/{folder}/{filename}.world_position"
+            feature_frames_names.append(f"{filename}.world_position")
+            file = load_image_from_disk(self.disk_mode, file, self.transform)
+            feature_frames.append(file)
+        return feature_frames, feature_frames_names
 
     def get_filename(self, idx: int) -> str:
         path = self.filenames[idx]
@@ -725,7 +703,7 @@ class STSSCrossValidation(Dataset):
             history_frames_names.append(h2_name)
         elif idx == 1:
             # h1
-            h1_name = self.get_filename(idx-1)
+            h1_name = self.get_filename(idx - 1)
             h1 = load_image_from_disk(self.disk_mode, f"{self.root_lr}/{h1_name}", self.transform)
             history_frames.append(h1)
             history_frames_names.append(h1_name)
@@ -736,7 +714,7 @@ class STSSCrossValidation(Dataset):
             history_frames_names.append(h2_name)
         else:
             for i in range(self.history):
-                file = self.get_filename(idx-(i+1))
+                file = self.get_filename(idx - (i + 1))
                 history_frames_names.append(file)
                 file = f"{self.root_lr}/{file}"
                 file = load_image_from_disk(self.disk_mode, file, self.transform)
@@ -754,10 +732,10 @@ class STSSCrossValidation(Dataset):
         # lr frame -> we use the same as the SS frame
 
         # get the future frames for extrapolation
-        if idx == len(self.filenames)-1:
+        if idx == len(self.filenames) - 1:
             ess_filename = "3599"
         else:
-            ess_filename = self.get_filename(idx+1)
+            ess_filename = self.get_filename(idx + 1)
 
         # features: basecolor, depth, metallic, nov, roughness, velocity
         feature_frames = []
@@ -971,7 +949,7 @@ class STSSCrossValidation2(Dataset):
         self.root_hr = os.path.join(root, "HR")
         self.root_lr = os.path.join(root, "LR")
         self.number_of_frames = number_of_frames
-        self.history = number_of_frames-1
+        self.history = number_of_frames - 1
         self.transform = transform
         self.crop_size = crop_size
         self.scale = scale
@@ -1032,7 +1010,7 @@ class STSSCrossValidation2(Dataset):
             lr_frames.append(h2)
         else:
             for i in range(self.number_of_frames):
-                filename = self.get_filename(idx-i)
+                filename = self.get_filename(idx - i)
                 file = f"{self.root_lr}/{filename}"
                 file = load_image_from_disk(self.disk_mode, file, self.transform)
                 lr_frames.append(file)
@@ -1040,7 +1018,7 @@ class STSSCrossValidation2(Dataset):
         hr_frames = []
 
         # edge case for STSS val dataset
-        if idx == len(self.filenames)-1:
+        if idx == len(self.filenames) - 1:
             filename = self.get_filename(idx)
             file = f"{self.root_hr}/{filename}"
             file = load_image_from_disk(self.disk_mode, file, self.transform)
@@ -1151,17 +1129,20 @@ def main() -> None:
     #                                 crop_size=None, use_hflip=False, use_rotation=False, digits=4, disk_mode=DiskMode.NPZ)
     # matrix_dataset.display_item(42)
 
-    # stss_data = STSSImagePair(root="../dataset/ue_data_npz/train", scale=2, history=2, last_frame_idx=299,
-    #                           crop_size=512, use_hflip=True, use_rotation=True, digits=4, disk_mode=DiskMode.NPZ)
-    # stss_data.display_item(0)
+    buffers = {"BASE_COLOR": True, "DEPTH": True, "METALLIC": True, "NOV": True, "ROUGHNESS": True, "VELOCITY": True,
+               "WORLD_NORMAL": True, "WORLD_POSITION": True}
+    stss_data = STSSImagePair(root="../dataset/ue_data_npz/train", scale=2, history=2, buffers=buffers,
+                              last_frame_idx=299,
+                              crop_size=512, use_hflip=True, use_rotation=True, digits=4, disk_mode=DiskMode.NPZ)
+    stss_data.display_item(0)
 
     # cross_val = STSSCrossValidation(root="../dataset/STSS_val_lewis_png", scale=2, history=2, crop_size=None,
     #                                 use_hflip=False, use_rotation=False)
     # cross_val.display_item(0)
 
-    cross_val2 = STSSCrossValidation2(root="../dataset/STSS_val_lewis_png", scale=2, number_of_frames=3, crop_size=None,
-                                      use_hflip=False, use_rotation=False)
-    cross_val2.display_item(len(cross_val2)-1)
+    # cross_val2 = STSSCrossValidation2(root="../dataset/STSS_val_lewis_png", scale=2, number_of_frames=3, crop_size=None,
+    #                                   use_hflip=False, use_rotation=False)
+    # cross_val2.display_item(len(cross_val2)-1)
 
 
 if __name__ == '__main__':

@@ -86,8 +86,11 @@ Make a similiar data loader to STSS
 - [x] crop and augment all of these files
 - [x] regarding training of STSS we want to load the data for SS frame and ESS frame together but make two seperate forward passes
 - [x] mind the 30 fps for history data when init filenames!
+- [x] Make multi Image dataloader as well as STSS dataloader 
 
-- [ ] Make multi Image dataloader as well as STSS dataloader 
+Abstract data loader so that:
+- [ ] the multi image dataloader can load multiple images as well as the buffers
+- [ ] the stss dataloader can load optionally load history and buffers
 
 ### Video
 - [ ] Load and process the [Reds](https://seungjunnah.github.io/Datasets/reds.html) dataset with x4 for simplicity
