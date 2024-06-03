@@ -71,6 +71,17 @@ def load_image_from_disk(mode: DiskMode, path: str, transform=transforms.ToTenso
             raise ValueError(f"The mode {mode} is not a valid mode with {path}!")
 
 
+# Recursive function to count values in a dictionary
+def count_values(dictionary):
+    count = 0
+    for value in dictionary.values():
+        if isinstance(value, dict):
+            count += count_values(value)  # Recursively count values
+        else:
+            count += 1  # Increment count for non-dictionary values
+    return count
+
+
 class SingleImagePair(Dataset):
     def __init__(self, root: str, transform=transforms.ToTensor(), pattern: str = None,
                  crop_size: int = None, scale: int = 2,
@@ -326,8 +337,6 @@ class STSSImagePair(Dataset):
         self.digits = digits
         self.disk_mode = disk_mode
         self.filenames = self.init_filenames()
-        self.ss_names: list[str]
-        self.ess_names: list[str]
 
     def init_filenames(self) -> list[str]:
         filenames = []
@@ -351,33 +360,30 @@ class STSSImagePair(Dataset):
         # Generate SS frame
         # lr frame
         file = f"{self.root_lr}/{folder}/{filename}"
-        lr_frame_name = filename
-        lr_frame = load_image_from_disk(self.disk_mode, file, self.transform)
+        file = load_image_from_disk(self.disk_mode, file, self.transform)
+        lr_frame = {filename: file}
 
         # features: basecolor, depth, metallic, nov, roughness, velocity, world normal, world position
-        feature_frames, feature_frames_names = self.load_buffers(folder, filename)
+        buffer_frames = self.load_buffers(folder, filename)
 
-        # 3 previous history frames [current - 2, current -4, current -6]
-        history_frames = []
-        history_frames_names = []
+        # previous history frames e.g. [current - 2, current -4, current -6]
+        history_frames = {}
         for i in range(self.history):
             # Extract the numeric part
             file = int(filename) - (i + 1) * 2
             # Generate right file name pattern
-            file = f"{file:0{self.digits}d}"  # Ensure 4/8 digit format
-            history_frames_names.append(file)
+            history_name = f"{file:0{self.digits}d}"  # Ensure 4/8 digit format
             # Put folder and file name back together and load the tensor
-            file = f"{self.root_lr}/{folder}/{file}"
+            file = f"{self.root_lr}/{folder}/{history_name}"
             file = load_image_from_disk(self.disk_mode, file, self.transform)
-            history_frames.append(file)
+            history_frames[history_name] = file
 
         # hr frame
         file = f"{self.root_hr}/{folder}/{filename}"
-        hr_frame_name = filename
-        hr_frame = load_image_from_disk(self.disk_mode, file, self.transform)
+        file = load_image_from_disk(self.disk_mode, file, self.transform)
+        hr_frame = {filename : file}
 
-        ss = [lr_frame, feature_frames, history_frames, hr_frame]
-        self.ss_names = [lr_frame_name, feature_frames_names, history_frames_names, hr_frame_name]
+        ss = {"LR": lr_frame, "Buffers": buffer_frames, "History": history_frames, "HR": hr_frame}
 
         # Generate ESS frame
         # lr frame -> we use the same as the SS frame
@@ -387,17 +393,16 @@ class STSSImagePair(Dataset):
         ess_filename = f"{ess_filename:0{self.digits}d}"  # Ensure 4/8 digit format
 
         # features: basecolor, depth, metallic, nov, roughness, velocity, world normal, world position
-        feature_frames, feature_frames_names = self.load_buffers(folder, ess_filename)
+        buffer_frames = self.load_buffers(folder, ess_filename)
 
         # history frames -> for now use same history frames as the SS frame
 
         # hr frame
         file = f"{self.root_hr}/{folder}/{ess_filename}"
-        hr_frame = load_image_from_disk(self.disk_mode, file, self.transform)
-        hr_frame_name = ess_filename
+        file = load_image_from_disk(self.disk_mode, file, self.transform)
+        hr_frame = {ess_filename: file}
 
-        ess = [lr_frame, feature_frames, history_frames, hr_frame]
-        self.ess_names = [lr_frame_name, feature_frames_names, history_frames_names, hr_frame_name]
+        ess = {"LR": lr_frame, "Buffers": buffer_frames, "History": history_frames, "HR": hr_frame}
 
         # Randomly crop the images
         if self.crop_size:
@@ -408,54 +413,45 @@ class STSSImagePair(Dataset):
 
         return ss, ess
 
-    def load_buffers(self, folder: str, filename: str) -> Optional[Tuple[list[torch.Tensor], list[str]]]:
+    def load_buffers(self, folder: str, filename: str) -> Optional[dict[str, torch.Tensor]]:
         if self.buffers is None:
-            return
-        feature_frames = []
-        feature_frames_names = []
+            return None
+        buffer = {}
         # features: basecolor, depth, metallic, nov, roughness, velocity, world normal, world position
         if self.buffers["BASE_COLOR"]:
             file = f"{self.root_lr}/{folder}/{filename}.basecolor"
-            feature_frames_names.append(f"{filename}.basecolor")
             file = load_image_from_disk(self.disk_mode, file, self.transform)
-            feature_frames.append(file)
+            buffer[f"{filename}.basecolor"] = file
         if self.buffers["DEPTH"]:  # for now we use log depth files
             file = f"{self.root_lr}/{folder}/{filename}.depth_log"
-            feature_frames_names.append(f"{filename}.depth_log")
             file = load_image_from_disk(self.disk_mode, file, self.transform, cv2.IMREAD_GRAYSCALE)
-            feature_frames.append(file)
+            buffer[f"{filename}.depth_log"] = file
         if self.buffers["METALLIC"]:
             file = f"{self.root_lr}/{folder}/{filename}.metallic"
-            feature_frames_names.append(f"{filename}.metallic")
             file = load_image_from_disk(self.disk_mode, file, self.transform, cv2.IMREAD_GRAYSCALE)
-            feature_frames.append(file)
+            buffer[f"{filename}.metallic"] = file
         if self.buffers["NOV"]:
             file = f"{self.root_lr}/{folder}/{filename}.normal_vector"
-            feature_frames_names.append(f"{filename}.normal_vector")
             file = load_image_from_disk(self.disk_mode, file, self.transform, cv2.IMREAD_GRAYSCALE)
-            feature_frames.append(file)
+            buffer[f"{filename}.normal_vector"] = file
         if self.buffers["ROUGHNESS"]:
             file = f"{self.root_lr}/{folder}/{filename}.roughness"
-            feature_frames_names.append(f"{filename}.roughness")
             file = load_image_from_disk(self.disk_mode, file, self.transform, cv2.IMREAD_GRAYSCALE)
-            feature_frames.append(file)
+            buffer[f"{filename}.roughness"] = file
         if self.buffers["VELOCITY"]:  # we use velocity log for now
             file = f"{self.root_lr}/{folder}/{filename}.velocity_log"
-            feature_frames_names.append(f"{filename}.velocity_log")
             file = load_image_from_disk(self.disk_mode, file, self.transform)
             # file = file[0:2] # actually we only need R and G from this buffer, but for now we use RGB
-            feature_frames.append(file)
+            buffer[f"{filename}.velocity_log"] = file
         if self.buffers["WORLD_NORMAL"]:
             file = f"{self.root_lr}/{folder}/{filename}.world_normal"
-            feature_frames_names.append(f"{filename}.world_normal")
             file = load_image_from_disk(self.disk_mode, file, self.transform)
-            feature_frames.append(file)
+            buffer[f"{filename}.world_normal"] = file
         if self.buffers["WORLD_POSITION"]:
             file = f"{self.root_lr}/{folder}/{filename}.world_position"
-            feature_frames_names.append(f"{filename}.world_position")
             file = load_image_from_disk(self.disk_mode, file, self.transform)
-            feature_frames.append(file)
-        return feature_frames, feature_frames_names
+            buffer[f"{filename}.world_position"] = file
+        return buffer
 
     def get_filename(self, idx: int) -> str:
         path = self.filenames[idx]
@@ -471,147 +467,173 @@ class STSSImagePair(Dataset):
 
         # Create two plots: one for the SS frame and one for the ESS frame
         # Display SS frame
-        fig_ss, axes_ss = plt.subplots(2, 6, figsize=(20, 12))
+        values = count_values(ss)
+        fig_ss, axes_ss = plt.subplots(2, math.ceil(values/2), figsize=(20, 12))
         fig_ss.suptitle('SS frames')
 
         axes_ss = axes_ss.flatten()
+        counter = 0
 
         # Display LR frame
-        lr_image = F.to_pil_image(ss[0])
-        axes_ss[0].imshow(lr_image)
-        axes_ss[0].set_title(f"LR frame {self.ss_names[0]}")
+        for key, val in ss["LR"].items():
+            lr_image = F.to_pil_image(val)
+            axes_ss[counter].imshow(lr_image)
+            axes_ss[counter].set_title(f"LR frame {key}")
+            counter += 1
 
-        # Display feature frames
-        for i, feature_frame in enumerate(ss[1]):
-            feature_frame = F.to_pil_image(feature_frame)
-            axes_ss[i + 1].imshow(feature_frame)
-            axes_ss[i + 1].set_title(f'Feature frame {self.ss_names[1][i]}')
+        # Display buffer frames
+        for key, val in ss["Buffers"].items():
+            buffer_frame = F.to_pil_image(val)
+            axes_ss[counter].imshow(buffer_frame)
+            axes_ss[counter].set_title(f'Feature frame {key}')
+            counter += 1
 
-        # Display feature frames
-        for i, history_frame in enumerate(ss[2]):
-            history_frame = F.to_pil_image(history_frame)
-            axes_ss[i + 7].imshow(history_frame)
-            axes_ss[i + 7].set_title(f'History frame {self.ss_names[2][i]}')
+        # Display history frames
+        for key, val in ss["History"].items():
+            history_frame = F.to_pil_image(val)
+            axes_ss[counter].imshow(history_frame)
+            axes_ss[counter].set_title(f'History frame {key}')
+            counter += 1
 
         # Display HR frame
-        hr_image = F.to_pil_image(ss[3])
-        axes_ss[10].imshow(hr_image)
-        axes_ss[10].set_title(f"HR frame {self.ss_names[3]}")
+        for key, val in ss["HR"].items():
+            hr_image = F.to_pil_image(val)
+            axes_ss[counter].imshow(hr_image)
+            axes_ss[counter].set_title(f"HR frame {key}")
+            counter += 1
 
         # Display ESS frame
-        fig_ess, axes_ess = plt.subplots(2, 6, figsize=(20, 12))
+        values = count_values(ess)
+        fig_ess, axes_ess = plt.subplots(2, math.ceil(values/2), figsize=(20, 12))
         fig_ess.suptitle('ESS frames')
 
         axes_ess = axes_ess.flatten()
+        counter = 0
 
         # Display LR frame
-        lr_image = F.to_pil_image(ess[0])
-        axes_ess[0].imshow(lr_image)
-        axes_ess[0].set_title(f"LR frame {self.ess_names[0]}")
+        for key, val in ess["LR"].items():
+            lr_image = F.to_pil_image(val)
+            axes_ess[counter].imshow(lr_image)
+            axes_ess[counter].set_title(f"LR frame {key}")
+            counter += 1
 
-        # Display feature frames
-        for i, feature_frame in enumerate(ess[1]):
-            feature_frame = F.to_pil_image(feature_frame)
-            axes_ess[i + 1].imshow(feature_frame)
-            axes_ess[i + 1].set_title(f'Feature frame {self.ess_names[1][i]}')
+        # Display buffer frames
+        for key, val in ess["Buffers"].items():
+            buffer_frame = F.to_pil_image(val)
+            axes_ess[counter].imshow(buffer_frame)
+            axes_ess[counter].set_title(f'Feature frame {key}')
+            counter += 1
 
-        # Display feature frames
-        for i, history_frame in enumerate(ess[2]):
-            history_frame = F.to_pil_image(history_frame)
-            axes_ess[i + 7].imshow(history_frame)
-            axes_ess[i + 7].set_title(f'History frame {self.ess_names[2][i]}')
+        # Display history frames
+        for key, val in ess["History"].items():
+            history_frame = F.to_pil_image(val)
+            axes_ess[counter].imshow(history_frame)
+            axes_ess[counter].set_title(f'History frame {key}')
+            counter += 1
 
         # Display HR frame
-        hr_image = F.to_pil_image(ess[3])
-        axes_ess[10].imshow(hr_image)
-        axes_ess[10].set_title(f"HR frame {self.ess_names[3]}")
+        for key, val in ess["HR"].items():
+            hr_image = F.to_pil_image(val)
+            axes_ess[counter].imshow(hr_image)
+            axes_ess[counter].set_title(f"HR frame {key}")
+            counter += 1
 
         plt.tight_layout()
         plt.show()
 
-    def get_random_crop_pair(self, ss: list[torch.Tensor], ess: list[torch.Tensor]) \
+    def get_random_crop_pair(self, ss: dict[str, dict[str, torch.Tensor]], ess: dict[str, dict[str, torch.Tensor]]) \
             -> None:
-        lr_i, lr_j, lr_h, lr_w = transforms.RandomCrop.get_params(ss[0],
+        for key, val in ss["LR"].items():
+            lr_frame = val
+        lr_i, lr_j, lr_h, lr_w = transforms.RandomCrop.get_params(lr_frame,
                                                                   output_size=(self.crop_size, self.crop_size))
         hr_i, hr_j, hr_h, hr_w = lr_i * self.scale, lr_j * self.scale, lr_h * self.scale, lr_w * self.scale
 
         # Crop SS frame
         # crop lr frame
-        ss[0] = F.crop(ss[0], lr_i, lr_j, lr_h, lr_w)
+        for key, val in ss["LR"].items():
+            ss["LR"][key] = F.crop(val, lr_i, lr_j, lr_h, lr_w)
         # crop features
-        for i, feature_frame in enumerate(ss[1]):
-            ss[1][i] = F.crop(feature_frame, lr_i, lr_j, lr_h, lr_w)
+        for key, val in ss["Buffers"].items():
+            ss["Buffers"][key] = F.crop(val, lr_i, lr_j, lr_h, lr_w)
         # crop history frames
-        for i, history_frame in enumerate(ss[2]):
-            ss[2][i] = F.crop(history_frame, lr_i, lr_j, lr_h, lr_w)
+        for key, val in ss["History"].items():
+            ss["History"][key] = F.crop(val, lr_i, lr_j, lr_h, lr_w)
         # crop hr frame
-        ss[3] = F.crop(ss[3], hr_i, hr_j, hr_h, hr_w)
+        for key, val in ss["HR"].items():
+            ss["HR"][key] = F.crop(val, hr_i, hr_j, hr_h, hr_w)
 
         # Crop ESS frame
-        # crop lr frame
-        ess[0] = F.crop(ess[0], lr_i, lr_j, lr_h, lr_w)
+        # crop lr frame -> shared
         # crop features
-        for i, feature_frame in enumerate(ess[1]):
-            ess[1][i] = F.crop(feature_frame, lr_i, lr_j, lr_h, lr_w)
+        for key, val in ess["Buffers"].items():
+            ess["Buffers"][key] = F.crop(val, lr_i, lr_j, lr_h, lr_w)
         # crop history frames -> shared
         # crop hr frame
-        ess[3] = F.crop(ess[3], hr_i, hr_j, hr_h, hr_w)
+        for key, val in ess["HR"].items():
+            ess["HR"][key] = F.crop(val, hr_i, hr_j, hr_h, hr_w)
 
-    def augment(self, ss: list[torch.Tensor], ess: list[torch.Tensor]) \
+    def augment(self, ss: dict[str, dict[str, torch.Tensor]], ess: dict[str, dict[str, torch.Tensor]]) \
             -> None:
         # Augment SS & ESS frame
         # Apply random horizontal flip
         if self.use_hflip:
             if random.random() > 0.5:
-                # hflip ss, ess lr frame
-                ss[0] = flip_image_horizontal(ss[0])
-                ess[0] = flip_image_horizontal(ess[0])
+                # hflip ss lr frame, ess lr frame shared
+                for key, val in ss["LR"].items():
+                    ss["LR"][key] = flip_image_horizontal(val)
                 # hflip ss, ess feature frames
-                for i, feature_frame in enumerate(ss[1]):
-                    ss[1][i] = flip_image_horizontal(feature_frame)
-                for i, feature_frame in enumerate(ess[1]):
-                    ess[1][i] = flip_image_horizontal(feature_frame)
+                for key, val in ss["Buffers"].items():
+                    ss["Buffers"][key] = flip_image_horizontal(val)
+                for key, val in ess["Buffers"].items():
+                    ess["Buffers"][key] = flip_image_horizontal(val)
                 # hflip ss history frames -> ess shared
-                for i, history_frame in enumerate(ss[2]):
-                    ss[2][i] = flip_image_horizontal(history_frame)
-                # hflip ss,ess hr frame
-                ss[3] = flip_image_horizontal(ss[3])
-                ess[3] = flip_image_horizontal(ess[3])
+                for key, val in ss["History"].items():
+                    ss["History"][key] = flip_image_horizontal(val)
+                # hflip ss, ess hr frame
+                for key, val in ss["HR"].items():
+                    ss["HR"][key] = flip_image_horizontal(val)
+                for key, val in ess["HR"].items():
+                    ess["HR"][key] = flip_image_horizontal(val)
 
         # Apply random rotation by v flipping and rot of 90
         if self.use_rotation:
             if random.random() > 0.5:
-                # vflip ss, ess lr frame
-                ss[0] = flip_image_vertical(ss[0])
-                ess[0] = flip_image_vertical(ess[0])
+                # vflip ss lr frame, ess lr frame shared
+                for key, val in ss["LR"].items():
+                    ss["LR"][key] = flip_image_vertical(val)
                 # vflip ss, ess feature frames
-                for i, feature_frame in enumerate(ss[1]):
-                    ss[1][i] = flip_image_vertical(feature_frame)
-                for i, feature_frame in enumerate(ess[1]):
-                    ess[1][i] = flip_image_vertical(feature_frame)
+                for key, val in ss["Buffers"].items():
+                    ss["Buffers"][key] = flip_image_vertical(val)
+                for key, val in ess["Buffers"].items():
+                    ess["Buffers"][key] = flip_image_vertical(val)
                 # vflip ss history frames -> ess shared
-                for i, history_frame in enumerate(ss[2]):
-                    ss[2][i] = flip_image_vertical(history_frame)
+                for key, val in ss["History"].items():
+                    ss["History"][key] = flip_image_vertical(val)
                 # vflip ss, ess hr frame
-                ss[3] = flip_image_vertical(ss[3])
-                ess[3] = flip_image_vertical(ess[3])
+                for key, val in ss["HR"].items():
+                    ss["HR"][key] = flip_image_vertical(val)
+                for key, val in ess["HR"].items():
+                    ess["HR"][key] = flip_image_vertical(val)
         if self.use_rotation:
             if random.random() > 0.5:
                 angle = -90  # for clockwise rotation like BasicSR
-                # rotate ss, ess lr frame
-                ss[0] = rotate_image(ss[0], angle)
-                ess[0] = rotate_image(ess[0], angle)
+                # rotate ss lr frame, ess lr frame shared
+                for key, val in ss["LR"].items():
+                    ss["LR"][key] = rotate_image(val, angle)
                 # rotate ss, ess feature frames
-                for i, feature_frame in enumerate(ss[1]):
-                    ss[1][i] = rotate_image(feature_frame, angle)
-                for i, feature_frame in enumerate(ess[1]):
-                    ess[1][i] = rotate_image(feature_frame, angle)
+                for key, val in ss["Buffers"].items():
+                    ss["Buffers"][key] = rotate_image(val, angle)
+                for key, val in ess["Buffers"].items():
+                    ess["Buffers"][key] = rotate_image(val, angle)
                 # rotate ss history frames -> ess shared
-                for i, history_frame in enumerate(ss[2]):
-                    ss[2][i] = rotate_image(history_frame, angle)
+                for key, val in ss["History"].items():
+                    ss["History"][key] = rotate_image(val, angle)
                 # rotate ss, ess hr frame
-                ss[3] = rotate_image(ss[3], angle)
-                ess[3] = rotate_image(ess[3], angle)
+                for key, val in ss["HR"].items():
+                    ss["HR"][key] = rotate_image(val, angle)
+                for key, val in ess["HR"].items():
+                    ess["HR"][key] = rotate_image(val, angle)
 
 
 class STSSCrossValidation(Dataset):
@@ -1129,10 +1151,9 @@ def main() -> None:
     #                                 crop_size=None, use_hflip=False, use_rotation=False, digits=4, disk_mode=DiskMode.NPZ)
     # matrix_dataset.display_item(42)
 
-    buffers = {"BASE_COLOR": True, "DEPTH": True, "METALLIC": True, "NOV": True, "ROUGHNESS": True, "VELOCITY": True,
+    buffers = {"BASE_COLOR": True, "DEPTH": True, "METALLIC": False, "NOV": False, "ROUGHNESS": False, "VELOCITY": True,
                "WORLD_NORMAL": True, "WORLD_POSITION": True}
-    stss_data = STSSImagePair(root="../dataset/ue_data_npz/train", scale=2, history=2, buffers=buffers,
-                              last_frame_idx=299,
+    stss_data = STSSImagePair(root="../dataset/ue_data_npz/train", scale=2, history=2, buffers=buffers, last_frame_idx=299,
                               crop_size=512, use_hflip=True, use_rotation=True, digits=4, disk_mode=DiskMode.NPZ)
     stss_data.display_item(0)
 
