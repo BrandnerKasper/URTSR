@@ -93,17 +93,15 @@ def write_frames(writer: SummaryWriter, step: int, extra: bool, buffers: dict[st
     # LR
     writer.add_images("SS/LR", input_t0[0], step)
     # Buffers
-    buff = []
+    buffer_keys = []
     for key, val in buffers.items():
         if val:
-            buff.append(key)
+            buffer_keys.append(key)
     for i, buffer in enumerate(input_t0[1]):
-        writer.add_images(f"SS/{buff[i]}", buffer, step)
+        writer.add_images(f"SS/{buffer_keys[i]}", buffer, step)
     # History
-    counter = 1
-    for key, val in input_t0["History"].items():
-        writer.add_images(f"SS/History T - {counter}", val, step)
-        counter += 1
+    for i, history_frame in enumerate(input_t0[2]):
+        writer.add_images(f"SS/History T - {(i+1)*2}", history_frame, step)
     # Output
     writer.add_images("SS/Output", output_t0, step)
     # GT
@@ -113,33 +111,13 @@ def write_frames(writer: SummaryWriter, step: int, extra: bool, buffers: dict[st
         return
     # ESS
     # LR
-    for key, val in input_t1["LR"].items():
-        lr_frame = val
-    writer.add_images("ESS/LR", lr_frame, step)
-    # Buffers
-    for key, val in input_t1["Buffers"].items():
-        match key:
-            case key.contains("basecolor"):
-                writer.add_images("ESS/Base Color", val, step)
-            case key.contains("depth_log"):
-                writer.add_images("ESS/Depth Log", val, step)
-            case key.contains("metallic"):
-                writer.add_images("ESS/Metallic", val, step)
-            case key.contains("normal_vector"):
-                writer.add_images("ESS/Normal Vector", val, step)
-            case key.contains("roughness"):
-                writer.add_images("ESS/Roughness", val, step)
-            case key.contains("velocity_log"):
-                writer.add_images("ESS/Velocity Log", val, step)
-            case key.contains("world_normal"):
-                writer.add_images("ESS/World Normal", val, step)
-            case key.contains("world_position"):
-                writer.add_images("ESS/World Position", val, step)
+    writer.add_images("ESS/LR", input_t1[0], step)
+    # Buffers -> same buffer keys
+    for i, buffer in enumerate(input_t1[1]):
+        writer.add_images(f"ESS/{buffer_keys[i]}", buffer, step)
     # History
-    counter = 1
-    for key, val in input_t1["History"].items():
-        writer.add_images(f"SS/History T - {counter}", val, step)
-        counter += 1
+    for i, history_frame in enumerate(input_t1[2]):
+        writer.add_images(f"ESS/History T - {(i + 1) * 2}", history_frame, step)
     # Output
     writer.add_images("ESS/Output", output_t1, step)
     # GT
@@ -401,38 +379,62 @@ def train_stss(filepath: str) -> None:
         ess_total_loss = 0.0
         total_loss = 0.0
 
-        # We do a double strategy here: Two forward passes, one for SS, one for ESS frame
         for ss, ess in tqdm(train_loader, desc=f'Training, Epoch {epoch + 1}/{epochs}', dynamic_ncols=True):
             # setup
             optimizer.zero_grad()
 
-            # forward pass for SS
+            # prepare data
+            # SS
             lr_image = ss[0].to(device) # shared
             ss_feature_images = [img.to(device) for img in ss[1]]
-            ss_feature_images = torch.cat(ss_feature_images, dim=1)
+            if ss_feature_images:
+                ss_feature_images = torch.cat(ss_feature_images, dim=1)
             history_images = [img.to(device) for img in ss[2]]
-            history_images = torch.stack(history_images, dim=2) # shared
+            if history_images:
+                history_images = torch.stack(history_images, dim=2) # shared
             ss_hr_image = ss[3].to(device)
-            ss_output = model(lr_image, ss_feature_images, history_images)
-            ss_loss = criterion(ss_output, ss_hr_image) # + 0.1 * lpips
-            ss_loss.backward(retain_graph=extra) # accumulate gradients for SS
-
-            # forward pass for ESS
-            ess_loss = 0
+            # ESS
             if extra:
                 ess_feature_images = [img.to(device) for img in ess[1]]
-                ess_feature_images = torch.cat(ess_feature_images, dim=1)
+                if ess_feature_images:
+                    ess_feature_images = torch.cat(ess_feature_images, dim=1)
                 ess_hr_image = ess[3].to(device)
-                ess_output = model(lr_image, ess_feature_images, history_images)
-                ess_loss = criterion(ess_output, ess_hr_image) # + 0.1* lpips
-                ess_loss.backward() # accumulate gradients for ESS
 
-            # New loss
-            loss = ss_loss + ess_loss # just for tracking
+            # forward pass
+            # depending on the network we perform two forward passes or only one
+            if model.do_two:
+                # SS
+                ss_output = model(lr_image, ss_feature_images, history_images)
+                ss_loss = criterion(ss_output, ss_hr_image) # + 0.1 * lpips
+                ss_loss.backward(retain_graph=extra) # accumulate gradients for SS
+                # ESS
+                ess_loss = 0
+                if extra:
+                    ess_output = model(lr_image, ess_feature_images, history_images)
+                    ess_loss = criterion(ess_output, ess_hr_image) # + 0.1* lpips
+                    ess_loss.backward() # accumulate gradients for ESS
+                loss = ss_loss + ess_loss
+            else:
+                if extra:
+                    if torch.is_tensor(ss_feature_images):
+                        feature_images = torch.cat([ss_feature_images, ess_feature_images], 1)
+                    else:
+                        feature_images = []
+                    hr_images = torch.cat([ss_hr_image, ess_hr_image], 1)
+                else:
+                    feature_images = ss_feature_images
+                    hr_images = ss_hr_image
+                output = model(lr_image, feature_images, history_images)
+                if extra:
+                    output = torch.cat(output,dim=1)
+                loss = criterion(output, hr_images)
+                loss.backward()
+
             optimizer.step()
 
-            ss_total_loss += ss_loss.item()
-            ess_total_loss += ess_loss.item()
+            if model.do_two:
+                ss_total_loss += ss_loss.item()
+                ess_total_loss += ess_loss.item()
             total_loss += loss.item()
             iteration_counter += 1 * batch_size
 
@@ -445,11 +447,14 @@ def train_stss(filepath: str) -> None:
         average_ess_loss = ess_total_loss / len(train_loader)
         average_loss = total_loss / len(train_loader)
         print("\n")
-        print(f"SS Loss: {average_ss_loss:.4f}, ESS Loss: {average_ess_loss:.4f}, Loss: {average_loss:.4f}\n")
+        if model.do_two:
+            print(f"SS Loss: {average_ss_loss:.4f}, ESS Loss: {average_ess_loss:.4f}, Loss: {average_loss:.4f}\n")
+            if extra:
+                writer.add_scalar('Train/SS Loss', average_ss_loss, epoch)
+                writer.add_scalar('Train/ESS Loss', average_ess_loss, epoch)
+        else:
+            print(f"Loss: {average_loss:.4f}\n")
         # Log loss to TensorBoard
-        if extra:
-            writer.add_scalar('Train/SS Loss', average_ss_loss, epoch)
-            writer.add_scalar('Train/ESS Loss', average_ess_loss, epoch)
         writer.add_scalar('Train/Loss', average_loss, epoch)
 
         # val loop
@@ -460,28 +465,51 @@ def train_stss(filepath: str) -> None:
 
         val_counter = 0
         for ss, ess in tqdm(val_loader, desc=f"Validation, Epoch {epoch + 1}/{epochs}", dynamic_ncols=True):
-            # forward pass for SS
+            # prepare data
+            # SS
             lr_image = ss[0].to(device)  # shared
             ss_feature_images = [img.to(device) for img in ss[1]]
-            ss_feature_images = torch.cat(ss_feature_images, dim=1)
+            if ss_feature_images:
+                ss_feature_images = torch.cat(ss_feature_images, dim=1)
             history_images = [img.to(device) for img in ss[2]]
-            history_images = torch.stack(history_images, dim=2)  # shared
+            if history_images:
+                history_images = torch.stack(history_images, dim=2)  # shared
             ss_hr_image = ss[3].to(device)
-
-            # forward pass for ESS
+            # ESS
             if extra:
                 ess_feature_images = [img.to(device) for img in ess[1]]
-                ess_feature_images = torch.cat(ess_feature_images, dim=1)
+                if ess_feature_images:
+                    ess_feature_images = torch.cat(ess_feature_images, dim=1)
                 ess_hr_image = ess[3].to(device)
 
             with torch.no_grad():
-                # SS frame
-                ss_output = model(lr_image, ss_feature_images, history_images)
-                ss_output = torch.clamp(ss_output, min=0.0, max=1.0)
-                if extra:
-                    # ESS frame
-                    ess_output = model(lr_image, ess_feature_images, history_images)
-                    ess_output = torch.clamp(ess_output, min=0.0, max=1.0)
+                # forward pass
+                # depending on the network we perform two forward passes or only one
+                if model.do_two:
+                    # SS
+                    ss_output = model(lr_image, ss_feature_images, history_images)
+                    ss_output = torch.clamp(ss_output, min=0.0, max=1.0)
+                    # ESS
+                    if extra:
+                        ess_output = model(lr_image, ess_feature_images, history_images)
+                        ess_output = torch.clamp(ess_output, min=0.0, max=1.0)
+                else:
+                    if extra:
+                        if ss_feature_images and ess_feature_images:
+                            feature_images = torch.cat([ss_feature_images, ess_feature_images], 1)
+                        else:
+                            feature_images = []
+                        hr_images = torch.cat([ss_hr_image, ess_hr_image], 1)
+                    else:
+                        feature_images = ss_feature_images
+                        hr_images = ss_hr_image
+                    if extra:
+                        ss_output, ess_output = model(lr_image, feature_images, history_images)
+                        ss_output = torch.clamp(ss_output, min=0.0, max=1.0)
+                        ess_output = torch.clamp(ess_output, min=0.0, max=1.0)
+                    else:
+                        ss_output = model(lr_image, feature_images, history_images)
+                        ss_output = torch.clamp(ss_output, min=0.0, max=1.0)
 
             # Calc PSNR and SSIM
             # SS frame
@@ -500,13 +528,17 @@ def train_stss(filepath: str) -> None:
 
         # PSNR & SSIM
         average_ss_metric = total_ss_metrics / len(val_loader)
-        average_ess_metric = total_ess_metrics / len(val_loader)
-        average_metric = (average_ss_metric + average_ess_metric) / 2
+        if extra:
+            average_ess_metric = total_ess_metrics / len(val_loader)
+            average_metric = (average_ss_metric + average_ess_metric) / 2
+        else:
+            average_metric = average_ss_metric
         print("\n")
         if extra:
             print(f"SS {average_ss_metric}")
             print(f"ESS {average_ess_metric}")
         print(f"Total {average_metric}")
+
         # Log PSNR & SSIM to TensorBoard
         # PSNR
         if extra:

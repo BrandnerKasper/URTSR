@@ -4,10 +4,11 @@ from torchinfo import summary
 
 
 class BaseModel(nn.Module):
-    def __init__(self, scale: int, down_and_up: int = 0):
+    def __init__(self, scale: int, down_and_up: int = 0, do_two: bool = True):
         super(BaseModel, self).__init__()
         self.scale = scale
         self.down_and_up = down_and_up
+        self.do_two = do_two
 
     # for evaluation only
     def summary(self, input_size) -> None:

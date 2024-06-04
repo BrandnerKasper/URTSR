@@ -51,7 +51,7 @@ def create_yaml(filename: str, model: str, epochs: int, scale: int, batch_size: 
     return yaml_text
 
 
-def init_model(model_name: str, scale: int, batch_size: int) -> BaseModel:
+def init_model(model_name: str, scale: int, batch_size: int, crop_size: int, buffer_cha: int, history_cha: int) -> BaseModel:
     match model_name:
         case "SRCNN":
             return SRCNN(scale=scale)
@@ -66,9 +66,9 @@ def init_model(model_name: str, scale: int, batch_size: int) -> BaseModel:
         case "STSS":
             return Stss(scale=scale)
         case "STSS2":
-            return Stss2(scale=scale)
+            return Stss2(scale=scale, buffer_cha=buffer_cha, history_cha=history_cha)
         case "ExtraSS":
-            return ExtraSS(scale=scale, batch_size=batch_size)
+            return ExtraSS(scale=scale, batch_size=batch_size, crop_size=crop_size, buffer_cha=buffer_cha, history_cha=history_cha)
         case "ExtraSS2":
             return ExtraSS2(scale=scale, batch_size=batch_size)
         case _:
@@ -188,6 +188,30 @@ def init_dataset(name: str, extra: bool, history: int, buffers: dict[str, bool],
             raise ValueError(f"The dataset '{name}' is not a valid dataset.")
 
 
+def calc_buffer_cha(buffers: dict[str, bool]) -> int:
+    channels = 0
+    for key, val in buffers.items():
+        if val:
+            match key:
+                case "BASE_COLOR":
+                    channels += 3
+                case "DEPTH":
+                    channels +=1
+                case "METALLIC":
+                    channels += 1
+                case "NOV":
+                    channels += 1
+                case "ROUGHNESS":
+                    channels += 1
+                case "VELOCITY":
+                    channels += 1
+                case "WORLD_NORMAL":
+                    channels += 3
+                case "WORLD_POSITION":
+                    channels += 3
+    return channels
+
+
 class Config:
     def __init__(self, filename: str, model: str, extra: bool, epochs: int, scale: int, batch_size: int,
                  crop_size: int, use_hflip: bool, use_rotation: bool, number_workers: int,
@@ -195,7 +219,7 @@ class Config:
                  start_decay_epoch: Optional[int],
                  dataset: str, history: int, buffers: dict[str, bool]):
         self.filename: str = filename
-        self.model: BaseModel = init_model(model, scale, batch_size)
+        self.model: BaseModel = init_model(model, scale, batch_size, crop_size, calc_buffer_cha(buffers), 3*history)
         self.extra = extra
         self.epochs: int = epochs
         self.scale: int = scale

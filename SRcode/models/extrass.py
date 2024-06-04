@@ -206,7 +206,8 @@ class ExtraSS(BaseModel):
         )
 
     def forward(self, x: torch.Tensor, features: torch.Tensor, his: torch.Tensor):
-        x = torch.cat([x, features], dim=1)
+        if torch.is_tensor(features):
+            x = torch.cat([x, features], dim=1)
         # SS Encoder forward pass
         if not self.extra:
             x1 = self.ss_red_1(x)

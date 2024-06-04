@@ -107,11 +107,11 @@ class Attention(nn.Module):
 
 
 class Stss2(BaseModel):
-    def __init__(self, scale: int, history_channels: int = 3*3, feature_channels: int = 0): # features = 9,
-        super(Stss2, self).__init__(scale=scale, down_and_up=3)
+    def __init__(self, scale: int, buffer_cha: int = 0, history_cha: int = 3 * 3):
+        super(Stss2, self).__init__(scale=scale, down_and_up=3, do_two=False)
 
         self.conv_in = nn.Sequential(
-            LWGatedConv2D(3 + feature_channels, 24, kernel=3, stride=1, pad=1),
+            LWGatedConv2D(3 + buffer_cha*2, 24, kernel=3, stride=1, pad=1),
             nn.ReLU(inplace=True),
             LWGatedConv2D(24, 24, kernel=3, stride=1, pad=1),
             nn.ReLU(inplace=True)
@@ -124,7 +124,7 @@ class Stss2(BaseModel):
         self.attention = Attention(dim=32, num_heads=8, bias=True)
 
         self.his_1 = nn.Sequential(
-            nn.Conv2d(history_channels, 24, kernel_size=3, stride=2, padding=1),
+            nn.Conv2d(history_cha, 24, kernel_size=3, stride=2, padding=1),
             nn.ReLU(inplace=True),
             nn.Conv2d(24, 24, kernel_size=3, stride=1, padding=1),
             nn.ReLU(inplace=True),
@@ -157,9 +157,9 @@ class Stss2(BaseModel):
             nn.PixelShuffle(scale)
         )
 
-    def forward(self, x, his):
-        # if feature is not None:
-        #     x = torch.cat([x, feature], 1)
+    def forward(self, x, buffer, his):
+        if torch.is_tensor(buffer):
+            x = torch.cat([x, buffer], 1)
         x1 = self.conv_in(x)
         x2 = self.down_1(x1)
         x3 = self.down_2(x2)
@@ -188,12 +188,12 @@ class Stss2(BaseModel):
 def main() -> None:
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    model = Stss2(scale=2, history_channels=3*3, feature_channels=0).to(device)
+    model = Stss2(scale=2, buffer_cha=3, history_cha=3*3).to(device)
     batch_size = 1
     input_data = (batch_size, 3, 1920, 1080)
-    # feature = (batch_size, 9, 1920, 1080)
+    buffer = (batch_size, 2*3, 1920, 1080) # 3 for SS, 3 for ESS
     his = (batch_size, 3, 3, 1920, 1080)
-    input_size = (input_data, his)
+    input_size = (input_data, his, buffer)
 
     model.summary(input_size)
     model.measure_inference_time(input_size)
