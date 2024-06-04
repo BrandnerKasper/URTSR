@@ -14,8 +14,8 @@ from models.subpixel import SubPixelNN
 from models.extraNet import ExtraNet
 from models.flavr import Flavr
 from models.flavr_original import Flavr_Original
+from models.stss_original import StssOriginal
 from models.stss import Stss
-from models.stss_2 import Stss2
 from models.extrass import ExtraSS
 from models.extrass2 import ExtraSS2
 
@@ -63,14 +63,12 @@ def init_model(model_name: str, scale: int, batch_size: int, crop_size: int, buf
             return Flavr(scale=scale)
         case "Flavr_Original":
             return Flavr_Original(scale=scale)
+        case "STSS_Original":
+            return StssOriginal(scale=scale)
         case "STSS":
-            return Stss(scale=scale)
-        case "STSS2":
-            return Stss2(scale=scale, buffer_cha=buffer_cha, history_cha=history_cha)
+            return Stss(scale=scale, buffer_cha=buffer_cha, history_cha=history_cha)
         case "ExtraSS":
             return ExtraSS(scale=scale, batch_size=batch_size, crop_size=crop_size, buffer_cha=buffer_cha, history_cha=history_cha)
-        case "ExtraSS2":
-            return ExtraSS2(scale=scale, batch_size=batch_size)
         case _:
             raise ValueError(f"The model '{model_name}' is not a valid model.")
 
@@ -323,7 +321,7 @@ def create_comment_from_config(file: Config) -> str:
 
 def main() -> None:
     # test_yaml_creation()
-    yaml_config = load_yaml_into_config("configs/stss2.yaml")
+    yaml_config = load_yaml_into_config("configs/stss.yaml")
     print(yaml_config)
 
 
