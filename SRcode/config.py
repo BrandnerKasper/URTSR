@@ -17,7 +17,6 @@ from models.flavr_original import Flavr_Original
 from models.stss_original import StssOriginal
 from models.stss import Stss
 from models.extrass import ExtraSS
-from models.extrass2 import ExtraSS2
 
 from data.dataloader import SingleImagePair, MultiImagePair, STSSImagePair, STSSCrossValidation, DiskMode
 
@@ -194,7 +193,7 @@ def calc_buffer_cha(buffers: dict[str, bool]) -> int:
                 case "BASE_COLOR":
                     channels += 3
                 case "DEPTH":
-                    channels +=1
+                    channels += 1
                 case "METALLIC":
                     channels += 1
                 case "NOV":
@@ -202,7 +201,7 @@ def calc_buffer_cha(buffers: dict[str, bool]) -> int:
                 case "ROUGHNESS":
                     channels += 1
                 case "VELOCITY":
-                    channels += 1
+                    channels += 3
                 case "WORLD_NORMAL":
                     channels += 3
                 case "WORLD_POSITION":
