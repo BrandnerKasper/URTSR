@@ -49,11 +49,11 @@ def depth_to_space(input_tensor, block_size):
 
 
 class FRNet3D(nn.Module):
-    def __init__(self):
+    def __init__(self, history: int = 3):
         super(FRNet3D, self).__init__()
 
         # Define the down-sampling blocks
-        self.down1 = self.down_conv3D_block(3, 22)
+        self.down1 = self.down_conv3D_block(history, 22)
         self.down2 = self.down_conv3D_block(22, 24)
         self.down3 = self.down_conv3D_block(24, 36)
         self.down4 = self.down_conv3D_block(36, 48)
@@ -117,7 +117,7 @@ class FRNet3D(nn.Module):
 
 
 class ExtraSS2(BaseModel):
-    def __init__(self, scale: int, batch_size: int, crop_size: Optional[int] = None):
+    def __init__(self, scale: int, batch_size: int, crop_size: Optional[int] = None, buffer_cha: int = 9, history_cha: int = 9):
         super(ExtraSS2, self).__init__(scale=scale, down_and_up=4)
 
         if crop_size is None:
@@ -125,7 +125,7 @@ class ExtraSS2(BaseModel):
         else:
             self.hr_input = torch.randn(batch_size, 3, crop_size, crop_size).to(device='cuda')
         self.extra = False
-        self.fr = FRNet3D()
+        self.fr = FRNet3D(int(history_cha/3))
 
         # Encoder for the SS forward pass
         self.ss_red_1 = nn.Conv2d(3 + 9, 22, kernel_size=3, stride=1, padding=1)

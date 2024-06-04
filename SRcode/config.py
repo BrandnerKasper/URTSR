@@ -111,7 +111,7 @@ def init_scheduler(scheduler_data: dict, optimizer: optim.Optimizer, epochs: int
             raise ValueError(f"The scheduler '{scheduler_name}' is not a valid scheduler.")
 
 
-def init_dataset(name: str, crop_size: int, use_hflip: bool, use_rotation: bool) -> (Dataset, Dataset):
+def init_dataset(name: str, extra: bool, history: int, buffers: dict[str, bool], crop_size: int, use_hflip: bool, use_rotation: bool) -> (Dataset, Dataset):
     root = f"dataset/{name}"
     match name:
         case "DIV2K":
@@ -171,15 +171,15 @@ def init_dataset(name: str, crop_size: int, use_hflip: bool, use_rotation: bool)
         #                          use_hflip=use_hflip, use_rotation=use_rotation, digits=4, disk_mode=DiskMode.NPZ)
         #     return train, val
         case "ue_data":
-            train = STSSImagePair(root=f"{root}/train", scale=2, history=3, last_frame_idx=299, crop_size=crop_size,
+            train = STSSImagePair(root=f"{root}/train", scale=2, extra=extra, history=history, buffers=buffers, last_frame_idx=299, crop_size=crop_size,
                                   use_hflip=use_hflip, use_rotation=use_rotation, digits=4)
-            val = STSSImagePair(root=f"{root}/val", scale=2, history=3, last_frame_idx=299, crop_size=crop_size,
+            val = STSSImagePair(root=f"{root}/val", scale=2, extra=extra, history=history, buffers=buffers, last_frame_idx=299, crop_size=crop_size,
                                 use_hflip=use_hflip, use_rotation=use_rotation, digits=4)
             return train, val
         case "ue_data_npz":
-            train = STSSImagePair(root=f"{root}/train", scale=2, history=4, last_frame_idx=299, crop_size=crop_size,
+            train = STSSImagePair(root=f"{root}/train", scale=2, extra=extra, history=history, buffers=buffers, last_frame_idx=299, crop_size=crop_size,
                                   use_hflip=use_hflip, use_rotation=use_rotation, digits=4, disk_mode=DiskMode.NPZ)
-            val = STSSImagePair(root=f"{root}/val", scale=2, history=4, last_frame_idx=299, crop_size=crop_size,
+            val = STSSImagePair(root=f"{root}/val", scale=2, extra=extra, history=history, buffers=buffers, last_frame_idx=299, crop_size=crop_size,
                                 use_hflip=use_hflip, use_rotation=use_rotation, digits=4, disk_mode=DiskMode.NPZ)
             # val = STSSCrossValidation(root=f"dataset/STSS_val_lewis_png", scale=2, history=2, crop_size=crop_size,
             #                           use_hflip=False, use_rotation=False)
@@ -189,13 +189,14 @@ def init_dataset(name: str, crop_size: int, use_hflip: bool, use_rotation: bool)
 
 
 class Config:
-    def __init__(self, filename: str, model: str, epochs: int, scale: int, batch_size: int,
+    def __init__(self, filename: str, model: str, extra: bool, epochs: int, scale: int, batch_size: int,
                  crop_size: int, use_hflip: bool, use_rotation: bool, number_workers: int,
                  learning_rate: float, criterion: str, optimizer: dict, scheduler: dict,
                  start_decay_epoch: Optional[int],
-                 dataset: str):
+                 dataset: str, history: int, buffers: dict[str, bool]):
         self.filename: str = filename
         self.model: BaseModel = init_model(model, scale, batch_size)
+        self.extra = extra
         self.epochs: int = epochs
         self.scale: int = scale
         self.batch_size: int = batch_size
@@ -209,12 +210,15 @@ class Config:
         self.scheduler: Optional[lr_scheduler.LRScheduler] = init_scheduler(scheduler, self.optimizer, self.epochs)
         self.start_decay_epoch: Optional[int] = start_decay_epoch
         self.dataset: str = dataset
-        self.train_dataset, self.val_dataset = init_dataset(dataset, crop_size, use_hflip, use_rotation)
+        self.history = history
+        self.buffers = buffers
+        self.train_dataset, self.val_dataset = init_dataset(dataset, extra, history, buffers, crop_size, use_hflip, use_rotation)
 
     def __str__(self):
         return f"Config:\n" \
                f"  Filename: {self.filename}\n" \
                f"  Model: {self.model.__class__.__name__}\n" \
+               f"  Extra: {self.extra} \n" \
                f"  Epochs: {self.epochs}\n" \
                f"  Scale: {self.scale}\n" \
                f"  Batch Size: {self.batch_size}\n" \
@@ -227,7 +231,17 @@ class Config:
                f"  Optimizer: {self.optimizer.__class__.__name__}\n" \
                f"  Scheduler: {self.scheduler.__class__.__name__ if self.scheduler else 'None'}\n" \
                f"  Start Decay Epoch: {self.start_decay_epoch if self.start_decay_epoch else 'None'}\n" \
-               f"  Dataset: {self.dataset}"
+               f"  Dataset: {self.dataset} \n" \
+               f"  History: {self.history} \n" \
+               f"  Buffers: \n" \
+               f"    Base Color: {self.buffers['BASE_COLOR']} \n" \
+               f"    Depth: {self.buffers['DEPTH']} \n" \
+               f"    Metallic: {self.buffers['METALLIC']} \n" \
+               f"    Nov: {self.buffers['NOV']} \n" \
+               f"    Roughness: {self.buffers['ROUGHNESS']} \n" \
+               f"    Velocity: {self.buffers['VELOCITY']} \n" \
+               f"    World Normal: {self.buffers['WORLD_NORMAL']} \n" \
+               f"    World Position: {self.buffers['WORLD_POSITION']} \n"
 
 
 def test_yaml_creation() -> None:
@@ -251,6 +265,7 @@ def load_yaml_into_config(file_path: str) -> Config:
     with open(file_path, "r") as file:
         config_dict = yaml.safe_load(file)
         model_name = config_dict["MODEL"]
+        extra = config_dict["EXTRA"]
         epochs = config_dict["EPOCHS"]
         scale = config_dict["SCALE"]
         batch_size = config_dict["BATCH_SIZE"]
@@ -264,12 +279,15 @@ def load_yaml_into_config(file_path: str) -> Config:
         scheduler = config_dict["SCHEDULER"]
         start_decay_epoch = scheduler["START_DECAY_EPOCH"]
         dataset = config_dict["DATASET"]
+        dataset_name = dataset["NAME"]
+        history = dataset["HISTORY"]
+        buffers = dataset["BUFFERS"]
         filename = file_path.split('/')[-1].split('.')[0]
 
-    return Config(filename, model_name, epochs, scale, batch_size,
+    return Config(filename, model_name, extra, epochs, scale, batch_size,
                   crop_size, use_hflip, use_rotation, number_workers,
                   learning_rate, criterion, optimizer, scheduler, start_decay_epoch,
-                  dataset)
+                  dataset_name, history, buffers)
 
 
 def create_comment_from_config(file: Config) -> str:
@@ -281,7 +299,7 @@ def create_comment_from_config(file: Config) -> str:
 
 def main() -> None:
     # test_yaml_creation()
-    yaml_config = load_yaml_into_config("configs/extranet.yaml")
+    yaml_config = load_yaml_into_config("configs/stss2.yaml")
     print(yaml_config)
 
 
