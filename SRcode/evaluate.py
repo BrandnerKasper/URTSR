@@ -7,13 +7,13 @@ from utils import utils
 import argparse
 from torch.utils.data import DataLoader
 
-from data.dataloader import SingleImagePair, MultiImagePair, STSSCrossValidation2
+from data.dataloader import SingleImagePair, MultiImagePair, STSSCrossValidation2, STSSImagePair, DiskMode
 from config import load_yaml_into_config, Config
 
 
 def parse_arguments() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Evaluate a trained SR network based on a pretrained model file.")
-    parser.add_argument('file_path', type=str, nargs='?', default='pretrained_models/extraSS.pth',
+    parser.add_argument('file_path', type=str, nargs='?', default='pretrained_models/extraSS_All.pth',
                         help="Path to the pretrained model .pth file")
     args = parser.parse_args()
     return args
@@ -31,80 +31,17 @@ def save_results(results: dict, name: str) -> None:
     file.close()
 
 
+def init_dataset(name: str, extra: bool, history: int, buffers: dict[str, bool]) -> STSSImagePair:
+    match name:
+        case "ue_data_npz":
+            return STSSImagePair(root=f"dataset/ue_data_npz/val", scale=2, extra=extra, history=history,
+                                 buffers=buffers, last_frame_idx=299, crop_size=None,
+                                 use_hflip=False, use_rotation=False, digits=4, disk_mode=DiskMode.NPZ)
+        case _:
+            raise ValueError(f"The dataset '{name}' is not a valid dataset.")
+
+
 def evaluate(pretrained_model_path: str) -> None:
-    model_name = pretrained_model_path.split('/')[-1].split('.')[0]
-    config = get_config_from_pretrained_model(model_name)
-
-    # decide if Single Image or Multi Image Pair
-    if isinstance(config.val_dataset, SingleImagePair):
-        evaluate_single_image_dataset(pretrained_model_path)
-    elif isinstance(config.val_dataset, MultiImagePair):
-        evaluate_multi_image_dataset(pretrained_model_path)
-    else:
-        evaluate_stss_image_dataset(pretrained_model_path)
-
-
-def evaluate_single_image_dataset(pretrained_model_path: str) -> None:
-    # Setup
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    print(f"Device: {device}")
-    model_name = pretrained_model_path.split('/')[-1].split('.')[0]
-    config = get_config_from_pretrained_model(model_name)
-    print(config)
-    with open(f"configs/{model_name}.yaml", "r") as file:
-        results: dict = yaml.safe_load(file)
-
-    # Datasets to evaluate:
-    datasets = ["Set5", "Set14", "Urban100"]  # this is additional for SISR!
-
-    # Loading model
-    model = config.model.to(device)
-    model.load_state_dict(torch.load(pretrained_model_path))
-    model.eval()
-
-    for dataset in datasets:
-        # Loading and preparing data
-        dataset_path = f"dataset/{dataset}"
-        evaluate_dataset = SingleImagePair(root=dataset_path, pattern="")
-
-        # Evaluate
-        total = utils.Metrics([], [])
-        for i in range(len(evaluate_dataset)):
-            filename = evaluate_dataset.get_filename(i)
-            lr_image, hr_image = evaluate_dataset.__getitem__(i)
-            lr_image, hr_image = lr_image.to(device), hr_image.to(device)
-
-            lr_image_model = utils.pad_to_divisible(lr_image.unsqueeze(0), 2 ** model.down_and_up)
-
-            with torch.no_grad():
-                output_image = model(lr_image_model).squeeze(0)
-                output_image = utils.pad_or_crop_to_target(output_image, hr_image)
-                output_image = torch.clamp(output_image, min=0.0, max=1.0)
-
-            # Calc Metrics
-            values = utils.calculate_metrics(hr_image, output_image)
-            print(f"{filename}: {values}")
-
-            # Calc total
-            total += values
-
-        # Calc average
-        length = len(evaluate_dataset)
-        average = total / length
-        print("\n")
-        print(f"Average {average} over dataset {dataset}")
-        print("\n")
-
-        # Generate result
-        results[dataset] = {
-            "PSNR": round(average.average_psnr, 2),
-            "SSIM": round(average.average_ssim, 2),
-        }
-
-    save_results(results, model_name)
-
-
-def evaluate_multi_image_dataset(pretrained_model_path: str) -> None:
     # Setup
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Device: {device}")
@@ -119,115 +56,105 @@ def evaluate_multi_image_dataset(pretrained_model_path: str) -> None:
     model = config.model.to(device)
     model.load_state_dict(torch.load(pretrained_model_path))
     model.eval()
+    extra = config.extra
 
-    val_dataset = STSSCrossValidation2(root="dataset/STSS_val_lewis_png", scale=2, number_of_frames=3, crop_size=256, use_hflip=False, use_rotation=False)
+    val_dataset = init_dataset(config.dataset, config.extra, config.history, config.buffers)
     val_loader = DataLoader(dataset=val_dataset, batch_size=1, shuffle=False, num_workers=config.number_workers)
-
-    total_metrics = utils.Metrics([0, 0], [0, 0])  # TODO: abstract number of values based on second dim of tensor [8, 2, 3, 1920, 1080]
-
-    for lr_images, hr_images in tqdm(val_loader, desc=f"Evaluating on {config.dataset}", dynamic_ncols=True):
-        lr_images = [img.to(device) for img in lr_images]
-        lr_image = lr_images[0]
-        hr_images = [img.to(device) for img in hr_images]
-        history_images = torch.stack(lr_images, dim=2)
-        with torch.no_grad():
-            output_image = model(lr_image, history_images)
-            output_image = [torch.clamp(img, min=0.0, max=1.0) for img in output_image]
-        # Calc PSNR and SSIM
-        metrics = utils.calculate_metrics(hr_images, output_image, "multi")
-        total_metrics += metrics
-
-    # PSNR & SSIM
-    average_metric = total_metrics / len(val_loader)
-    print("\n")
-    print(average_metric)
-
-    # Write results
-    # TODO: abstract number of values based on number of frames
-    results["PSNR"] = {
-        "Frame_0": round(average_metric.psnr_values[0], 2),
-        "Frame_1": round(average_metric.psnr_values[1], 2),
-        "Average": round(average_metric.average_psnr, 2)
-    }
-    results["SSIM"] = {
-        "Frame_0": round(average_metric.ssim_values[0], 2),
-        "Frame_1": round(average_metric.ssim_values[1], 2),
-        "Average": round(average_metric.average_ssim, 2)
-    }
-
-    # Save results
-    save_results(results, model_name)
-
-
-def evaluate_stss_image_dataset(pretrained_model_path: str) -> None:
-    # Setup
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    print(f"Device: {device}")
-    model_name = pretrained_model_path.split('/')[-1].split('.')[0]
-    config = get_config_from_pretrained_model(model_name)
-    print(config)
-
-    with open(f"configs/{model_name}.yaml", "r") as file:
-        results: dict = yaml.safe_load(file)
-
-    # Loading model
-    model = config.model.to(device)
-    model.load_state_dict(torch.load(pretrained_model_path))
-    model.eval()
-
-    val_loader = DataLoader(dataset=config.val_dataset, batch_size=1, shuffle=False, num_workers=config.number_workers)
     total_ss_metrics = utils.Metrics([0], [0])
     total_ess_metrics = utils.Metrics([0], [0])
     for ss, ess in tqdm(val_loader, desc=f"Evaluating on {config.dataset}", dynamic_ncols=True):
-        # forward pass for SS
+        # prepare data
+        # SS
         lr_image = ss[0].to(device)  # shared
+        lr_image = utils.pad_to_divisible(lr_image, 2 ** model.down_and_up)
         ss_feature_images = [img.to(device) for img in ss[1]]
-        ss_feature_images = torch.cat(ss_feature_images, dim=1)
+        if ss_feature_images:
+            ss_feature_images = [utils.pad_to_divisible(img, 2 ** model.down_and_up) for img in ss_feature_images]
+            ss_feature_images = torch.cat(ss_feature_images, dim=1)
         history_images = [img.to(device) for img in ss[2]]
-        history_images = torch.stack(history_images, dim=2)  # shared
+        if history_images:
+            history_images = [utils.pad_to_divisible(img, 2 ** model.down_and_up) for img in history_images]
+            history_images = torch.stack(history_images, dim=2)  # shared
         ss_hr_image = ss[3].to(device)
-
-        # forward pass for ESS
-        ess_feature_images = [img.to(device) for img in ess[1]]
-        ess_feature_images = torch.cat(ess_feature_images, dim=1)
-        ess_hr_image = ess[3].to(device)
+        ss_hr_image = utils.pad_to_divisible(ss_hr_image, 2 ** model.down_and_up * config.scale)
+        # ESS
+        if extra:
+            ess_feature_images = [img.to(device) for img in ess[1]]
+            if ess_feature_images:
+                ess_feature_images = [utils.pad_to_divisible(img, 2 ** model.down_and_up) for img in ess_feature_images]
+                ess_feature_images = torch.cat(ess_feature_images, dim=1)
+            ess_hr_image = ess[3].to(device)
+            ess_hr_image = utils.pad_to_divisible(ess_hr_image, 2 ** model.down_and_up * config.scale)
 
         with torch.no_grad():
-            # SS frame
-            ss_output = model(lr_image, ss_feature_images, history_images)
-            ss_output = torch.clamp(ss_output, min=0.0, max=1.0)
-            # ESS frame
-            ess_output = model(lr_image, ess_feature_images, history_images)
-            ess_output = torch.clamp(ess_output, min=0.0, max=1.0)
+            # forward pass
+            # depending on the network we perform two forward passes or only one
+            if model.do_two:
+                # SS
+                ss_output = model(lr_image, ss_feature_images, history_images)
+                ss_output = torch.clamp(ss_output, min=0.0, max=1.0)
+                # ESS
+                if extra:
+                    ess_output = model(lr_image, ess_feature_images, history_images)
+                    ess_output = torch.clamp(ess_output, min=0.0, max=1.0)
+            else:
+                if extra:
+                    if ss_feature_images and ess_feature_images:
+                        feature_images = torch.cat([ss_feature_images, ess_feature_images], 1)
+                    else:
+                        feature_images = []
+                else:
+                    feature_images = ss_feature_images
+                if extra:
+                    ss_output, ess_output = model(lr_image, feature_images, history_images)
+                    ss_output = torch.clamp(ss_output, min=0.0, max=1.0)
+                    ess_output = torch.clamp(ess_output, min=0.0, max=1.0)
+                else:
+                    ss_output = model(lr_image, feature_images, history_images)
+                    ss_output = torch.clamp(ss_output, min=0.0, max=1.0)
 
         # Calc PSNR and SSIM
         # SS frame
         ss_metric = utils.calculate_metrics(ss_hr_image, ss_output, "single")
         total_ss_metrics += ss_metric
-        # ESS frame
-        ess_metric = utils.calculate_metrics(ess_hr_image, ess_output, "single")
-        total_ess_metrics += ess_metric
+        if extra:
+            # ESS frame
+            ess_metric = utils.calculate_metrics(ess_hr_image, ess_output, "single")
+            total_ess_metrics += ess_metric
 
     # PSNR & SSIM
     average_ss_metric = total_ss_metrics / len(val_loader)
-    average_ess_metric = total_ess_metrics / len(val_loader)
-    average_metric = (average_ss_metric + average_ess_metric) / 2
+    if extra:
+        average_ess_metric = total_ess_metrics / len(val_loader)
+        average_metric = (average_ss_metric + average_ess_metric) / 2
+    else:
+        average_metric = average_ss_metric
     print("\n")
-    print(f"SS {average_ss_metric}")
-    print(f"ESS {average_ess_metric}")
+    if extra:
+        print(f"SS {average_ss_metric}")
+        print(f"ESS {average_ess_metric}")
     print(f"Total {average_metric}")
     # Write results
     # TODO: abstract number of values based on number of frames
-    results["PSNR"] = {
-        "Frame_0": round(average_ss_metric.average_psnr, 2),
-        "Frame_1": round(average_ess_metric.average_psnr, 2),
-        "Average": round(average_metric.average_psnr, 2)
-    }
-    results["SSIM"] = {
-        "Frame_0": round(average_ss_metric.average_ssim, 2),
-        "Frame_1": round(average_ess_metric.average_ssim, 2),
-        "Average": round(average_metric.average_ssim, 2)
-    }
+    if extra:
+        results["PSNR"] = {
+            "Frame_0": round(average_ss_metric.average_psnr, 2),
+            "Frame_1": round(average_ess_metric.average_psnr, 2),
+            "Average": round(average_metric.average_psnr, 2)
+        }
+        results["SSIM"] = {
+            "Frame_0": round(average_ss_metric.average_ssim, 2),
+            "Frame_1": round(average_ess_metric.average_ssim, 2),
+            "Average": round(average_metric.average_ssim, 2)
+        }
+    else:
+        results["PSNR"] = {
+            "Frame_0": round(average_metric.average_psnr, 2)
+        }
+        results["SSIM"] = {
+            "Frame_0": round(average_metric.average_ssim, 2)
+        }
+
     # Save results
     save_results(results, model_name)
 

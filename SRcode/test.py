@@ -22,78 +22,32 @@ def generate_directory(path):
         os.makedirs(path)
 
 
-def test() -> None:
-    pretrained_model_path = "pretrained_models/extraSS.pth"
-    save_path = "results/extraSS"
+def init_dataset(name: str, extra: bool, history: int, buffers: dict[str, bool]) -> STSSImagePair:
+    match name:
+        case "ue_data_npz":
+            return STSSImagePair(root=f"dataset/ue_data_npz/test", scale=2, extra=extra, history=history,
+                                 buffers=buffers, last_frame_idx=299, crop_size=None,
+                                 use_hflip=False, use_rotation=False, digits=4, disk_mode=DiskMode.NPZ)
+        case _:
+            raise ValueError(f"The dataset '{name}' is not a valid dataset.")
 
+
+def test(model_path: str) -> None:
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Device: {device}")
-    model_name = pretrained_model_path.split('/')[-1].split('.')[0]
+    model_name = model_path.split('/')[-1].split('.')[0]
     config = get_config_from_pretrained_model(model_name)
     print(config)
 
-    # Loading model
-    model = config.model.to(device)
-    model.load_state_dict(torch.load(pretrained_model_path))
-    model.eval()
-    path = "dataset/ue_data_npz/test"
-
-    test_dataset = MultiImagePair(root=path, number_of_frames=3, last_frame_idx=299,
-                         transform=transforms.ToTensor(), crop_size=None, scale=2,
-                         use_hflip=False, use_rotation=False, digits=4, disk_mode=DiskMode.NPZ)
-    test_dataset = STSSImagePair(root=path, scale=2, history=3, last_frame_idx=299, crop_size=None,
-                                use_hflip=False, use_rotation=False, digits=4, disk_mode=DiskMode.NPZ)
-    # test_dataset = STSSCrossValidation2(root="dataset/STSS_val_lewis_png", scale=2, number_of_frames=3, crop_size=None, use_hflip=False, use_rotation=False)
-
-    counter = 0
-    for idx in tqdm(range(len(test_dataset)), "Generating sequence.."):
-        if counter % 2 == 1:
-            # print("skipped\n")
-            counter += 1
-            continue
-        counter += 1
-        filename = test_dataset.get_filename(idx)
-        subfolder = test_dataset.get_path(idx).split("/")[0] # we want to retrieve the sub folder of the val sequences
-        generate_directory(f"{save_path}/{subfolder}")
-        # print(f"Filename: {filename}\n")
-        lr_images, hr_image = test_dataset.__getitem__(idx)
-        with torch.no_grad():
-            lr_images = [img.unsqueeze(0) for img in lr_images]
-            lr_images = [img.to(device) for img in lr_images]
-            lr_images = [utils.pad_to_divisible(img, 2 ** model.down_and_up) for img in lr_images]
-            lr_image = lr_images[0]
-            history_images = torch.stack(lr_images, dim=2)
-            output_image = model(lr_image, history_images)
-            output_image = [torch.clamp(img, min=0.0, max=1.0) for img in output_image]
-        # Safe generated images into a folder
-        for i in range(len(output_image)):
-            frame = F.to_pil_image(output_image[i].squeeze(0))
-            # generate the right filename
-            filename = int(filename) + i
-            # print(f"Save file at {save_path}/{subfolder}/{filename:04d}.png")
-            frame.save(f"{save_path}/{subfolder}/{filename:04d}.png")
-
-
-def test_stss_image_dataset() -> None:
-    pretrained_model_path = "pretrained_models/extraSS.pth"
-    save_path = "results/extraSS"
-
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    print(f"Device: {device}")
-    model_name = pretrained_model_path.split('/')[-1].split('.')[0]
-    config = get_config_from_pretrained_model(model_name)
-    print(config)
+    save_path = f"results/{model_name}"
 
     # Loading model
     model = config.model.to(device)
-    model.load_state_dict(torch.load(pretrained_model_path))
+    model.load_state_dict(torch.load(model_path))
     model.eval()
-    path = "dataset/ue_data/test"
+    extra = config.extra
 
-    test_dataset = STSSImagePair(root=path, scale=2, history=3, last_frame_idx=299, crop_size=None,
-                         use_hflip=False, use_rotation=False, digits=4)
-    # test_dataset = STSSCrossValidation(root="dataset/STSS_val_lewis_png", scale=2, history=2, crop_size=None,
-    #                                 use_hflip=False, use_rotation=False)
+    test_dataset = init_dataset(config.dataset, config.extra, config.history, config.buffers)
 
     counter = 0
     for idx in tqdm(range(len(test_dataset)), "Generating sequence.."):
@@ -107,39 +61,78 @@ def test_stss_image_dataset() -> None:
         generate_directory(f"{save_path}/{subfolder}")
         print(f"Filename: {filename}\n")
         ss, ess = test_dataset.__getitem__(idx)
-        # forward pass for SS
+        # prepare data
+        # SS
         lr_image = ss[0].unsqueeze(0).to(device)  # shared
         lr_image = utils.pad_to_divisible(lr_image, 2 ** model.down_and_up)
         ss_feature_images = [img.unsqueeze(0).to(device) for img in ss[1]]
-        ss_feature_images = [utils.pad_to_divisible(img, 2 ** model.down_and_up) for img in ss_feature_images]
-        ss_feature_images = torch.cat(ss_feature_images, dim=1)
+        if ss_feature_images:
+            ss_feature_images = [utils.pad_to_divisible(img, 2 ** model.down_and_up) for img in ss_feature_images]
+            ss_feature_images = torch.cat(ss_feature_images, dim=1)
         history_images = [img.unsqueeze(0).to(device) for img in ss[2]]
-        history_images = [utils.pad_to_divisible(img, 2 ** model.down_and_up) for img in history_images]
-        history_images = torch.stack(history_images, dim=2)  # shared
+        if history_images:
+            history_images = [utils.pad_to_divisible(img, 2 ** model.down_and_up) for img in history_images]
+            history_images = torch.stack(history_images, dim=2)  # shared
+        # ESS
+        if extra:
+            ess_feature_images = [img.unsqueeze(0).to(device) for img in ess[1]]
+            if ess_feature_images:
+                ess_feature_images = [utils.pad_to_divisible(img, 2 ** model.down_and_up) for img in ess_feature_images]
+                ess_feature_images = torch.cat(ess_feature_images, dim=1)
+        # forward pass for SS
+        # lr_image = ss[0].unsqueeze(0).to(device)  # shared
+        # lr_image = utils.pad_to_divisible(lr_image, 2 ** model.down_and_up)
+        # ss_feature_images = [img.unsqueeze(0).to(device) for img in ss[1]]
+        # ss_feature_images = [utils.pad_to_divisible(img, 2 ** model.down_and_up) for img in ss_feature_images]
+        # ss_feature_images = torch.cat(ss_feature_images, dim=1)
+        # history_images = [img.unsqueeze(0).to(device) for img in ss[2]]
+        # history_images = [utils.pad_to_divisible(img, 2 ** model.down_and_up) for img in history_images]
+        # history_images = torch.stack(history_images, dim=2)  # shared
 
         # forward pass for ESS
-        ess_feature_images = [img.unsqueeze(0).to(device) for img in ess[1]]
-        ess_feature_images = [utils.pad_to_divisible(img, 2 ** model.down_and_up) for img in ess_feature_images]
-        ess_feature_images = torch.cat(ess_feature_images, dim=1)
+        # ess_feature_images = [img.unsqueeze(0).to(device) for img in ess[1]]
+        # ess_feature_images = [utils.pad_to_divisible(img, 2 ** model.down_and_up) for img in ess_feature_images]
+        # ess_feature_images = torch.cat(ess_feature_images, dim=1)
 
         with torch.no_grad():
-            # SS frame
-            ss_output = model(lr_image, ss_feature_images, history_images)
-            ss_output = torch.clamp(ss_output, min=0.0, max=1.0)
-            # ESS frame
-            ess_output = model(lr_image, ess_feature_images, history_images)
-            ess_output = torch.clamp(ess_output, min=0.0, max=1.0)
+            # forward pass
+            # depending on the network we perform two forward passes or only one
+            if model.do_two:
+                # SS
+                ss_output = model(lr_image, ss_feature_images, history_images)
+                ss_output = torch.clamp(ss_output, min=0.0, max=1.0)
+                # ESS
+                if extra:
+                    ess_output = model(lr_image, ess_feature_images, history_images)
+                    ess_output = torch.clamp(ess_output, min=0.0, max=1.0)
+            else:
+                if extra:
+                    if ss_feature_images and ess_feature_images:
+                        feature_images = torch.cat([ss_feature_images, ess_feature_images], 1)
+                    else:
+                        feature_images = []
+                else:
+                    feature_images = ss_feature_images
+                if extra:
+                    ss_output, ess_output = model(lr_image, feature_images, history_images)
+                    ss_output = torch.clamp(ss_output, min=0.0, max=1.0)
+                    ess_output = torch.clamp(ess_output, min=0.0, max=1.0)
+                else:
+                    ss_output = model(lr_image, feature_images, history_images)
+                    ss_output = torch.clamp(ss_output, min=0.0, max=1.0)
         # Safe generated images into a folder
         ss_frame = F.to_pil_image(ss_output.squeeze(0))
         ss_frame.save(f"{save_path}/{subfolder}/{filename}.png")
-        filename = int(filename) + 1
-        ess_frame = F.to_pil_image(ess_output.squeeze(0))
-        ess_frame.save(f"{save_path}/{subfolder}/{filename:04d}.png")
+        if extra:
+            filename = int(filename) + 1
+            ess_frame = F.to_pil_image(ess_output.squeeze(0))
+            ess_frame.save(f"{save_path}/{subfolder}/{filename:04d}.png")
 
 
 def main() -> None:
-    # test()
-    test_stss_image_dataset()
+    args = parse_arguments()
+    file_path = args.file_path
+    test(file_path)
 
 
 if __name__ == '__main__':

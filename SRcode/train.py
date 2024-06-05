@@ -220,14 +220,12 @@ def train(filepath: str) -> None:
                         ess_output = torch.clamp(ess_output, min=0.0, max=1.0)
                 else:
                     if extra:
-                        if ss_feature_images and ess_feature_images:
+                        if torch.is_tensor(ss_feature_images):
                             feature_images = torch.cat([ss_feature_images, ess_feature_images], 1)
                         else:
                             feature_images = []
-                        hr_images = torch.cat([ss_hr_image, ess_hr_image], 1)
                     else:
                         feature_images = ss_feature_images
-                        hr_images = ss_hr_image
                     if extra:
                         ss_output, ess_output = model(lr_image, feature_images, history_images)
                         ss_output = torch.clamp(ss_output, min=0.0, max=1.0)

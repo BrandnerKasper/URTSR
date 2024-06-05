@@ -1,5 +1,9 @@
 import cv2
 import numpy as np
+from matplotlib import pyplot as plt
+import torch
+import torch.nn.functional as F
+import torchvision.transforms.functional as FV
 
 
 def motion_diff() -> None:
@@ -68,9 +72,232 @@ def motion_edge_diff() -> None:
     cv2.imwrite("warped.png", img_warped)
 
 
+def warping() -> None:
+    # Load the images
+    image = cv2.imread('../dataset/ue_data/test/LR/18/0251.png').astype(np.float32) / 255.0
+    current_motion = cv2.imread('../dataset/ue_data/test/LR/18/0251.velocity_log.png', cv2.IMREAD_UNCHANGED)
+    next_motion = cv2.imread('../dataset/ue_data/test/LR/18/0252.velocity_log.png', cv2.IMREAD_UNCHANGED)
+
+    # Normalize motion vectors (assuming they are in the range [0, 255] in the image)
+    current_motion = (current_motion / 255.0 - 0.5) * 2
+    next_motion = (next_motion / 255.0 - 0.5) * 2
+
+    # Display the normalized motion vectors for debugging
+    plt.figure(figsize=(10, 5))
+    plt.subplot(1, 2, 1)
+    plt.title('Normalized Current Motion Vector')
+    plt.imshow(current_motion, cmap='viridis')
+
+    plt.subplot(1, 2, 2)
+    plt.title('Normalized Next Motion Vector')
+    plt.imshow(next_motion, cmap='viridis')
+    plt.show()
+
+    # Get the height and width of the image
+    height, width = image.shape[:2]
+
+    # Create a meshgrid for pixel coordinates
+    x, y = np.meshgrid(np.arange(width), np.arange(height))
+
+    # Compute new pixel locations using current motion vectors
+    new_x = (x + next_motion[:, :, 0] * width).astype(np.float32)
+    new_y = (y + next_motion[:, :, 1] * height).astype(np.float32)
+
+    # Clip the new coordinates to be within the image boundaries
+    new_x = np.clip(new_x, 0, width - 1)
+    new_y = np.clip(new_y, 0, height - 1)
+
+    # Warp the image using remap
+    warped_image = cv2.remap(image, new_x, new_y, interpolation=cv2.INTER_LINEAR, borderMode=cv2.BORDER_CONSTANT)
+
+    # Display the images
+    plt.figure(figsize=(15, 5))
+    plt.subplot(1, 3, 1)
+    plt.title('Original Image')
+    plt.imshow(image)
+
+    plt.subplot(1, 3, 2)
+    plt.title('Current Motion Vector')
+    plt.imshow(current_motion)
+
+    plt.subplot(1, 3, 3)
+    plt.title('Warped Image')
+    plt.imshow(warped_image)
+
+    plt.show()
+
+    # Save the warped image for further inspection
+    cv2.imwrite('warped_image.png', (warped_image* 255).astype(np.uint8))
+
+
+def warping_2() -> None:
+    # Load the images
+    image = cv2.imread('../dataset/ue_data/test/LR/18/0251.png').astype(np.float32) / 255.0
+    current_motion = cv2.imread('../dataset/ue_data/test/LR/18/0251.velocity_log.png', cv2.IMREAD_UNCHANGED).astype(np.float32)
+    next_motion = cv2.imread('../dataset/ue_data/test/LR/18/0252.velocity_log.png', cv2.IMREAD_UNCHANGED).astype(np.float32)
+
+    # Normalize motion vectors (assuming they are in the range [0, 255] in the image)
+    # Normalize to the range [-1, 1] assuming the maximum motion vector displacement is represented by 255
+    current_motion = (current_motion / 255.0 - 0.5) * 2
+    next_motion = (next_motion / 255.0 - 0.5) * 2
+
+    # Resize motion vectors to match the shape [H, W, 2]
+    current_motion = current_motion[..., :2]
+    next_motion = next_motion[..., :2]
+
+    # Convert the image and motion vectors to PyTorch tensors
+    image_tensor = torch.from_numpy(image.transpose(2, 0, 1)).unsqueeze(0)  # Shape: [1, 3, H, W]
+    motion_tensor = torch.from_numpy(current_motion.transpose(2, 0, 1)).unsqueeze(0)  # Shape: [1, 2, H, W]
+
+    # Get the height and width of the image
+    height, width = image.shape[:2]
+
+    # Create a normalized grid for pixel coordinates
+    grid_y, grid_x = torch.meshgrid(torch.linspace(-1, 1, height), torch.linspace(-1, 1, width))
+    grid = torch.stack((grid_x, grid_y), 2).unsqueeze(0)  # Shape: [1, H, W, 2]
+
+    # Move the motion_tensor to the correct device
+    motion_tensor = motion_tensor.to(grid.device)
+
+    # Permute the motion_tensor to match the shape of grid
+    motion_tensor_permuted = motion_tensor.permute(0, 2, 3, 1)  # Shape: [1, H, W, 2]
+
+    # Add the motion vectors to the grid
+    warped_grid = grid + motion_tensor_permuted
+
+    # Warp the image using grid_sample
+    warped_image = F.grid_sample(image_tensor, warped_grid, mode='bilinear', padding_mode='border', align_corners=False)
+
+    # Convert the warped image tensor back to a numpy array
+    warped_image_np = warped_image.squeeze().permute(1, 2, 0).numpy()
+
+    # Display the images
+    plt.figure(figsize=(15, 5))
+    plt.subplot(1, 3, 1)
+    plt.title('Original Image')
+    plt.imshow(image)
+
+    plt.subplot(1, 3, 2)
+    plt.title('Current Motion Vector')
+    plt.imshow(current_motion[..., 0], cmap='coolwarm')  # Display one channel of the motion vector
+
+    plt.subplot(1, 3, 3)
+    plt.title('Warped Image')
+    plt.imshow(warped_image_np)
+
+    plt.show()
+
+    # Save the warped image for further inspection
+    warped_image_255 = (warped_image_np * 255).astype(np.uint8)
+    cv2.imwrite('warped_image_pytorch.png', warped_image_255)
+
+
+def warp(x_np, flo_np):
+    x = torch.tensor(x_np).unsqueeze(0).cuda()
+    flo = torch.tensor(flo_np).unsqueeze(0).cuda()
+
+    B, C, H, W = x.size()
+    # mesh grid
+    xx = torch.arange(0, W).view(1, -1).repeat(H, 1)
+    yy = torch.arange(0, H).view(-1, 1).repeat(1, W)
+    xx = xx.view(1, 1, H, W).repeat(B, 1, 1, 1)
+    yy = yy.view(1, 1, H, W).repeat(B, 1, 1, 1)
+    grid = torch.cat((xx, yy), 1).float()
+
+    if x.is_cuda:
+        grid = grid.cuda()
+    vgrid = grid + flo
+
+    # scale grid to [-1,1]
+    vgrid[:, 0, :, :] = 2.0 * vgrid[:, 0, :, :].clone() / max(W - 1, 1) - 1.0
+    vgrid[:, 1, :, :] = 2.0 * vgrid[:, 1, :, :].clone() / max(H - 1, 1) - 1.0
+
+    vgrid = vgrid.permute(0, 2, 3, 1)
+    flo = flo.permute(0, 2, 3, 1)
+    output = F.grid_sample(x, vgrid)
+    mask = torch.ones(x.size(), device=x.device)
+    mask = F.grid_sample(mask, vgrid)
+
+    mask[mask < 0.9999] = 0
+    mask[mask > 0] = 1
+
+    return output * mask
+
+
+def load_npz(path: str) -> torch.Tensor:
+    img = np.load(f"{path}.npz")
+    return torch.from_numpy(next(iter(img.values())))
+
+
+def warping_3(image_path, current_motion_path, next_motion_path):
+    # Load the images
+    image = load_npz(image_path).numpy()
+    current_motion = load_npz(current_motion_path).numpy()
+    next_motion = load_npz(next_motion_path)
+
+    # Normalize motion vectors (assuming they are in the range [0, 255] in the image)
+    current_motion2 = current_motion - 0.7373
+    current_motion3 = current_motion2 * 2
+    next_motion = (next_motion / 255.0 - 0.5) * 2
+
+    # Get the height and width of the image
+    height, width = image.shape[:2]
+
+    # Create a meshgrid for pixel coordinates
+    x, y = np.meshgrid(np.arange(width), np.arange(height))
+
+    # Compute new pixel locations using current motion vectors
+    new_x = (x + current_motion3[:, :, 0] * width).astype(np.float32)
+    new_y = (y + current_motion3[:, :, 1] * height).astype(np.float32)
+
+    # Clip the new coordinates to be within the image boundaries
+    new_x = np.clip(new_x, 0, width - 1)
+    new_y = np.clip(new_y, 0, height - 1)
+
+    # Warp the image using remap
+    warped_image = cv2.remap(image, new_x, new_y, interpolation=cv2.INTER_LINEAR, borderMode=cv2.BORDER_CONSTANT)
+
+    # Display the images
+    plt.figure(figsize=(15, 5))
+    plt.subplot(1, 3, 1)
+    plt.title('Original Image')
+    image = FV.to_pil_image(image)
+    plt.imshow(image)
+
+    plt.subplot(1, 3, 2)
+    plt.title('Current Motion Vector')
+    plt.imshow(current_motion)
+
+    plt.subplot(1, 3, 3)
+    plt.title('Warped Image')
+    plt.imshow(warped_image)
+
+    plt.show()
+
+
 def main() -> None:
-    motion_diff()
+    # motion_diff()
     # motion_edge_diff()
+    # warping()
+    # warping_2()
+
+    # # Load the images
+    # image = cv2.imread('../dataset/ue_data/test/LR/18/0251.png').astype(np.float32) / 255.0
+    # current_motion = cv2.imread('../dataset/ue_data/test/LR/18/0251.velocity_log.png', cv2.IMREAD_UNCHANGED).astype(
+    #     np.float32)
+    # next_motion = cv2.imread('../dataset/ue_data/test/LR/18/0252.velocity_log.png', cv2.IMREAD_UNCHANGED).astype(
+    #     np.float32)
+    #
+    #
+    # warped = warp(image, current_motion)
+    # print(warped)
+
+    # Paths to the images (assuming the images are stored in /mnt/data/)
+    image_path = '../dataset/ue_data_npz/test/LR/19/0006'
+    current_motion_path = '../dataset/ue_data_npz/test/LR/19/0006.velocity_log'
+    next_motion_path = '../dataset/ue_data_npz/test/LR/19/0006.velocity_log'
+
+    warping_3(image_path, current_motion_path, next_motion_path)
 
 
 if __name__ == "__main__":

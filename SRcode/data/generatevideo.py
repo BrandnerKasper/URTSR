@@ -34,7 +34,6 @@ def generate_video(path: str, name: str, save_path: str) -> None:
 
     # Define video codec and create VideoWriter object
     fourcc = cv2.VideoWriter.fourcc(*'mp4v')  # Adjust codec as needed
-    generate_directory(save_path)
     video = cv2.VideoWriter(os.path.join(save_path, f"{name}.mp4"), fourcc, 60, (width, height))
 
     for img in tqdm(images, desc=f"Generating video.."):
@@ -63,11 +62,12 @@ def generate_sub_video(path: str, name: str, save_path: str, sub_type: str) -> N
 
 
 def generate_network_videos() -> None:
-    path = "../results/test"
-    names = ["01", "02", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12"]
+    path = "../results/extraSS_All"
+    names = ["17", "18", "19", "20"]
+    generate_directory("../videos/extraSS_All")
     for name in names:
         print(f"Videos for {name}..")
-        generate_video(path, name, f"../videos/{name}")
+        generate_video(path, name, f"../videos/extraSS_All")
 
 
 def generate_train_videos() -> None:
@@ -107,7 +107,8 @@ def generate_directory(path):
 
 
 def main() -> None:
-    generate_train_videos()
+    # generate_train_videos()
+    generate_network_videos()
 
 
 if __name__ == "__main__":
