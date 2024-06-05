@@ -4,11 +4,20 @@ import torch
 from tqdm import tqdm
 import torchvision.transforms.functional as F
 from torch.utils.data import DataLoader
+import argparse
 
 from data.dataloader import SingleImagePair, MultiImagePair, STSSImagePair, DiskMode, STSSCrossValidation, \
     STSSCrossValidation2
 from config import load_yaml_into_config, Config
 from utils import utils
+
+
+def parse_arguments() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="Evaluate a trained SR network based on a pretrained model file.")
+    parser.add_argument('file_path', type=str, nargs='?', default='pretrained_models/extraSS_All.pth',
+                        help="Path to the pretrained model .pth file")
+    args = parser.parse_args()
+    return args
 
 
 def get_config_from_pretrained_model(name: str) -> Config:
