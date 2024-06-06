@@ -108,7 +108,12 @@ Abstract data loader so that:
 
 *logaritmic scale for depth not bad, because objects don't disappear in the fog, but might lose detail, again tradeoff here*
 
-- [ ] honestly for motion vectors we can try logarithmic scale as well
+- [x] honestly for motion vectors we can try logarithmic scale as well -> looks good to be honest :9
+- [ ] warp lr frames based on motion vector data, the idea: we move the pixel in image space (x,y) based on the values of the R (x) and G (y) channel values 
+-> (this data needs to be normalized again into values of -1 to 1, atm we have RGB so in range of 0 to 1)
+- [ ] take warped lr images into the network instead of just lr images
+- [ ] also warp the history frames!
+- [ ] based on the buffers generate a mask and add this mask to the gated convolution!!
 
 ## General
 
@@ -119,6 +124,11 @@ Abstract data loader so that:
 - [ ] safe the time it took to train the model in hours:min inside the result file
 - [x] play around with tensor board to visualize training process (loss, SSIM, PSNR, images?)
 - [x] abstract get item fct for loaders to either take ".png", ".pth" or ".npz"
+
+AFTER the extrapolated frames are nearer to the values of the SS frame:
+- [ ] boost the values of both with [**RepRB**](https://arxiv.org/pdf/2404.16484) Convolution
+- [ ] add a [**texture consistency loss**](https://openaccess.thecvf.com/content/CVPR2023/papers/Zhou_Exploring_Motion_Ambiguity_and_Alignment_for_High-Quality_Video_Frame_Interpolation_CVPR_2023_paper.pdf) in addition to the L1 loss
+- [ ] try the auto encoder [stuff](https://arxiv.org/pdf/2111.06377)
 
 ### Config
 

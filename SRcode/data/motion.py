@@ -235,6 +235,17 @@ def warping_3(image_path, current_motion_path, next_motion_path):
     current_motion = load_npz(current_motion_path).numpy()
     next_motion = load_npz(next_motion_path)
 
+    # Display the normalized motion vectors for debugging
+    plt.figure(figsize=(10, 5))
+    plt.subplot(1, 2, 1)
+    plt.title('Normalized Current Motion Vector')
+    plt.imshow(current_motion, cmap='viridis')
+
+    plt.subplot(1, 2, 2)
+    plt.title('Normalized Next Motion Vector')
+    plt.imshow(next_motion, cmap='viridis')
+    plt.show()
+
     # Normalize motion vectors (assuming they are in the range [0, 255] in the image)
     current_motion2 = current_motion - 0.7373
     current_motion3 = current_motion2 * 2
@@ -275,29 +286,117 @@ def warping_3(image_path, current_motion_path, next_motion_path):
     plt.show()
 
 
+def normalize_channel(channel):
+    channel_min = channel.min()
+    channel_max = channel.max()
+    normalized_channel = (channel - channel_min) / (channel_max - channel_min)
+    return normalized_channel
+
+
 def main() -> None:
-    # motion_diff()
-    # motion_edge_diff()
-    # warping()
-    # warping_2()
+    image_path = 'test/0037.png'
+    current_mv_path = "test/0037.velocity.png"
+    # current_mv_log_path = "test/0037.velocity_log.png"
+    next_mv_path = "test/0038.velocity.png"
+    next_mv_log_path = "test/0038.velocity_log.png"
 
-    # # Load the images
-    # image = cv2.imread('../dataset/ue_data/test/LR/18/0251.png').astype(np.float32) / 255.0
-    # current_motion = cv2.imread('../dataset/ue_data/test/LR/18/0251.velocity_log.png', cv2.IMREAD_UNCHANGED).astype(
-    #     np.float32)
-    # next_motion = cv2.imread('../dataset/ue_data/test/LR/18/0252.velocity_log.png', cv2.IMREAD_UNCHANGED).astype(
-    #     np.float32)
-    #
-    #
-    # warped = warp(image, current_motion)
-    # print(warped)
+    image = cv2.imread(image_path)
+    current_mv = cv2.imread(current_mv_path)
+    # current_mv_log = cv2.imread(current_mv_log_path)
 
-    # Paths to the images (assuming the images are stored in /mnt/data/)
-    image_path = '../dataset/ue_data_npz/test/LR/19/0006'
-    current_motion_path = '../dataset/ue_data_npz/test/LR/19/0006.velocity_log'
-    next_motion_path = '../dataset/ue_data_npz/test/LR/19/0006.velocity_log'
+    # Convert images from BGR to RGB (OpenCV loads images in BGR format)
+    image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+    current_mv_rgb = cv2.cvtColor(current_mv, cv2.COLOR_BGR2RGB)
+    # current_mv_log_rgb = cv2.cvtColor(current_mv_log, cv2.COLOR_BGR2RGB)
 
-    warping_3(image_path, current_motion_path, next_motion_path)
+    # Normalize pixel values to be between 0 and 1
+    image_rgb = image_rgb / 255.0
+    current_mv_rgb = current_mv_rgb / 255.0
+    # current_mv_log_rgb = current_mv_log_rgb / 255.0
+    # current_mv_log_rgb = (current_mv_log_rgb - 0.5) * 2
+
+    # Separate RGB channels for image_rgb
+    image_r = image_rgb[:, :, 0]
+    image_g = image_rgb[:, :, 1]
+    image_b = image_rgb[:, :, 2]
+
+    current_mv_r = current_mv_rgb[:, :, 0]
+    current_mv_g = current_mv_rgb[:, :, 1]
+    current_mv_b = current_mv_rgb[:, :, 2]
+
+    # current_mv_log_r = current_mv_log_rgb[:, :, 0]
+    # current_mv_log_g = current_mv_log_rgb[:, :, 0]
+    # current_mv_log_b = current_mv_log_rgb[:, :, 0]
+
+    # normalize the values
+    current_mv_r = normalize_channel(current_mv_r)
+    current_mv_g = normalize_channel(current_mv_g)
+    current_mv_b = np.full((1080, 1920), 0.5)
+
+    normalized_image = np.stack([current_mv_r, current_mv_g, current_mv_b], axis=-1)
+    cv2.imwrite("test/0037.norm_mv.png", (normalized_image*255).astype(np.uint8))
+
+
+
+    # Plot the images in one plot
+    plt.figure(figsize=(15, 15))
+
+    # Original image RGB channels
+    plt.subplot(5, 3, 1)
+    plt.imshow(image_r, cmap='Reds')
+    plt.title('Image - Red Channel')
+    plt.axis('off')
+
+    plt.subplot(5, 3, 2)
+    plt.imshow(image_g, cmap='Greens')
+    plt.title('Image - Green Channel')
+    plt.axis('off')
+
+    plt.subplot(5, 3, 3)
+    plt.imshow(image_b, cmap='Blues')
+    plt.title('Image - Blue Channel')
+    plt.axis('off')
+
+    # Current MV RGB channels
+    plt.subplot(5, 3, 4)
+    plt.imshow(current_mv_r, cmap='Reds')
+    plt.title('Current MV - Red Channel')
+    plt.axis('off')
+
+    plt.subplot(5, 3, 5)
+    plt.imshow(current_mv_g, cmap='Greens')
+    plt.title('Current MV - Green Channel')
+    plt.axis('off')
+
+    plt.subplot(5, 3, 6)
+    plt.imshow(current_mv_b, cmap='Blues')
+    plt.title('Current MV - Blue Channel')
+    plt.axis('off')
+
+    # mv normalized
+    plt.subplot(5, 3, 7)
+    plt.imshow(normalized_image)
+    plt.title("Current MV normalized")
+
+    # Plotting the original image for reference
+    plt.subplot(5, 3, 10)
+    plt.imshow(image_rgb)
+    plt.title('Original Image')
+    plt.axis('off')
+
+    plt.figure(figsize=(15, 10))
+
+    # Display the normalized_image
+    plt.imshow(normalized_image)
+    plt.title('Normalized Image')
+    plt.axis('off')
+
+    plt.show()
+
+    plt.tight_layout()
+    plt.show()
+
+
 
 
 if __name__ == "__main__":
