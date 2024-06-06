@@ -192,7 +192,7 @@ def warping_2() -> None:
     cv2.imwrite('warped_image_pytorch.png', warped_image_255)
 
 
-def warp(x_np, flo_np):
+def warp2(x_np, flo_np):
     x = torch.tensor(x_np).unsqueeze(0).cuda()
     flo = torch.tensor(flo_np).unsqueeze(0).cuda()
 
@@ -222,6 +222,41 @@ def warp(x_np, flo_np):
     mask[mask > 0] = 1
 
     return output * mask
+
+
+def warp(x, flow, mode='bilinear', padding_mode='border'):
+    """ Backward warp `x` according to `flow`
+
+        Both x and flow are pytorch tensor in shape `nchw` and `n2hw`
+
+        Reference:
+            https://github.com/sniklaus/pytorch-spynet/blob/master/run.py#L41
+    """
+
+    n, c, h, w = x.size()
+
+    # create mesh grid
+    iu = torch.linspace(-1.0, 1.0, w).view(1, 1, 1, w).expand(n, -1, h, -1)
+    iv = torch.linspace(-1.0, 1.0, h).view(1, 1, h, 1).expand(n, -1, -1, w)
+    grid = torch.cat([iu, iv], 1).to(flow.device)
+
+    # normalize flow to [-1, 1]
+    flow = torch.cat([
+        flow[:, 0:1, ...] / ((w - 1.0) / 2.0),
+        flow[:, 1:2, ...] / ((h - 1.0) / 2.0)], dim=1)
+
+    # add flow to grid and reshape to nhw2
+    grid = (grid - flow).permute(0, 2, 3, 1)
+
+    # bilinear sampling
+    # Note: `align_corners` is set to `True` by default for PyTorch version < 1.4.0
+    if int(''.join(torch.__version__.split('.')[:2])) >= 14:
+        output = F.grid_sample(
+            x, grid, mode=mode, padding_mode=padding_mode, align_corners=True)
+    else:
+        output = F.grid_sample(x, grid, mode=mode, padding_mode=padding_mode)
+
+    return output
 
 
 def load_npz(path: str) -> torch.Tensor:
@@ -334,69 +369,81 @@ def main() -> None:
     current_mv_b = np.full((1080, 1920), 0.5)
 
     normalized_image = np.stack([current_mv_r, current_mv_g, current_mv_b], axis=-1)
+    normalized_image_dual = np.stack([current_mv_r, current_mv_g], axis=-1)
+    normalized_image_dual = (normalized_image_dual - 0.5) * 2
+    normalized_image = (normalized_image * 255).astype(np.uint8)
+    normalized_image = cv2.cvtColor(normalized_image, cv2.COLOR_RGB2BGR)
     cv2.imwrite("test/0037.norm_mv.png", (normalized_image*255).astype(np.uint8))
+
+    img = torch.tensor(image_rgb).unsqueeze(0).cuda()
+    mv = torch.tensor(normalized_image_dual).unsqueeze(0).cuda()
+
+    img = img.permute(0, 3, 1, 2)
+    mv = mv.permute(0, 3, 1, 2)
+
+    warped = warp(img, mv)
+    warped_c = warped.squeeze(0).cpu().numpy()
 
 
 
     # Plot the images in one plot
-    plt.figure(figsize=(15, 15))
-
-    # Original image RGB channels
-    plt.subplot(5, 3, 1)
-    plt.imshow(image_r, cmap='Reds')
-    plt.title('Image - Red Channel')
-    plt.axis('off')
-
-    plt.subplot(5, 3, 2)
-    plt.imshow(image_g, cmap='Greens')
-    plt.title('Image - Green Channel')
-    plt.axis('off')
-
-    plt.subplot(5, 3, 3)
-    plt.imshow(image_b, cmap='Blues')
-    plt.title('Image - Blue Channel')
-    plt.axis('off')
-
-    # Current MV RGB channels
-    plt.subplot(5, 3, 4)
-    plt.imshow(current_mv_r, cmap='Reds')
-    plt.title('Current MV - Red Channel')
-    plt.axis('off')
-
-    plt.subplot(5, 3, 5)
-    plt.imshow(current_mv_g, cmap='Greens')
-    plt.title('Current MV - Green Channel')
-    plt.axis('off')
-
-    plt.subplot(5, 3, 6)
-    plt.imshow(current_mv_b, cmap='Blues')
-    plt.title('Current MV - Blue Channel')
-    plt.axis('off')
-
-    # mv normalized
-    plt.subplot(5, 3, 7)
-    plt.imshow(normalized_image)
-    plt.title("Current MV normalized")
-
-    # Plotting the original image for reference
-    plt.subplot(5, 3, 10)
-    plt.imshow(image_rgb)
-    plt.title('Original Image')
-    plt.axis('off')
+    # plt.figure(figsize=(15, 15))
+    #
+    # # Original image RGB channels
+    # plt.subplot(5, 3, 1)
+    # plt.imshow(image_r, cmap='Reds')
+    # plt.title('Image - Red Channel')
+    # plt.axis('off')
+    #
+    # plt.subplot(5, 3, 2)
+    # plt.imshow(image_g, cmap='Greens')
+    # plt.title('Image - Green Channel')
+    # plt.axis('off')
+    #
+    # plt.subplot(5, 3, 3)
+    # plt.imshow(image_b, cmap='Blues')
+    # plt.title('Image - Blue Channel')
+    # plt.axis('off')
+    #
+    # # Current MV RGB channels
+    # plt.subplot(5, 3, 4)
+    # plt.imshow(current_mv_r, cmap='Reds')
+    # plt.title('Current MV - Red Channel')
+    # plt.axis('off')
+    #
+    # plt.subplot(5, 3, 5)
+    # plt.imshow(current_mv_g, cmap='Greens')
+    # plt.title('Current MV - Green Channel')
+    # plt.axis('off')
+    #
+    # plt.subplot(5, 3, 6)
+    # plt.imshow(current_mv_b, cmap='Blues')
+    # plt.title('Current MV - Blue Channel')
+    # plt.axis('off')
+    #
+    # # mv normalized
+    # plt.subplot(5, 3, 7)
+    # plt.imshow(normalized_image)
+    # plt.title("Current MV normalized")
+    #
+    # # Plotting the original image for reference
+    # plt.subplot(5, 3, 10)
+    # plt.imshow(image_rgb)
+    # plt.title('Original Image')
+    # plt.axis('off')
 
     plt.figure(figsize=(15, 10))
 
     # Display the normalized_image
-    plt.imshow(normalized_image)
-    plt.title('Normalized Image')
+    warped_c = np.transpose(warped_c, (1, 2, 0))
+    warped_c = (warped_c * 255).astype(np.uint8)
+    warped_c = cv2.cvtColor(warped_c, cv2.COLOR_RGB2BGR)
+    cv2.imwrite("test/0037.warped.png", warped_c)
+    plt.imshow(warped_c)
+    plt.title('Warped Image')
     plt.axis('off')
 
     plt.show()
-
-    plt.tight_layout()
-    plt.show()
-
-
 
 
 if __name__ == "__main__":
