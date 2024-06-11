@@ -110,7 +110,7 @@ Abstract data loader so that:
 
 - [x] honestly for motion vectors we can try logarithmic scale as well -> looks good to be honest :9
 - [ ] warp lr frames based on motion vector data, the idea: we move the pixel in image space (x,y) based on the values of the R (x) and G (y) channel values 
--> (this data needs to be normalized again into values of -1 to 1, atm we have RGB so in range of 0 to 1)
+-> (this data needs to be moved again into values of -1 to 1, unreal atm produces values btw. 0 and 1 for us, atm we have RGB so in range of 0 to 1)
 - [ ] take warped lr images into the network instead of just lr images
 - [ ] also warp the history frames!
 - [ ] based on the buffers generate a mask and add this mask to the gated convolution!!
@@ -185,6 +185,10 @@ We want to create our own dataset in Unreal Engine 5.3:
 - [ ] FSR
 - [ ] XeSS
 - [ ] (TSR)
+
+Save them as:
+- [x] png -> problem tone mapper non linear maps motion vector data into pngs
+- [ ] use exr (must for mvs!)
 
 Generate a dataset from the matrix scene:
 - [x] one for training
