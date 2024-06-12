@@ -4,7 +4,7 @@ from matplotlib import pyplot as plt
 import torch
 import torch.nn.functional as F
 import torchvision.transforms.functional as FV
-import OpenEXR
+
 
 def motion_diff() -> None:
     # Load the two images
@@ -80,7 +80,6 @@ def warp(x, flow, mode='bilinear', padding_mode='border'):
         Reference:
             https://github.com/sniklaus/pytorch-spynet/blob/master/run.py#L41
     """
-
     n, c, h, w = x.size()
 
     # create mesh grid
@@ -88,71 +87,34 @@ def warp(x, flow, mode='bilinear', padding_mode='border'):
     iv = torch.linspace(-1.0, 1.0, h).view(1, 1, h, 1).expand(n, -1, -1, w)
     grid = torch.cat([iu, iv], 1).to(flow.device)
 
-    print(flow)
-    # normalize flow to [-1, 1]
-    # flow = torch.cat([
-    #     flow[:, 0:1, ...] / ((w - 1.0) / 2.0),
-    #     flow[:, 1:2, ...] / ((h - 1.0) / 2.0)], dim=1)
-
     x = x.float()
     grid = grid.float()
     flow = flow.float()
 
+    # Ensure the grid is within the range [-1, 1]
+    grid[:, :, 0] = torch.clamp(grid[:, :, 0], -1, 1)
+    grid[:, :, 1] = torch.clamp(grid[:, :, 1], -1, 1)
+
     # add flow to grid and reshape to nhw2
-    grid = (grid - flow).permute(0, 2, 3, 1)
+    grid = (grid - flow).permute(0, 2, 3, 1) # we use - for forward warping
 
-    # bilinear sampling
-    # Note: `align_corners` is set to `True` by default for PyTorch version < 1.4.0
-    if int(''.join(torch.__version__.split('.')[:2])) >= 14:
-        output = F.grid_sample(
-            x, grid, mode=mode, padding_mode=padding_mode, align_corners=True)
-    else:
-        output = F.grid_sample(x, grid, mode=mode, padding_mode=padding_mode)
+    output = F.grid_sample(x, grid, mode=mode, padding_mode=padding_mode)
 
+    output = torch.clamp(output, min=0, max=1)
     return output
-
-
-def backward_warp_motion(pre: torch.Tensor, motion: torch.Tensor, cur: torch.Tensor) -> torch.Tensor:
-    # see: https://discuss.pytorch.org/t/image-warping-for-backward-flow-using-forward-flow-matrix-optical-flow/99298
-    # input image is: [batch, channel, height, width]
-    # st = time.time()
-    index_batch, number_channels, height, width = pre.size()
-    grid_x = torch.arange(width).view(1, -1).repeat(height, 1)
-    grid_y = torch.arange(height).view(-1, 1).repeat(1, width)
-    grid_x = grid_x.view(1, 1, height, width).repeat(index_batch, 1, 1, 1)
-    grid_y = grid_y.view(1, 1, height, width).repeat(index_batch, 1, 1, 1)
-    #
-    grid = torch.cat((grid_x, grid_y), 1).float().cuda()
-    # grid is: [batch, channel (2), height, width]
-    vgrid = grid - motion
-    # Grid values must be normalised positions in [-1, 1]
-    vgrid_x = vgrid[:, 0, :, :]
-    vgrid_y = vgrid[:, 1, :, :]
-    vgrid[:, 0, :, :] = (vgrid_x / width) * 2.0 - 1.0
-    vgrid[:, 1, :, :] = (vgrid_y / height) * 2.0 - 1.0
-    # swapping grid dimensions in order to match the input of grid_sample.
-    # that is: [batch, output_height, output_width, grid_pos (2)]
-    vgrid = vgrid.permute((0, 2, 3, 1))
-    warped = F.grid_sample(pre, vgrid, align_corners=True)
-
-    # return warped
-    oox, ooy = torch.split((vgrid < -1) | (vgrid > 1), 1, dim=3)
-    oo = (oox | ooy).permute(0, 3, 1, 2)
-    # ed = time.time()
-    # print('warp {}'.format(ed-st))
-    return torch.where(oo, cur, warped)
 
 
 def warp_img(image: np.ndarray, mv: np.ndarray) -> np.ndarray:
     # move pixel values to be between -1 and 1
-    mv = (mv - 0.5) * 2
+    mv = (mv - 0.5) * 1
     print(mv.shape)
     mv_r = mv[:, :, 0]
     mv_g = mv[:, :, 1]
-    mv_r = mv_r * -1
-    # mv_g = mv_g * -1
+    # mv_r = mv_r * -1
+    mv_g = mv_g * -1
 
     mv = np.stack([mv_r, mv_g], axis=-1)
+    # mv = mv * -1
 
     image = torch.tensor(image).unsqueeze(0).cuda()
     mv = torch.tensor(mv).unsqueeze(0).cuda()
@@ -161,6 +123,119 @@ def warp_img(image: np.ndarray, mv: np.ndarray) -> np.ndarray:
     mv = mv.permute(0, 3, 1, 2)
 
     return np.transpose(warp(image, mv).squeeze(0).cpu().numpy(), (1, 2, 0))
+
+
+def custom_warp(image: torch.Tensor, mv: torch.Tensor):
+    image = image.float()
+    mv = mv.float()
+    b, c, h, w = image.size()
+
+    # Create a grid of coordinates normalized to [-1, 1]
+    grid_y, grid_x = torch.meshgrid(torch.linspace(-1, 1, h), torch.linspace(-1, 1, w))
+    grid = torch.stack((grid_x, grid_y), 2).cuda()  # Shape: (H, W, 2)
+
+    # Squeeze out the first dimension
+    mv_squeezed = mv.squeeze(0)  # Shape: [2, 1080, 1920]
+    # Transpose the axes to get the desired shape [1080, 1920, 2]
+    mv_transposed = mv_squeezed.permute(1, 2, 0)
+    # Apply motion vectors to the grid
+    grid += mv_transposed
+
+    # Ensure the grid is within the range [-1, 1]
+    grid[:, :, 0] = torch.clamp(grid[:, :, 0], -1, 1)
+    grid[:, :, 1] = torch.clamp(grid[:, :, 1], -1, 1)
+
+
+    # # Transpose the axes to get the desired shape [1080, 1920, 2]
+    # mv_transposed = mv_squeezed.permute(1, 2, 0)
+    # vgrid = grid + mv_transposed
+
+    # # Ensure the grid is within the range [-1, 1]
+    # vgrid[:, :, 0] = torch.clamp(vgrid[:, :, 0], -1, 1)
+    # vgrid[:, :, 1] = torch.clamp(vgrid[:, :, 1], -1, 1)
+
+    # display_image(vgrid.squeeze(0).cpu().numpy(), "VGRID")
+
+    # vgrid[:, 0, :, :] = 2.0 * vgrid[:, 0, :, :].clone() / max(w - 1, 1) - 1.0
+    #
+    # vgrid[:, 1, :, :] = 2.0 * vgrid[:, 1, :, :].clone() / max(h - 1, 1) - 1.0
+
+    vgrid = grid.unsqueeze(0)
+
+    return F.grid_sample(image, vgrid, 'nearest', align_corners=True)
+
+
+def mv_zoom_windmill() -> None:
+    image_path = 'Style_EXR/0082.FinalImage.png'
+    current_mv_path = "Style_EXR/0082.FinalImagevelocity.exr"
+    next_mv_path = "Style_EXR/0083.FinalImagevelocity.exr"
+
+    image = cv2.imread(image_path)
+    image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+    image = image / 255.0
+
+    mv = cv2.imread(next_mv_path, cv2.IMREAD_ANYCOLOR | cv2.IMREAD_ANYDEPTH)
+    mv = cv2.cvtColor(mv, cv2.COLOR_BGR2RGB)
+
+    # Display r and g channels
+    mv_r = mv[:, :, 0]  # Red channel
+    mv_g = mv[:, :, 1]  # Blue channel
+
+    # Display the R channel
+    plt.figure(figsize=(12, 6))
+    plt.subplot(1, 2, 1)
+    plt.imshow(mv_r, cmap='Reds')
+    plt.title('Red Channel')
+    plt.colorbar()
+
+    # Display the G channel
+    plt.subplot(1, 2, 2)
+    plt.imshow(mv_g, cmap='Greens')
+    plt.title('Green Channel')
+    plt.colorbar()
+
+    plt.show()
+
+    warped = warp_img(image, mv)
+    display_image(warped, "Warped")
+    save_image(warped, "warped.png")
+
+
+def move_all_directions() -> None:
+    image_path = 'MV/0060.FinalImage.png'
+    current_mv_path = "MV/0060.FinalImageM_Velocity.exr"
+    next_mv_path = "MV/0061.FinalImageM_Velocity.exr"
+    prev_mv_path = "MV/0059.FinalImageM_Velocity.exr"
+
+    image = cv2.imread(image_path)
+    image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+    image = image / 255.0
+
+    mv = cv2.imread(current_mv_path, cv2.IMREAD_ANYCOLOR | cv2.IMREAD_ANYDEPTH)
+    mv = cv2.cvtColor(mv, cv2.COLOR_BGR2RGB)
+
+    # Display r and g channels
+    mv_r = mv[:, :, 0]  # Red channel
+    mv_g = mv[:, :, 1]  # Blue channel
+
+    # Display the R channel
+    plt.figure(figsize=(12, 6))
+    plt.subplot(1, 2, 1)
+    plt.imshow(mv_r, cmap='Reds')
+    plt.title('Red Channel')
+    plt.colorbar()
+
+    # Display the G channel
+    plt.subplot(1, 2, 2)
+    plt.imshow(mv_g, cmap='Greens')
+    plt.title('Green Channel')
+    plt.colorbar()
+
+    plt.show()
+
+    warped = warp_img(image, mv)
+    display_image(warped, "Warped")
+    save_image(warped, "warped.png")
 
 
 def display_image(image: np.ndarray, name: str) -> None:
@@ -189,8 +264,8 @@ def mv_mask(ocmv, mv, gate = 0.1):
 
 def generate_mask() -> None:
     # Load the motion vector images (assuming they are in a compatible format)
-    current_mv_path = 'Test2/FinalImageM_Velocity.0011.exr'
-    previous_mv_path = 'Test2/FinalImageM_Velocity.0010.exr'
+    current_mv_path = "Style_EXR/0083.FinalImagevelocity.exr"
+    previous_mv_path = "Style_EXR/0082.FinalImagevelocity.exr"
 
     current_mv = cv2.imread(current_mv_path, cv2.IMREAD_UNCHANGED)
     previous_mv = cv2.imread(previous_mv_path, cv2.IMREAD_UNCHANGED)
@@ -210,7 +285,7 @@ def generate_mask() -> None:
     motion_diff_normalized = (motion_diff - np.min(motion_diff)) / (np.max(motion_diff) - np.min(motion_diff))
 
     # Set a threshold to create the motion mask
-    threshold = 0.02  # You may need to adjust this value
+    threshold = 0.1  # You may need to adjust this value
     motion_mask = (motion_diff_normalized > threshold).astype(np.uint8)
 
     # Display the motion mask
@@ -221,7 +296,8 @@ def generate_mask() -> None:
 
 
 def main() -> None:
-
+    # move_all_directions()
+    # mv_zoom_windmill()
     generate_mask()
 
     # image_path = 'Test2/FinalImage.0010.png'
