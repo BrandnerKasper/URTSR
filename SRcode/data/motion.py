@@ -4,6 +4,7 @@ from matplotlib import pyplot as plt
 import torch
 import torch.nn.functional as F
 import torchvision.transforms.functional as FV
+from dataloader import DiskMode, load_image_from_disk
 
 
 def motion_diff() -> None:
@@ -108,8 +109,8 @@ def warp_img(image: np.ndarray, mv: np.ndarray) -> np.ndarray:
     # move pixel values to be between -1 and 1
     mv = (mv - 0.5) * 1
     print(mv.shape)
-    mv_r = mv[:, :, 0]
-    mv_g = mv[:, :, 1]
+    mv_r = mv[0, :, :]
+    mv_g = mv[1, :, :]
     # mv_r = mv_r * -1
     mv_g = mv_g * -1
 
@@ -119,7 +120,7 @@ def warp_img(image: np.ndarray, mv: np.ndarray) -> np.ndarray:
     image = torch.tensor(image).unsqueeze(0).cuda()
     mv = torch.tensor(mv).unsqueeze(0).cuda()
 
-    image = image.permute(0, 3, 1, 2)
+    # image = image.permute(0, 3, 1, 2)
     mv = mv.permute(0, 3, 1, 2)
 
     return np.transpose(warp(image, mv).squeeze(0).cpu().numpy(), (1, 2, 0))
@@ -166,20 +167,16 @@ def custom_warp(image: torch.Tensor, mv: torch.Tensor):
 
 
 def mv_zoom_windmill() -> None:
-    image_path = 'Style_EXR/0082.FinalImage.png'
-    current_mv_path = "Style_EXR/0082.FinalImagevelocity.exr"
-    next_mv_path = "Style_EXR/0083.FinalImagevelocity.exr"
+    image_path = '../dataset/ue_data_npz/test/LR/17/0082'
+    next_mv_path = '../dataset/ue_data_npz/test/LR/17/0083.velocity'
 
-    image = cv2.imread(image_path)
-    image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-    image = image / 255.0
+    image = load_image_from_disk(DiskMode.NPZ, image_path)
 
-    mv = cv2.imread(next_mv_path, cv2.IMREAD_ANYCOLOR | cv2.IMREAD_ANYDEPTH)
-    mv = cv2.cvtColor(mv, cv2.COLOR_BGR2RGB)
+    mv = load_image_from_disk(DiskMode.NPZ, next_mv_path)
 
     # Display r and g channels
-    mv_r = mv[:, :, 0]  # Red channel
-    mv_g = mv[:, :, 1]  # Blue channel
+    mv_r = mv[0, :, :]  # Red channel
+    mv_g = mv[1, :, :]  # Blue channel
 
     # Display the R channel
     plt.figure(figsize=(12, 6))
@@ -295,10 +292,103 @@ def generate_mask() -> None:
     plt.show()
 
 
+def generate_error_mask(gt_image, sr_image):
+    """
+    Generates an error mask between the ground truth and super-resolved images.
+
+    Parameters:
+    gt_image (numpy.ndarray): Ground truth image.
+    sr_image (numpy.ndarray): Super-resolved image.
+
+    Returns:
+    numpy.ndarray: Error mask.
+    """
+    # Ensure the images are of the same size
+    if gt_image.shape != sr_image.shape:
+        raise ValueError("Ground truth and super-resolved images must have the same dimensions.")
+
+    # Convert images to float32 for precise difference calculation
+    gt_image = gt_image.astype(np.float32)
+    sr_image = sr_image.astype(np.float32)
+
+    # Calculate the absolute difference
+    error = np.abs(gt_image - sr_image)
+
+    # Normalize the error to the range [0, 1]
+    error_norm = cv2.normalize(error, None, alpha=0, beta=1, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32F)
+
+    return 1 - error_norm
+
+
+def visualize_error_mask(gt_image, sr_image, error_mask):
+    """
+    Visualizes the ground truth, super-resolved, and error mask images.
+
+    Parameters:
+    gt_image (numpy.ndarray): Ground truth image.
+    sr_image (numpy.ndarray): Super-resolved image.
+    error_mask (numpy.ndarray): Error mask.
+    """
+    plt.figure(figsize=(20, 8))
+
+    plt.subplot(1, 3, 1)
+    plt.title('Ground Truth')
+    gt_image = np.transpose(gt_image, (1, 2, 0))
+    plt.imshow(cv2.cvtColor(gt_image, cv2.COLOR_BGR2RGB))
+    plt.axis('off')
+
+    plt.subplot(1, 3, 2)
+    plt.title('Super-Resolved')
+    sr_image = np.transpose(sr_image, (1, 2, 0))
+    plt.imshow(cv2.cvtColor(sr_image, cv2.COLOR_BGR2RGB))
+    plt.axis('off')
+
+    plt.subplot(1, 3, 3)
+    plt.title('Error Mask')
+    error_mask = np.transpose(error_mask, (1, 2, 0))
+    plt.imshow(error_mask, cmap='hot')
+    plt.colorbar()
+    plt.axis('off')
+
+    plt.show()
+
+
+def error_mask_test() -> None:
+    # gt_path_sr = "../dataset/ue_data_npz/test/HR/17/0086"
+    # gt_path_ess = "../dataset/ue_data_npz/test/HR/17/0087"
+    #
+    # model_path_sr = "../results/flavr/17/0086"
+    # model_path_ess = "../results/flavr/17/0087"
+    #
+    # ss_gt = load_image_from_disk(DiskMode.NPZ, gt_path_ess)
+    # ss_model = load_image_from_disk(DiskMode.CV2, model_path_ess)
+    #
+    # ss_gt = ss_gt.numpy()
+    # ss_model = ss_model.numpy()
+
+    # ss_error_mask = generate_error_mask(ss_gt, ss_model)
+    # error_mask = np.transpose(ss_error_mask, (1, 2, 0))
+    # save_image(error_mask, "error.png")
+    # visualize_error_mask(ss_gt, ss_model, ss_error_mask)
+
+    warped_path = "warped"
+    warped = load_image_from_disk(DiskMode.CV2, warped_path)
+    gt_path = '../dataset/ue_data_npz/test/LR/17/0083'
+    gt = load_image_from_disk(DiskMode.NPZ, gt_path)
+
+    warped = warped.numpy()
+    gt = gt.numpy()
+    error = generate_error_mask(gt, warped)
+    error_t = np.transpose(error, (1, 2, 0))
+    save_image(error_t, "warped_error.png")
+    visualize_error_mask(gt, warped, error)
+
+
 def main() -> None:
+    error_mask_test()
     # move_all_directions()
     # mv_zoom_windmill()
-    generate_mask()
+    # generate_mask()
 
     # image_path = 'Test2/FinalImage.0010.png'
     # current_mv_path = "Test2/FinalImageM_Velocity.0010.exr"

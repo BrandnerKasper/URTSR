@@ -338,11 +338,8 @@ def warp_img(image: torch.Tensor, mv: torch.Tensor) -> torch.Tensor:
     image = image.unsqueeze(0).cuda()
     mv = mv.unsqueeze(0).cuda()
 
-    # image = image.permute(0, 3, 1, 2)
     mv = mv.permute(0, 3, 1, 2)
-    # warped = warp(image, mv)
-    # warped = warped.squeeze(0)
-    # warped = warped.permute(1, 2, 0)
+
 
     return warp(image, mv).squeeze(0).cpu()
 
