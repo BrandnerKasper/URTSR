@@ -200,8 +200,6 @@ def calc_buffer_cha(buffers: dict[str, bool]) -> int:
                     channels += 1
                 case "ROUGHNESS":
                     channels += 1
-                case "VELOCITY":
-                    channels += 3
                 case "WORLD_NORMAL":
                     channels += 3
                 case "WORLD_POSITION":
@@ -260,7 +258,6 @@ class Config:
                f"    Metallic: {self.buffers['METALLIC']} \n" \
                f"    Nov: {self.buffers['NOV']} \n" \
                f"    Roughness: {self.buffers['ROUGHNESS']} \n" \
-               f"    Velocity: {self.buffers['VELOCITY']} \n" \
                f"    World Normal: {self.buffers['WORLD_NORMAL']} \n" \
                f"    World Position: {self.buffers['WORLD_POSITION']} \n"
 

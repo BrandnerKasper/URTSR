@@ -116,7 +116,34 @@ def delete_buffers(path: str) -> None:
             os.remove(os.path.join(path, filename))
 
 
-def main() -> None:
+def delete_certain_buffer_files(path: str, pattern: str) -> None:
+    # Iterate over all files in the folder
+    for filename in os.listdir(path):
+        # Check if the substring is in the filename
+        if pattern in filename:
+            # Construct the full file path
+            file_path = os.path.join(path, filename)
+            try:
+                os.remove(file_path)
+                print(f"Deleted: {file_path}")
+            except Exception as e:
+                print(f"Error deleting {file_path}: {e}")
+
+
+def delete_velocity_log_buffers() -> None:
+    path = "../dataset/ue_data_npz/"
+    train = ["01", "02", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12"]
+    val = ["13", "14", "15", "16"]
+    test = ["17", "18", "19", "20"]
+    for folder in train:
+        delete_certain_buffer_files(f"{path}/train/LR/{folder}", "velocity_log")
+    for folder in val:
+        delete_certain_buffer_files(f"{path}/val/LR/{folder}", "velocity_log")
+    for folder in test:
+        delete_certain_buffer_files(f"{path}/test/LR/{folder}", "velocity_log")
+
+
+def old() -> None:
     args = parse_arguments()
     folder_path = args.folder_path
     factor = args.factor
@@ -140,6 +167,10 @@ def main() -> None:
             create_pt_files(folder_path, safe_folder_path)
         case 'npz':
             create_compressed_npz_files(folder_path, safe_folder_path)
+
+
+def main() -> None:
+    delete_velocity_log_buffers()
 
 
 if __name__ == "__main__":

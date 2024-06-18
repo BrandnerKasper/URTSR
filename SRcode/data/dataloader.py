@@ -14,7 +14,8 @@ import os
 import time
 from torchvision import transforms
 import torch
-import torchvision.transforms.functional as F
+import torchvision.transforms.functional as FV
+import torch.nn.functional as F
 
 
 def get_random_crop_pair(lr_tensor: torch.Tensor, hr_tensor: torch.Tensor, patch_size: int, scale: int) \
@@ -22,22 +23,22 @@ def get_random_crop_pair(lr_tensor: torch.Tensor, hr_tensor: torch.Tensor, patch
     lr_i, lr_j, lr_h, lr_w = transforms.RandomCrop.get_params(lr_tensor, output_size=(patch_size, patch_size))
     hr_i, hr_j, hr_h, hr_w = lr_i * scale, lr_j * scale, lr_h * scale, lr_w * scale
 
-    lr_tensor_patch = F.crop(lr_tensor, lr_i, lr_j, lr_h, lr_w)
-    hr_tensor_patch = F.crop(hr_tensor, hr_i, hr_j, hr_h, hr_w)
+    lr_tensor_patch = FV.crop(lr_tensor, lr_i, lr_j, lr_h, lr_w)
+    hr_tensor_patch = FV.crop(hr_tensor, hr_i, hr_j, hr_h, hr_w)
 
     return lr_tensor_patch, hr_tensor_patch
 
 
 def flip_image_horizontal(img: torch.Tensor) -> torch.Tensor:
-    return F.hflip(img)
+    return FV.hflip(img)
 
 
 def flip_image_vertical(img: torch.Tensor) -> torch.Tensor:
-    return F.vflip(img)
+    return FV.vflip(img)
 
 
 def rotate_image(img: torch.Tensor, angle: int) -> torch.Tensor:
-    return F.rotate(img, angle)
+    return FV.rotate(img, angle)
 
 
 class DiskMode(Enum):
@@ -165,8 +166,8 @@ class SingleImagePair(Dataset):
 
     def display_item(self, idx: int) -> None:
         lr_image, hr_image = self.__getitem__(idx)
-        lr_image = F.to_pil_image(lr_image)
-        hr_image = F.to_pil_image(hr_image)
+        lr_image = FV.to_pil_image(lr_image)
+        hr_image = FV.to_pil_image(hr_image)
 
         fig, axes = plt.subplots(1, 2, figsize=(10, 10))
         axes[0].imshow(lr_image)
@@ -265,13 +266,13 @@ class MultiImagePair(Dataset):
 
         # Display LR frames
         for i, lr_frame in enumerate(lr_frames):
-            lr_image = F.to_pil_image(lr_frame)
+            lr_image = FV.to_pil_image(lr_frame)
             axes[i].imshow(lr_image)
             axes[i].set_title(f'LR image {self.get_filename(idx - i)}')
 
         # Display HR frames
         for i, hr_frame in enumerate(hr_frames):
-            hr_image = F.to_pil_image(hr_frame)
+            hr_image = FV.to_pil_image(hr_frame)
             axes[num_lr_frames + i].imshow(hr_image)
             axes[num_lr_frames + i].set_title(f'HR image {self.get_filename(idx + i)}')
 
@@ -286,10 +287,10 @@ class MultiImagePair(Dataset):
 
         lr_frame_patches = []
         for lr_frame in lr_frames:
-            lr_frame_patches.append(F.crop(lr_frame, lr_i, lr_j, lr_h, lr_w))
+            lr_frame_patches.append(FV.crop(lr_frame, lr_i, lr_j, lr_h, lr_w))
         hr_frame_patches = []
         for hr_frame in hr_frames:
-            hr_frame_patches.append(F.crop(hr_frame, hr_i, hr_j, hr_h, hr_w))
+            hr_frame_patches.append(FV.crop(hr_frame, hr_i, hr_j, hr_h, hr_w))
 
         return lr_frame_patches, hr_frame_patches
 
@@ -318,6 +319,57 @@ class MultiImagePair(Dataset):
                 for i in range(len(hr_frames)):
                     hr_frames[i] = rotate_image(hr_frames[i], angle)
         return lr_frames, hr_frames
+
+
+# warping
+def warp_img(image: torch.Tensor, mv: torch.Tensor) -> torch.Tensor:
+    # move pixel values back to be between -0.5 and 0.5
+    mv = (mv - 0.5)
+    mv_r = mv[0, :, :]
+    mv_g = mv[1, :, :]
+    mv_g = mv_g * -1
+
+    mv = torch.stack([mv_r, mv_g], dim=-1)
+
+    image = torch.tensor(image).unsqueeze(0).cuda()
+    mv = torch.tensor(mv).unsqueeze(0).cuda()
+
+    image = image.permute(0, 3, 1, 2)
+    mv = mv.permute(0, 3, 1, 2)
+
+    return warp(image, mv).permute(1, 2, 0)
+
+
+def warp(x, flow, mode='bilinear', padding_mode='border'):
+    """ Modified warp to forward warp image x based on motion vector flow
+
+        Both x and flow are pytorch tensor in shape `nchw` and `n2hw`
+
+        Reference:
+            https://github.com/sniklaus/pytorch-spynet/blob/master/run.py#L41
+    """
+    n, c, h, w = x.size()
+
+    # create mesh grid
+    iu = torch.linspace(-1.0, 1.0, w).view(1, 1, 1, w).expand(n, -1, h, -1)
+    iv = torch.linspace(-1.0, 1.0, h).view(1, 1, h, 1).expand(n, -1, -1, w)
+    grid = torch.cat([iu, iv], 1).to(flow.device)
+
+    x = x.float()
+    grid = grid.float()
+    flow = flow.float()
+
+    # Ensure the grid is within the range [-1, 1]
+    grid[:, :, 0] = torch.clamp(grid[:, :, 0], -1, 1)
+    grid[:, :, 1] = torch.clamp(grid[:, :, 1], -1, 1)
+
+    # add flow to grid and reshape to nhw2
+    grid = (grid - flow).permute(0, 2, 3, 1) # we use - for forward warping
+
+    output = F.grid_sample(x, grid, mode=mode, padding_mode=padding_mode)
+
+    output = torch.clamp(output, min=0, max=1)
+    return output
 
 
 class STSSImagePair(Dataset):
@@ -364,7 +416,7 @@ class STSSImagePair(Dataset):
         file = load_image_from_disk(self.disk_mode, file, self.transform)
         lr_frame = file
 
-        # features: basecolor, depth, metallic, nov, roughness, velocity, world normal, world position
+        # features: basecolor, depth, metallic, nov, roughness, world normal, world position
         buffer_frames, buffer_frame_names = self.load_buffers(folder, filename)
 
         # previous history frames e.g. [current - 2, current -4, current -6]
@@ -372,13 +424,20 @@ class STSSImagePair(Dataset):
         history_frames_names = []
         for i in range(self.history):
             # Extract the numeric part
-            file = int(filename) - (i + 1) * 2
+            h_filename = int(filename) - (i + 1) * 2
             # Generate right file name pattern
-            file = f"{file:0{self.digits}d}"  # Ensure 4/8 digit format
-            history_frames_names.append(file)
+            h_filename = f"{h_filename:0{self.digits}d}"  # Ensure 4/8 digit format
+            history_frames_names.append(h_filename)
             # Put folder and file name back together and load the tensor
-            file = f"{self.root_lr}/{folder}/{file}"
+            file = f"{self.root_lr}/{folder}/{h_filename}"
             file = load_image_from_disk(self.disk_mode, file, self.transform)
+            # warp history frames
+            counter = int(filename) - int(h_filename)
+            for j in range(counter):
+                mv_filename = int(filename) - counter + j + 1
+                mv_filename = f"{mv_filename:0{self.digits}d}"  # Ensure 4/8 digit format
+                mv = self.load_mv(folder, mv_filename)
+                file = warp_img(file, mv)
             history_frames.append(file)
 
         # hr frame
@@ -393,11 +452,13 @@ class STSSImagePair(Dataset):
         self.ess_names = []
         if self.extra:
             # Generate ESS frame
-            # lr frame -> we use the same as the SS frame
-
             # get the future frames for extrapolation
             ess_filename = int(filename) + 1
             ess_filename = f"{ess_filename:0{self.digits}d}"  # Ensure 4/8 digit format
+
+            # lr frame -> we warp the frame based on the next motion vector
+            mv = self.load_mv(folder, ess_filename)
+            ess_lr_frame = warp_img(lr_frame, mv)
 
             # features: basecolor, depth, metallic, nov, roughness, velocity, world normal, world position
             buffer_frames, buffer_frame_names = self.load_buffers(folder, ess_filename)
@@ -409,7 +470,7 @@ class STSSImagePair(Dataset):
             file = load_image_from_disk(self.disk_mode, file, self.transform)
             hr_frame = file
 
-            ess = [lr_frame, buffer_frames, history_frames, hr_frame]
+            ess = [ess_lr_frame, buffer_frames, history_frames, hr_frame]
             self.ess_names = [filename, buffer_frame_names, history_frames_names, ess_filename]
 
         # Randomly crop the images
@@ -420,6 +481,10 @@ class STSSImagePair(Dataset):
         self.augment(ss, ess)
 
         return ss, ess
+
+    def load_mv(self, folder: str, filename: str) -> torch.Tensor:
+        path = f"{self.root_lr}/{folder}/{filename}.velocity"
+        return load_image_from_disk(self.disk_mode, path)
 
     def load_buffers(self, folder: str, filename: str) -> Optional[Tuple[list[torch.Tensor], list[str]]]:
         if self.buffers is None:
@@ -452,12 +517,12 @@ class STSSImagePair(Dataset):
             feature_frames_names.append(f"{filename}.roughness")
             file = load_image_from_disk(self.disk_mode, file, self.transform, cv2.IMREAD_GRAYSCALE)
             feature_frames.append(file)
-        if self.buffers["VELOCITY"]:  # we use velocity log for now
-            file = f"{self.root_lr}/{folder}/{filename}.velocity_log"
-            feature_frames_names.append(f"{filename}.velocity_log")
-            file = load_image_from_disk(self.disk_mode, file, self.transform)
-            # file = file[0:2] # actually we only need R and G from this buffer, but for now we use RGB
-            feature_frames.append(file)
+        # if self.buffers["VELOCITY"]:  # we use velocity log for now
+        #     file = f"{self.root_lr}/{folder}/{filename}.velocity_log"
+        #     feature_frames_names.append(f"{filename}.velocity_log")
+        #     file = load_image_from_disk(self.disk_mode, file, self.transform)
+        #     # file = file[0:2] # actually we only need R and G from this buffer, but for now we use RGB
+        #     feature_frames.append(file)
         if self.buffers["WORLD_NORMAL"]:
             file = f"{self.root_lr}/{folder}/{filename}.world_normal"
             feature_frames_names.append(f"{filename}.world_normal")
@@ -492,27 +557,27 @@ class STSSImagePair(Dataset):
         counter = 0
 
         # Display LR frame
-        lr_image = F.to_pil_image(ss[0])
+        lr_image = FV.to_pil_image(ss[0])
         axes_ss[counter].imshow(lr_image)
         axes_ss[counter].set_title(f"LR frame {self.ss_names[0]}")
         counter += 1
 
         # Display feature frames
         for i, feature_frame in enumerate(ss[1]):
-            feature_frame = F.to_pil_image(feature_frame)
+            feature_frame = FV.to_pil_image(feature_frame)
             axes_ss[counter].imshow(feature_frame)
             axes_ss[counter].set_title(f'Feature frame {self.ss_names[1][i]}')
             counter += 1
 
         # Display feature frames
         for i, history_frame in enumerate(ss[2]):
-            history_frame = F.to_pil_image(history_frame)
+            history_frame = FV.to_pil_image(history_frame)
             axes_ss[counter].imshow(history_frame)
             axes_ss[counter].set_title(f'History frame {self.ss_names[2][i]}')
             counter += 1
 
         # Display HR frame
-        hr_image = F.to_pil_image(ss[3])
+        hr_image = FV.to_pil_image(ss[3])
         axes_ss[counter].imshow(hr_image)
         axes_ss[counter].set_title(f"HR frame {self.ss_names[3]}")
 
@@ -526,27 +591,27 @@ class STSSImagePair(Dataset):
             counter = 0
 
             # Display LR frame
-            lr_image = F.to_pil_image(ess[0])
+            lr_image = FV.to_pil_image(ess[0])
             axes_ess[counter].imshow(lr_image)
             axes_ess[counter].set_title(f"LR frame {self.ess_names[0]}")
             counter += 1
 
             # Display feature frames
             for i, feature_frame in enumerate(ess[1]):
-                feature_frame = F.to_pil_image(feature_frame)
+                feature_frame = FV.to_pil_image(feature_frame)
                 axes_ess[counter].imshow(feature_frame)
                 axes_ess[counter].set_title(f'Feature frame {self.ess_names[1][i]}')
                 counter += 1
 
             # Display feature frames
             for i, history_frame in enumerate(ess[2]):
-                history_frame = F.to_pil_image(history_frame)
+                history_frame = FV.to_pil_image(history_frame)
                 axes_ess[counter].imshow(history_frame)
                 axes_ess[counter].set_title(f'History frame {self.ess_names[2][i]}')
                 counter += 1
 
             # Display HR frame
-            hr_image = F.to_pil_image(ess[3])
+            hr_image = FV.to_pil_image(ess[3])
             axes_ess[counter].imshow(hr_image)
             axes_ess[counter].set_title(f"HR frame {self.ess_names[3]}")
 
@@ -561,27 +626,27 @@ class STSSImagePair(Dataset):
 
         # Crop SS frame
         # crop lr frame
-        ss[0] = F.crop(ss[0], lr_i, lr_j, lr_h, lr_w)
+        ss[0] = FV.crop(ss[0], lr_i, lr_j, lr_h, lr_w)
         # crop features
         for i, feature_frame in enumerate(ss[1]):
-            ss[1][i] = F.crop(feature_frame, lr_i, lr_j, lr_h, lr_w)
+            ss[1][i] = FV.crop(feature_frame, lr_i, lr_j, lr_h, lr_w)
         # crop history frames
         for i, history_frame in enumerate(ss[2]):
-            ss[2][i] = F.crop(history_frame, lr_i, lr_j, lr_h, lr_w)
+            ss[2][i] = FV.crop(history_frame, lr_i, lr_j, lr_h, lr_w)
         # crop hr frame
-        ss[3] = F.crop(ss[3], hr_i, hr_j, hr_h, hr_w)
+        ss[3] = FV.crop(ss[3], hr_i, hr_j, hr_h, hr_w)
 
         if not self.extra:
             return
         # Crop ESS frame
         # crop lr frame
-        ess[0] = F.crop(ess[0], lr_i, lr_j, lr_h, lr_w)
+        ess[0] = FV.crop(ess[0], lr_i, lr_j, lr_h, lr_w)
         # crop features
         for i, feature_frame in enumerate(ess[1]):
-            ess[1][i] = F.crop(feature_frame, lr_i, lr_j, lr_h, lr_w)
+            ess[1][i] = FV.crop(feature_frame, lr_i, lr_j, lr_h, lr_w)
         # crop history frames -> shared
         # crop hr frame
-        ess[3] = F.crop(ess[3], hr_i, hr_j, hr_h, hr_w)
+        ess[3] = FV.crop(ess[3], hr_i, hr_j, hr_h, hr_w)
 
     def augment(self, ss: list[torch.Tensor], ess: list[torch.Tensor]) \
             -> None:
@@ -841,24 +906,24 @@ class STSSCrossValidation(Dataset):
         axes_ss = axes_ss.flatten()
 
         # Display LR frame
-        lr_image = F.to_pil_image(ss[0])
+        lr_image = FV.to_pil_image(ss[0])
         axes_ss[0].imshow(lr_image)
         axes_ss[0].set_title(f"LR frame {self.ss_names[0]}")
 
         # Display feature frames
         for i, feature_frame in enumerate(ss[1]):
-            feature_frame = F.to_pil_image(feature_frame)
+            feature_frame = FV.to_pil_image(feature_frame)
             axes_ss[i + 1].imshow(feature_frame)
             axes_ss[i + 1].set_title(f'Feature frame {self.ss_names[1][i]}')
 
         # Display feature frames
         for i, history_frame in enumerate(ss[2]):
-            history_frame = F.to_pil_image(history_frame)
+            history_frame = FV.to_pil_image(history_frame)
             axes_ss[i + 7].imshow(history_frame)
             axes_ss[i + 7].set_title(f'History frame {self.ss_names[2][i]}')
 
         # Display HR frame
-        hr_image = F.to_pil_image(ss[3])
+        hr_image = FV.to_pil_image(ss[3])
         axes_ss[10].imshow(hr_image)
         axes_ss[10].set_title(f"HR frame {self.ss_names[3]}")
 
@@ -869,24 +934,24 @@ class STSSCrossValidation(Dataset):
         axes_ess = axes_ess.flatten()
 
         # Display LR frame
-        lr_image = F.to_pil_image(ess[0])
+        lr_image = FV.to_pil_image(ess[0])
         axes_ess[0].imshow(lr_image)
         axes_ess[0].set_title(f"LR frame {self.ess_names[0]}")
 
         # Display feature frames
         for i, feature_frame in enumerate(ess[1]):
-            feature_frame = F.to_pil_image(feature_frame)
+            feature_frame = FV.to_pil_image(feature_frame)
             axes_ess[i + 1].imshow(feature_frame)
             axes_ess[i + 1].set_title(f'Feature frame {self.ess_names[1][i]}')
 
         # Display feature frames
         for i, history_frame in enumerate(ess[2]):
-            history_frame = F.to_pil_image(history_frame)
+            history_frame = FV.to_pil_image(history_frame)
             axes_ess[i + 7].imshow(history_frame)
             axes_ess[i + 7].set_title(f'History frame {self.ess_names[2][i]}')
 
         # Display HR frame
-        hr_image = F.to_pil_image(ess[3])
+        hr_image = FV.to_pil_image(ess[3])
         axes_ess[10].imshow(hr_image)
         axes_ess[10].set_title(f"HR frame {self.ess_names[3]}")
 
@@ -901,25 +966,25 @@ class STSSCrossValidation(Dataset):
 
         # Crop SS frame
         # crop lr frame
-        ss[0] = F.crop(ss[0], lr_i, lr_j, lr_h, lr_w)
+        ss[0] = FV.crop(ss[0], lr_i, lr_j, lr_h, lr_w)
         # crop features
         for i, feature_frame in enumerate(ss[1]):
-            ss[1][i] = F.crop(feature_frame, lr_i, lr_j, lr_h, lr_w)
+            ss[1][i] = FV.crop(feature_frame, lr_i, lr_j, lr_h, lr_w)
         # crop history frames
         for i, history_frame in enumerate(ss[2]):
-            ss[2][i] = F.crop(history_frame, lr_i, lr_j, lr_h, lr_w)
+            ss[2][i] = FV.crop(history_frame, lr_i, lr_j, lr_h, lr_w)
         # crop hr frame
-        ss[3] = F.crop(ss[3], hr_i, hr_j, hr_h, hr_w)
+        ss[3] = FV.crop(ss[3], hr_i, hr_j, hr_h, hr_w)
 
         # Crop ESS frame
         # crop lr frame
-        ess[0] = F.crop(ess[0], lr_i, lr_j, lr_h, lr_w)
+        ess[0] = FV.crop(ess[0], lr_i, lr_j, lr_h, lr_w)
         # crop features
         for i, feature_frame in enumerate(ess[1]):
-            ess[1][i] = F.crop(feature_frame, lr_i, lr_j, lr_h, lr_w)
+            ess[1][i] = FV.crop(feature_frame, lr_i, lr_j, lr_h, lr_w)
         # crop history frames -> shared
         # crop hr frame
-        ess[3] = F.crop(ess[3], hr_i, hr_j, hr_h, hr_w)
+        ess[3] = FV.crop(ess[3], hr_i, hr_j, hr_h, hr_w)
 
     def augment(self, ss: list[torch.Tensor], ess: list[torch.Tensor]) \
             -> None:
@@ -1098,13 +1163,13 @@ class STSSCrossValidation2(Dataset):
 
         # Display LR frames
         for i, lr_frame in enumerate(lr_frames):
-            lr_image = F.to_pil_image(lr_frame)
+            lr_image = FV.to_pil_image(lr_frame)
             axes[i].imshow(lr_image)
             axes[i].set_title(f'LR image {self.get_filename(idx - i)}')
 
         # Display HR frames
         for i, hr_frame in enumerate(hr_frames):
-            hr_image = F.to_pil_image(hr_frame)
+            hr_image = FV.to_pil_image(hr_frame)
             axes[num_lr_frames + i].imshow(hr_image)
             axes[num_lr_frames + i].set_title(f'HR image {self.get_filename(idx + i)}')
 
@@ -1119,10 +1184,10 @@ class STSSCrossValidation2(Dataset):
 
         lr_frame_patches = []
         for lr_frame in lr_frames:
-            lr_frame_patches.append(F.crop(lr_frame, lr_i, lr_j, lr_h, lr_w))
+            lr_frame_patches.append(FV.crop(lr_frame, lr_i, lr_j, lr_h, lr_w))
         hr_frame_patches = []
         for hr_frame in hr_frames:
-            hr_frame_patches.append(F.crop(hr_frame, hr_i, hr_j, hr_h, hr_w))
+            hr_frame_patches.append(FV.crop(hr_frame, hr_i, hr_j, hr_h, hr_w))
 
         return lr_frame_patches, hr_frame_patches
 
@@ -1165,7 +1230,7 @@ def main() -> None:
     #                                 crop_size=None, use_hflip=False, use_rotation=False, digits=4, disk_mode=DiskMode.NPZ)
     # matrix_dataset.display_item(42)
 
-    buffers = {"BASE_COLOR": True, "DEPTH": False, "METALLIC": False, "NOV": False, "ROUGHNESS": False, "VELOCITY": False,
+    buffers = {"BASE_COLOR": True, "DEPTH": False, "METALLIC": False, "NOV": False, "ROUGHNESS": False,
                "WORLD_NORMAL": False, "WORLD_POSITION": False}
     stss_data = STSSImagePair(root="../dataset/ue_data_npz/train", scale=2, extra=True, history=4, buffers=buffers,
                               last_frame_idx=299,
