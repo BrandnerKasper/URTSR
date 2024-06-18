@@ -16,6 +16,10 @@ from torchvision import transforms
 import torch
 import torchvision.transforms.functional as FV
 import torch.nn.functional as F
+import multiprocessing
+
+# Set the start method for multiprocessing
+multiprocessing.set_start_method('spawn', force=True)
 
 
 def get_random_crop_pair(lr_tensor: torch.Tensor, hr_tensor: torch.Tensor, patch_size: int, scale: int) \
@@ -331,13 +335,16 @@ def warp_img(image: torch.Tensor, mv: torch.Tensor) -> torch.Tensor:
 
     mv = torch.stack([mv_r, mv_g], dim=-1)
 
-    image = torch.tensor(image).unsqueeze(0).cuda()
-    mv = torch.tensor(mv).unsqueeze(0).cuda()
+    image = image.unsqueeze(0).cuda()
+    mv = mv.unsqueeze(0).cuda()
 
-    image = image.permute(0, 3, 1, 2)
+    # image = image.permute(0, 3, 1, 2)
     mv = mv.permute(0, 3, 1, 2)
+    # warped = warp(image, mv)
+    # warped = warped.squeeze(0)
+    # warped = warped.permute(1, 2, 0)
 
-    return warp(image, mv).permute(1, 2, 0)
+    return warp(image, mv).squeeze(0).cpu()
 
 
 def warp(x, flow, mode='bilinear', padding_mode='border'):
@@ -366,7 +373,7 @@ def warp(x, flow, mode='bilinear', padding_mode='border'):
     # add flow to grid and reshape to nhw2
     grid = (grid - flow).permute(0, 2, 3, 1) # we use - for forward warping
 
-    output = F.grid_sample(x, grid, mode=mode, padding_mode=padding_mode)
+    output = F.grid_sample(x, grid, mode=mode, padding_mode=padding_mode, align_corners=True)
 
     output = torch.clamp(output, min=0, max=1)
     return output
@@ -1230,12 +1237,12 @@ def main() -> None:
     #                                 crop_size=None, use_hflip=False, use_rotation=False, digits=4, disk_mode=DiskMode.NPZ)
     # matrix_dataset.display_item(42)
 
-    buffers = {"BASE_COLOR": True, "DEPTH": False, "METALLIC": False, "NOV": False, "ROUGHNESS": False,
+    buffers = {"BASE_COLOR": False, "DEPTH": False, "METALLIC": False, "NOV": False, "ROUGHNESS": False,
                "WORLD_NORMAL": False, "WORLD_POSITION": False}
-    stss_data = STSSImagePair(root="../dataset/ue_data_npz/train", scale=2, extra=True, history=4, buffers=buffers,
+    stss_data = STSSImagePair(root="../dataset/ue_data_npz/test", scale=2, extra=True, history=4, buffers=buffers,
                               last_frame_idx=299,
-                              crop_size=512, use_hflip=True, use_rotation=True, digits=4, disk_mode=DiskMode.NPZ)
-    stss_data.display_item(0)
+                              crop_size=1024, use_hflip=False, use_rotation=False, digits=4, disk_mode=DiskMode.NPZ)
+    stss_data.display_item(80)
 
     # cross_val = STSSCrossValidation(root="../dataset/STSS_val_lewis_png", scale=2, history=2, crop_size=None,
     #                                 use_hflip=False, use_rotation=False)
