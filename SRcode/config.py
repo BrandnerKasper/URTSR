@@ -1,6 +1,5 @@
 import yaml
 import torch.nn as nn
-from torch.nn.modules.loss import _Loss
 import torch.optim as optim
 import torch.optim.lr_scheduler as lr_scheduler
 from torch.utils.data import Dataset
@@ -19,6 +18,7 @@ from models.stss import Stss
 from models.extrass import ExtraSS
 
 from data.dataloader import SingleImagePair, MultiImagePair, STSSImagePair, STSSCrossValidation, DiskMode
+from loss.temporal import TemporalLoss
 
 
 def create_yaml(filename: str, model: str, epochs: int, scale: int, batch_size: int,
@@ -72,10 +72,12 @@ def init_model(model_name: str, scale: int, batch_size: int, crop_size: int, buf
             raise ValueError(f"The model '{model_name}' is not a valid model.")
 
 
-def init_criterion(criterion_name: str) -> _Loss:
+def init_criterion(criterion_name: str) -> nn.Module:
     match criterion_name:
         case "L1":
             return nn.L1Loss()
+        case "Huber Loss":
+            return TemporalLoss()
         case _:
             raise ValueError(f"The criterion '{criterion_name}' is not a valid criterion.")
 
@@ -224,7 +226,7 @@ class Config:
         self.use_rotation: bool = use_rotation
         self.number_workers: int = number_workers
         self.learning_rate: float = learning_rate
-        self.criterion: _Loss = init_criterion(criterion)
+        self.criterion: nn.Module = init_criterion(criterion)
         self.optimizer: optim.Optimizer = init_optimizer(optimizer, self.model, self.learning_rate)
         self.scheduler: Optional[lr_scheduler.LRScheduler] = init_scheduler(scheduler, self.optimizer, self.epochs)
         self.start_decay_epoch: Optional[int] = start_decay_epoch

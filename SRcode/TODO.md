@@ -129,6 +129,7 @@ Abstract data loader so that:
 
 AFTER the extrapolated frames are nearer to the values of the SS frame:
 - [ ] boost the values of both with [**RepRB**](https://arxiv.org/pdf/2404.16484) Convolution
+- [ ] try the Huber loss `F.smooth_l1_loss(x,y)`, which is a combo btw. L1 and L2 
 - [ ] add a [**texture consistency loss**](https://openaccess.thecvf.com/content/CVPR2023/papers/Zhou_Exploring_Motion_Ambiguity_and_Alignment_for_High-Quality_Video_Frame_Interpolation_CVPR_2023_paper.pdf) in addition to the L1 loss
 - [ ] try the auto encoder [stuff](https://arxiv.org/pdf/2111.06377)
 

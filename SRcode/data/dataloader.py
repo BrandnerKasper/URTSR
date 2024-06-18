@@ -334,13 +334,9 @@ def warp_img(image: torch.Tensor, mv: torch.Tensor) -> torch.Tensor:
     mv_g = mv_g * -1
 
     mv = torch.stack([mv_r, mv_g], dim=-1)
-
     image = image.unsqueeze(0).cuda()
     mv = mv.unsqueeze(0).cuda()
-
     mv = mv.permute(0, 3, 1, 2)
-
-
     return warp(image, mv).squeeze(0).cpu()
 
 
@@ -1238,7 +1234,7 @@ def main() -> None:
                "WORLD_NORMAL": False, "WORLD_POSITION": False}
     stss_data = STSSImagePair(root="../dataset/ue_data_npz/test", scale=2, extra=True, history=4, buffers=buffers,
                               last_frame_idx=299,
-                              crop_size=1024, use_hflip=True, use_rotation=True, digits=4, disk_mode=DiskMode.NPZ)
+                              crop_size=None, use_hflip=False, use_rotation=False, digits=4, disk_mode=DiskMode.NPZ)
     stss_data.display_item(80)
 
     # cross_val = STSSCrossValidation(root="../dataset/STSS_val_lewis_png", scale=2, history=2, crop_size=None,
