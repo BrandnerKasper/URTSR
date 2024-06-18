@@ -25,6 +25,7 @@ Just some notes and todos what I'd like to consider for my thesis.
 - [ ] later try it with two different forward passes but update the weights (backward) after each forward pass and NOT together
 - [x] instead of the hole inpaint function use a small attention layer from [here](https://github.com/swz30/Restormer/blob/main/basicsr/models/archs/restormer_arch.py)
 - [x] train without buffers on my data set and cross validate on Lewis scene and look how good it performs
+- [ ] generate warping mask and use it for the gated convolution
 
 ### Flow-Agnostic Video Representations for Fast Frame Interpolation (FLAVR)
 - [ ] Spatial SR for Single Image Super Resolution (SISR)
@@ -109,10 +110,11 @@ Abstract data loader so that:
 *logaritmic scale for depth not bad, because objects don't disappear in the fog, but might lose detail, again tradeoff here*
 
 - [x] honestly for motion vectors we can try logarithmic scale as well -> looks good to be honest :9
-- [ ] warp lr frames based on motion vector data, the idea: we move the pixel in image space (x,y) based on the values of the R (x) and G (y) channel values 
+- [x] warp lr frames based on motion vector data, the idea: we move the pixel in image space (x,y) based on the values of the R (x) and G (y) channel values 
 -> (this data needs to be moved again into values of -1 to 1, unreal atm produces values btw. 0 and 1 for us, atm we have RGB so in range of 0 to 1)
-- [ ] take warped lr images into the network instead of just lr images
-- [ ] also warp the history frames!
+- [x] use exr files because tone mapper influences mv data
+- [x] take warped lr images into the network instead of just lr images
+- [x] also warp the history frames! -> multiple times so we get to the history frames to the same point in time
 - [ ] based on the buffers generate a mask and add this mask to the gated convolution!!
 
 ## General
@@ -188,7 +190,7 @@ We want to create our own dataset in Unreal Engine 5.3:
 
 Save them as:
 - [x] png -> problem tone mapper non linear maps motion vector data into pngs
-- [ ] use exr (must for mvs!)
+- [x] use exr (must for mvs!)
 
 Generate a dataset from the matrix scene:
 - [x] one for training
@@ -272,8 +274,8 @@ HD
 - [x] Clean up evalaute.py by removing the comparison of bilinear, bicubic and the network
 - [x] Load config files into pandas dataframe
 - [x] Save dataframe into csv file
-- [ ] fix eval script to work with Multi Image Pair
-- [ ] abstract eval script to work with Single Images as well as Multi Images
+- [x] fix eval script to work with Multi Image Pair
+- [x] abstract eval script to work with Single Images as well as Multi Images
 
 Single Image Super Resolution (SISR) eval:
 - [x] Set5
@@ -295,8 +297,8 @@ After calling evaluate.py with config.yaml we want to create a result.yaml file 
 
 ### Frame Generation
 - [x] write a script which generates a video based on pngs
-- [ ] write a test script which simulates a 30 fps 1080p image flow to generate a 60 fps 4k image flow
-- [ ] abstract the test script to safe the images per sequence in sub folders beginning with the right index
+- [x] write a test script which simulates a 30 fps 1080p image flow to generate a 60 fps 4k image flow
+- [x] abstract the test script to safe the images per sequence in sub folders beginning with the right index
 
 ### Metrics
 We want to evaluate on:
