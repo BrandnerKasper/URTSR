@@ -440,7 +440,7 @@ class STSSImagePair(Dataset):
             file = load_image_from_disk(self.disk_mode, file, self.transform)
             # warp history frames
             counter = int(filename) - int(h_filename)
-            for j in range(counter):
+            for j in range(counter+1): # we need to warp from t_0 to t_1
                 mv_filename = int(filename) - counter + j + 1
                 mv_filename = f"{mv_filename:0{self.digits}d}"  # Ensure 4/8 digit format
                 mv = self.load_mv(folder, mv_filename)
@@ -1241,7 +1241,7 @@ def main() -> None:
                "WORLD_NORMAL": False, "WORLD_POSITION": False}
     stss_data = STSSImagePair(root="../dataset/ue_data_npz/test", scale=2, extra=True, history=4, buffers=buffers,
                               last_frame_idx=299,
-                              crop_size=1024, use_hflip=False, use_rotation=False, digits=4, disk_mode=DiskMode.NPZ)
+                              crop_size=1024, use_hflip=True, use_rotation=True, digits=4, disk_mode=DiskMode.NPZ)
     stss_data.display_item(80)
 
     # cross_val = STSSCrossValidation(root="../dataset/STSS_val_lewis_png", scale=2, history=2, crop_size=None,
