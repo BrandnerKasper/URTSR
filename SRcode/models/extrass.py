@@ -116,6 +116,10 @@ class ExtraSS(BaseModel):
             self.hr_input = torch.randn(batch_size, 3, crop_size, crop_size).to(device='cuda')
         self.extra = False
         self.fr = FRNet(history_cha=history_cha)
+        if history_cha == 0:
+            self.history_encoding = 0
+        else:
+            self.history_encoding = 5
 
         # Encoder for the SS forward pass
         self.ss_red_1 = nn.Conv2d(3 + buffer_cha, 22, kernel_size=3, stride=1, padding=1)
@@ -148,7 +152,7 @@ class ExtraSS(BaseModel):
         )
 
         # Encoder for the ESS forward pass
-        self.ess_red_1 = nn.Conv2d(3 + buffer_cha + 12 + 5, 22, kernel_size=3, stride=1, padding=1)
+        self.ess_red_1 = nn.Conv2d(3 + buffer_cha + 12 + self.history_encoding, 22, kernel_size=3, stride=1, padding=1)
         self.ess_down_1 = nn.Sequential(
             nn.Conv2d(22, 22, kernel_size=3, stride=1, padding=1),
             nn.ReLU(inplace=True),
@@ -224,9 +228,12 @@ class ExtraSS(BaseModel):
             # Use SS frame as additonal input
             hr = space_to_depth(self.hr_input, 2)
             # Use FRNet as additional input
-            his = torch.cat(torch.unbind(his, 1), 1)
-            his = self.fr(his)
-            x = torch.cat([x, hr, his], dim=1)
+            if torch.is_tensor(his):
+                his = torch.cat(torch.unbind(his, 1), 1)
+                his = self.fr(his)
+                x = torch.cat([x, hr, his], dim=1)
+            else:
+                x = torch.cat([x, hr], dim=1)
             x1 = self.ess_red_1(x)
             x2 = self.ess_down_1(x1)
             x2 = self.ess_red_2(x2)
