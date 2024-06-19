@@ -76,7 +76,7 @@ def init_criterion(criterion_name: str) -> nn.Module:
     match criterion_name:
         case "L1":
             return nn.L1Loss()
-        case "Huber Loss":
+        case "HLoss":
             return TemporalLoss()
         case _:
             raise ValueError(f"The criterion '{criterion_name}' is not a valid criterion.")
