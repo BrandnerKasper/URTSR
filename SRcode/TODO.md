@@ -14,6 +14,8 @@ Just some notes and todos what I'd like to consider for my thesis.
 - [x] Spatial SR for Real-Time Super Resolution (RTSR) -> multiple input frames
 - [ ] Temporal SR
 - [x] maybe other dataloader since only 1 frame is generated per forward pass
+- [x] make buffers optional
+- [x] make history frames optional
 
 ### Space-time Supersampling (STSS):
 - [ ] Spatial SR for Single Image Super Resolution (SISR)
@@ -25,6 +27,8 @@ Just some notes and todos what I'd like to consider for my thesis.
 - [ ] later try it with two different forward passes but update the weights (backward) after each forward pass and NOT together
 - [x] instead of the hole inpaint function use a small attention layer from [here](https://github.com/swz30/Restormer/blob/main/basicsr/models/archs/restormer_arch.py)
 - [x] train without buffers on my data set and cross validate on Lewis scene and look how good it performs
+- [x] make buffers optional
+- [x] make history frames optional
 - [ ] generate warping mask and use it for the gated convolution
 
 ### Flow-Agnostic Video Representations for Fast Frame Interpolation (FLAVR)
