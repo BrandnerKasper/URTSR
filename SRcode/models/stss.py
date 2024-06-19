@@ -111,7 +111,7 @@ class Stss(BaseModel):
         super(Stss, self).__init__(scale=scale, down_and_up=3, do_two=False)
 
         self.conv_in = nn.Sequential(
-            LWGatedConv2D(3 + buffer_cha*2, 24, kernel=3, stride=1, pad=1),
+            LWGatedConv2D(3+3 + buffer_cha*2, 24, kernel=3, stride=1, pad=1),
             nn.ReLU(inplace=True),
             LWGatedConv2D(24, 24, kernel=3, stride=1, pad=1),
             nn.ReLU(inplace=True)
@@ -147,8 +147,10 @@ class Stss(BaseModel):
             nn.Conv2d(32, 32, kernel_size=3, stride=1, padding=1),
             nn.ReLU(inplace=True)
         )
-        
-        self.up_1 = Up(64 + 32, 32)
+        if history_cha == 0:
+            self.up_1 = Up(64, 32)
+        else:
+            self.up_1 = Up(64 + 32, 32)
         self.up_2 = Up(56, 24)
         self.up_3 = Up(48, 24)
 
@@ -168,12 +170,13 @@ class Stss(BaseModel):
         # Attention!
         x4 = self.attention(x4)
 
-        his = torch.cat(torch.unbind(his, 1), 1)
-        his = self.his_1(his)
-        his = self.his_2(his)
-        his = self.his_3(his)
+        if torch.is_tensor(his):
+            his = torch.cat(torch.unbind(his, 1), 1)
+            his = self.his_1(his)
+            his = self.his_2(his)
+            his = self.his_3(his)
 
-        x4 = torch.cat([x4, his], 1)
+            x4 = torch.cat([x4, his], 1)
 
         x = self.up_1(x4, x3)
         x = self.up_2(x, x2)
