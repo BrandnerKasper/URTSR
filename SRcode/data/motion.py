@@ -73,7 +73,7 @@ def motion_edge_diff() -> None:
     cv2.imwrite("warped.png", img_warped)
 
 
-def warp(x, flow, mode='bilinear', padding_mode='border'):
+def warp(x, flow, mode='bilinear', padding_mode='zeros'):
     """ Backward warp `x` according to `flow`
 
         Both x and flow are pytorch tensor in shape `nchw` and `n2hw`
@@ -251,12 +251,64 @@ def save_image(img: np.ndarray, name: str) -> None:
     cv2.imwrite(f"{name}", img)
 
 
-def mv_mask(ocmv, mv, gate = 0.1):
+def mv_mask(ocmv, mv, gate = 0.015):
     delta = ocmv - mv
+    delta = torch.Tensor(delta)
     mask = torch.where(torch.abs(delta) < gate, False, True)
     x, y = mask[0, :, :], mask[1, :, :]
     mask = torch.where(((x) | (y)), 1, 0)
     return mask
+
+
+def save_image_2D(img: np.ndarray, name: str) -> None:
+    # Ensure the input is a NumPy array with shape (2, 1920, 1080)
+    assert img.shape[0] == 2, "The input image must have 2 channels"
+    assert len(img.shape) == 3, "The input image must be a 3D array"
+
+    # Normalize the image to range [0, 255]
+    img = (img * 255).astype(np.uint8)
+
+    # Create an empty array with shape (1920, 1080, 3)
+    # img_rgb = np.zeros((img.shape[1], img.shape[2], 3), dtype=np.uint8)
+
+    # Create an array filled with 0.5
+    img_rgb = np.full((img.shape[1], img.shape[2], 3), 0.5, dtype=np.float32)
+
+    # Assign the first channel to the Red channel and the second to the Green channel
+    img_rgb[..., 0] = img[0]  # Red channel
+    img_rgb[..., 1] = img[1]  # Green channel
+
+    # Convert to BGR (as OpenCV expects images in BGR format)
+    img_bgr = cv2.cvtColor(img_rgb, cv2.COLOR_RGB2BGR)
+
+    # Save the image
+    cv2.imwrite(name, img_bgr)
+
+
+def save_grayscale_image(img: np.ndarray, name: str) -> None:
+    # Ensure the input is a 2D NumPy array
+    assert len(img.shape) == 2, "The input image must be a 2D array"
+
+    # Normalize the image to range [0, 255]
+    img = (img * 255).astype(np.uint8)
+
+    # Save the image
+    cv2.imwrite(name, img)
+
+
+def test_mv_mask() -> None:
+    mv_next = '../dataset/ue_data_npz/test/LR/17/0084.velocity'
+    mv_next = load_image_from_disk(DiskMode.NPZ, mv_next)
+    mv_current = '../dataset/ue_data_npz/test/LR/17/0083.velocity'
+    mv_current = load_image_from_disk(DiskMode.NPZ, mv_current)
+
+    mv_next = mv_next.numpy()
+    mv_current = mv_current.numpy()
+    error = mv_mask(mv_next, mv_current)
+    # error_t = np.transpose(error, (1, 2, 0))
+
+    save_grayscale_image(error.numpy(), "mv_error_mask.jpg")
+    # visualize_error_mask(mv_current, mv_next, error)
 
 
 def generate_mask() -> None:
@@ -316,7 +368,7 @@ def generate_error_mask(gt_image, sr_image):
 
     # Normalize the error to the range [0, 1]
     error_norm = cv2.normalize(error, None, alpha=0, beta=1, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32F)
-
+    # error_norm = np.where(error_norm < 0.3, 0, error_norm)
     return 1 - error_norm
 
 
@@ -373,7 +425,7 @@ def error_mask_test() -> None:
 
     warped_path = "warped"
     warped = load_image_from_disk(DiskMode.CV2, warped_path)
-    gt_path = '../dataset/ue_data_npz/test/LR/17/0083'
+    gt_path = '../dataset/ue_data_npz/test/LR/17/0082'
     gt = load_image_from_disk(DiskMode.NPZ, gt_path)
 
     warped = warped.numpy()
@@ -385,7 +437,9 @@ def error_mask_test() -> None:
 
 
 def main() -> None:
+    # test_mv_mask()
     error_mask_test()
+    # mv_zoom_windmill()
     # move_all_directions()
     # mv_zoom_windmill()
     # generate_mask()
