@@ -6,6 +6,7 @@ from enum import Enum, auto
 from typing import Optional, Tuple
 
 import numpy as np
+import torchvision.transforms
 from matplotlib import pyplot as plt
 from torch.utils.data import Dataset
 from PIL import Image
@@ -340,7 +341,7 @@ def warp_img(image: torch.Tensor, mv: torch.Tensor) -> torch.Tensor:
     return warp(image, mv).squeeze(0).cpu()
 
 
-def warp(x, flow, mode='bilinear', padding_mode='border'):
+def warp(x, flow, mode='bilinear', padding_mode='zeros'):
     """ Modified warp to forward warp image x based on motion vector flow
 
         Both x and flow are pytorch tensor in shape `nchw` and `n2hw`
@@ -370,6 +371,38 @@ def warp(x, flow, mode='bilinear', padding_mode='border'):
 
     output = torch.clamp(output, min=0, max=1)
     return output
+
+
+def generate_error_mask(pre_warped: torch.Tensor, warped: torch.Tensor) -> torch.Tensor:
+    # Ensure the images are of the same size
+    if pre_warped.shape != warped.shape:
+        raise ValueError("Ground truth and super-resolved images must have the same dimensions.")
+
+    # Convert images to float32 for precise difference calculation
+    pre_warped = pre_warped.float()
+    warped = warped.float()
+
+    # Calculate the absolute difference
+    error = torch.abs(warped - pre_warped)
+
+    # Normalize the error to the range [0, 1]
+    error_min = error.min()
+    error_max = error.max()
+    error_norm = (error - error_min) / (error_max - error_min)
+    # Define the weights for RGB to Grayscale conversion
+    weights = torch.tensor([0.299, 0.587, 0.114])
+
+    # Ensure weights have the same shape as the input tensor channels
+    weights = weights.view(3, 1, 1)
+
+    # Convert RGB to Grayscale
+    mask = (error_norm * weights).sum(dim=0)
+    # If you want to apply a threshold, uncomment the following line:
+    # error_norm = torch.where(error_norm < 0.3, torch.tensor(0.0), error_norm)
+    # We turn the mask to greyscale:
+
+
+    return mask.unsqueeze(0) # general for masking it is more interesting to use the error_norm here
 
 
 class STSSImagePair(Dataset):
@@ -414,7 +447,9 @@ class STSSImagePair(Dataset):
         # lr frame
         file = f"{self.root_lr}/{folder}/{filename}"
         file = load_image_from_disk(self.disk_mode, file, self.transform)
-        lr_frame = file
+        ss_lr_frame = file
+        ss_mask = torch.ones(ss_lr_frame.size())
+        ss_mask_name = f"{filename}_mask"
 
         # features: basecolor, depth, metallic, nov, roughness, world normal, world position
         buffer_frames, buffer_frame_names = self.load_buffers(folder, filename)
@@ -445,8 +480,8 @@ class STSSImagePair(Dataset):
         file = load_image_from_disk(self.disk_mode, file, self.transform)
         hr_frame = file
 
-        ss = [lr_frame, buffer_frames, history_frames, hr_frame]
-        self.ss_names = [filename, buffer_frame_names, history_frames_names, filename]
+        ss = [ss_lr_frame, ss_mask, buffer_frames, history_frames, hr_frame]
+        self.ss_names = [filename, ss_mask_name, buffer_frame_names, history_frames_names, filename]
 
         ess = []
         self.ess_names = []
@@ -458,7 +493,10 @@ class STSSImagePair(Dataset):
 
             # lr frame -> we warp the frame based on the next motion vector
             mv = self.load_mv(folder, ess_filename)
-            ess_lr_frame = warp_img(lr_frame, mv)
+            ess_lr_frame = warp_img(ss_lr_frame, mv)
+            # generate a mask btw. the warped and not warped image
+            ess_mask = generate_error_mask(ss_lr_frame, ess_lr_frame)
+            ess_mask_name = f"{filename}_{ess_filename}_mask"
 
             # features: basecolor, depth, metallic, nov, roughness, velocity, world normal, world position
             buffer_frames, buffer_frame_names = self.load_buffers(folder, ess_filename)
@@ -470,8 +508,8 @@ class STSSImagePair(Dataset):
             file = load_image_from_disk(self.disk_mode, file, self.transform)
             hr_frame = file
 
-            ess = [ess_lr_frame, buffer_frames, history_frames, hr_frame]
-            self.ess_names = [filename, buffer_frame_names, history_frames_names, ess_filename]
+            ess = [ess_lr_frame, ess_mask, buffer_frames, history_frames, hr_frame]
+            self.ess_names = [filename, ess_mask_name, buffer_frame_names, history_frames_names, ess_filename]
 
         # Randomly crop the images
         if self.crop_size:
@@ -563,27 +601,27 @@ class STSSImagePair(Dataset):
         counter += 1
 
         # Display feature frames
-        for i, feature_frame in enumerate(ss[1]):
+        for i, feature_frame in enumerate(ss[2]):
             feature_frame = FV.to_pil_image(feature_frame)
             axes_ss[counter].imshow(feature_frame)
-            axes_ss[counter].set_title(f'Feature frame {self.ss_names[1][i]}')
+            axes_ss[counter].set_title(f'Feature frame {self.ss_names[2][i]}')
             counter += 1
 
         # Display feature frames
-        for i, history_frame in enumerate(ss[2]):
+        for i, history_frame in enumerate(ss[3]):
             history_frame = FV.to_pil_image(history_frame)
             axes_ss[counter].imshow(history_frame)
-            axes_ss[counter].set_title(f'History frame {self.ss_names[2][i]}')
+            axes_ss[counter].set_title(f'History frame {self.ss_names[3][i]}')
             counter += 1
 
         # Display HR frame
-        hr_image = FV.to_pil_image(ss[3])
+        hr_image = FV.to_pil_image(ss[4])
         axes_ss[counter].imshow(hr_image)
-        axes_ss[counter].set_title(f"HR frame {self.ss_names[3]}")
+        axes_ss[counter].set_title(f"HR frame {self.ss_names[4]}")
 
         # Display ESS frame
         if self.extra:
-            values = count_values(ess)
+            values = count_values(ess) + 1
             fig_ess, axes_ess = plt.subplots(2, math.ceil(values / 2), figsize=(20, 12))
             fig_ess.suptitle('ESS frames')
 
@@ -593,27 +631,33 @@ class STSSImagePair(Dataset):
             # Display LR frame
             lr_image = FV.to_pil_image(ess[0])
             axes_ess[counter].imshow(lr_image)
-            axes_ess[counter].set_title(f"LR frame {self.ess_names[0]}")
+            axes_ess[counter].set_title(f"warped LR frame {self.ess_names[0]}")
+            counter += 1
+
+            # Display Mask
+            mask_image = FV.to_pil_image(ess[1])
+            axes_ess[counter].imshow(mask_image, cmap="grey")
+            axes_ess[counter].set_title(f"Mask {self.ess_names[1]}")
             counter += 1
 
             # Display feature frames
-            for i, feature_frame in enumerate(ess[1]):
+            for i, feature_frame in enumerate(ess[2]):
                 feature_frame = FV.to_pil_image(feature_frame)
                 axes_ess[counter].imshow(feature_frame)
-                axes_ess[counter].set_title(f'Feature frame {self.ess_names[1][i]}')
+                axes_ess[counter].set_title(f'Feature frame {self.ess_names[2][i]}')
                 counter += 1
 
             # Display feature frames
-            for i, history_frame in enumerate(ess[2]):
+            for i, history_frame in enumerate(ess[3]):
                 history_frame = FV.to_pil_image(history_frame)
                 axes_ess[counter].imshow(history_frame)
-                axes_ess[counter].set_title(f'History frame {self.ess_names[2][i]}')
+                axes_ess[counter].set_title(f'History frame {self.ess_names[3][i]}')
                 counter += 1
 
             # Display HR frame
-            hr_image = FV.to_pil_image(ess[3])
+            hr_image = FV.to_pil_image(ess[4])
             axes_ess[counter].imshow(hr_image)
-            axes_ess[counter].set_title(f"HR frame {self.ess_names[3]}")
+            axes_ess[counter].set_title(f"HR frame {self.ess_names[4]}")
 
         plt.tight_layout()
         plt.show()
@@ -627,26 +671,30 @@ class STSSImagePair(Dataset):
         # Crop SS frame
         # crop lr frame
         ss[0] = FV.crop(ss[0], lr_i, lr_j, lr_h, lr_w)
+        # crop the mask
+        ss[1] = FV.crop(ss[1], lr_i, lr_j, lr_h, lr_w)
         # crop features
-        for i, feature_frame in enumerate(ss[1]):
-            ss[1][i] = FV.crop(feature_frame, lr_i, lr_j, lr_h, lr_w)
+        for i, feature_frame in enumerate(ss[2]):
+            ss[2][i] = FV.crop(feature_frame, lr_i, lr_j, lr_h, lr_w)
         # crop history frames
-        for i, history_frame in enumerate(ss[2]):
-            ss[2][i] = FV.crop(history_frame, lr_i, lr_j, lr_h, lr_w)
+        for i, history_frame in enumerate(ss[3]):
+            ss[3][i] = FV.crop(history_frame, lr_i, lr_j, lr_h, lr_w)
         # crop hr frame
-        ss[3] = FV.crop(ss[3], hr_i, hr_j, hr_h, hr_w)
+        ss[4] = FV.crop(ss[4], hr_i, hr_j, hr_h, hr_w)
 
         if not self.extra:
             return
         # Crop ESS frame
         # crop lr frame
         ess[0] = FV.crop(ess[0], lr_i, lr_j, lr_h, lr_w)
+        # crop the mask
+        ess[1] = FV.crop(ess[1], lr_i, lr_j, lr_h, lr_w)
         # crop features
-        for i, feature_frame in enumerate(ess[1]):
-            ess[1][i] = FV.crop(feature_frame, lr_i, lr_j, lr_h, lr_w)
+        for i, feature_frame in enumerate(ess[2]):
+            ess[2][i] = FV.crop(feature_frame, lr_i, lr_j, lr_h, lr_w)
         # crop history frames -> shared
         # crop hr frame
-        ess[3] = FV.crop(ess[3], hr_i, hr_j, hr_h, hr_w)
+        ess[4] = FV.crop(ess[4], hr_i, hr_j, hr_h, hr_w)
 
     def augment(self, ss: list[torch.Tensor], ess: list[torch.Tensor]) \
             -> None:
@@ -657,20 +705,23 @@ class STSSImagePair(Dataset):
                 # SS
                 # hflip ss lr frame
                 ss[0] = flip_image_horizontal(ss[0])
+                # hflip mask
+                ss[1] = flip_image_horizontal(ss[1])
                 # hflip ss feature frames
-                for i, feature_frame in enumerate(ss[1]):
-                    ss[1][i] = flip_image_horizontal(feature_frame)
+                for i, feature_frame in enumerate(ss[2]):
+                    ss[2][i] = flip_image_horizontal(feature_frame)
                 # hflip ss history frames -> ess shared
-                for i, history_frame in enumerate(ss[2]):
-                    ss[2][i] = flip_image_horizontal(history_frame)
+                for i, history_frame in enumerate(ss[3]):
+                    ss[3][i] = flip_image_horizontal(history_frame)
                 # hflip ss hr frame
-                ss[3] = flip_image_horizontal(ss[3])
+                ss[4] = flip_image_horizontal(ss[4])
                 # ESS
                 if self.extra:
                     ess[0] = flip_image_horizontal(ess[0])
-                    for i, feature_frame in enumerate(ess[1]):
-                        ess[1][i] = flip_image_horizontal(feature_frame)
-                    ess[3] = flip_image_horizontal(ess[3])
+                    ess[1] = flip_image_horizontal(ess[1])
+                    for i, feature_frame in enumerate(ess[2]):
+                        ess[2][i] = flip_image_horizontal(feature_frame)
+                    ess[4] = flip_image_horizontal(ess[4])
 
         # Apply random rotation by v flipping and rot of 90
         if self.use_rotation:
@@ -678,20 +729,23 @@ class STSSImagePair(Dataset):
                 # SS
                 # vflip ss lr frame
                 ss[0] = flip_image_vertical(ss[0])
+                # vlip mask
+                ss[1] = flip_image_vertical(ss[1])
                 # vflip ss feature frames
-                for i, feature_frame in enumerate(ss[1]):
-                    ss[1][i] = flip_image_vertical(feature_frame)
+                for i, feature_frame in enumerate(ss[2]):
+                    ss[2][i] = flip_image_vertical(feature_frame)
                 # vflip ss history frames -> ess shared
-                for i, history_frame in enumerate(ss[2]):
-                    ss[2][i] = flip_image_vertical(history_frame)
+                for i, history_frame in enumerate(ss[3]):
+                    ss[3][i] = flip_image_vertical(history_frame)
                 # vflip ss hr frame
-                ss[3] = flip_image_vertical(ss[3])
+                ss[4] = flip_image_vertical(ss[4])
                 # ESS
                 if self.extra:
                     ess[0] = flip_image_vertical(ess[0])
-                    for i, feature_frame in enumerate(ess[1]):
-                        ess[1][i] = flip_image_vertical(feature_frame)
-                    ess[3] = flip_image_vertical(ess[3])
+                    ess[1] = flip_image_vertical(ess[1])
+                    for i, feature_frame in enumerate(ess[2]):
+                        ess[2][i] = flip_image_vertical(feature_frame)
+                    ess[4] = flip_image_vertical(ess[4])
 
         if self.use_rotation:
             if random.random() > 0.5:
@@ -699,20 +753,23 @@ class STSSImagePair(Dataset):
                 # SS
                 # rotate ss lr frame
                 ss[0] = rotate_image(ss[0], angle)
+                # rotate mask
+                ss[1] = rotate_image(ss[1].unsqueeze(0), angle).squeeze(0)
                 # rotate ss feature frames
-                for i, feature_frame in enumerate(ss[1]):
-                    ss[1][i] = rotate_image(feature_frame, angle)
+                for i, feature_frame in enumerate(ss[2]):
+                    ss[2][i] = rotate_image(feature_frame, angle)
                 # rotate ss history frames -> ess shared
-                for i, history_frame in enumerate(ss[2]):
-                    ss[2][i] = rotate_image(history_frame, angle)
+                for i, history_frame in enumerate(ss[3]):
+                    ss[3][i] = rotate_image(history_frame, angle)
                 # rotate ss hr frame
-                ss[3] = rotate_image(ss[3], angle)
+                ss[4] = rotate_image(ss[4], angle)
                 # ESS
                 if self.extra:
                     ess[0] = rotate_image(ess[0], angle)
-                    for i, feature_frame in enumerate(ess[1]):
-                        ess[1][i] = rotate_image(feature_frame, angle)
-                    ess[3] = rotate_image(ess[3], angle)
+                    ess[1] = rotate_image(ess[1].unsqueeze(0), angle).squeeze(0)
+                    for i, feature_frame in enumerate(ess[2]):
+                        ess[2][i] = rotate_image(feature_frame, angle)
+                    ess[4] = rotate_image(ess[4], angle)
 
 
 class STSSCrossValidation(Dataset):
@@ -1232,10 +1289,11 @@ def main() -> None:
 
     buffers = {"BASE_COLOR": False, "DEPTH": False, "METALLIC": False, "NOV": False, "ROUGHNESS": False,
                "WORLD_NORMAL": False, "WORLD_POSITION": False}
-    stss_data = STSSImagePair(root="../dataset/ue_data_npz/test", scale=2, extra=True, history=4, buffers=buffers,
+    stss_data = STSSImagePair(root="../dataset/ue_data_npz/test", scale=2, extra=True, history=3, buffers=buffers,
                               last_frame_idx=299,
-                              crop_size=None, use_hflip=False, use_rotation=False, digits=4, disk_mode=DiskMode.NPZ)
-    stss_data.display_item(80)
+                              crop_size=512, use_hflip=True, use_rotation=True, digits=4, disk_mode=DiskMode.NPZ)
+    for i in range(120):
+        stss_data.display_item(i*10)
 
     # cross_val = STSSCrossValidation(root="../dataset/STSS_val_lewis_png", scale=2, history=2, crop_size=None,
     #                                 use_hflip=False, use_rotation=False)
