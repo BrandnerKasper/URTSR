@@ -18,7 +18,7 @@ from models.stss import Stss
 from models.extrass import ExtraSS
 
 from data.dataloader import SingleImagePair, MultiImagePair, STSSImagePair, STSSCrossValidation, DiskMode
-from loss.temporal import TemporalLoss
+from loss.loss import EBMELoss
 
 
 def create_yaml(filename: str, model: str, epochs: int, scale: int, batch_size: int,
@@ -76,8 +76,10 @@ def init_criterion(criterion_name: str) -> nn.Module:
     match criterion_name:
         case "L1":
             return nn.L1Loss()
-        case "HLoss":
-            return TemporalLoss()
+        case "HuberLoss":
+            return nn.HuberLoss()
+        case "EBMELoss":
+            return EBMELoss()
         case _:
             raise ValueError(f"The criterion '{criterion_name}' is not a valid criterion.")
 
