@@ -152,7 +152,7 @@ class ExtraSS(BaseModel):
         )
 
         # Encoder for the ESS forward pass
-        self.ess_red_1 = nn.Conv2d(3 + buffer_cha + 12 + self.history_encoding, 22, kernel_size=3, stride=1, padding=1)
+        self.ess_red_1 = nn.Conv2d(3 + 3 + buffer_cha + 12 + self.history_encoding, 22, kernel_size=3, stride=1, padding=1)
         self.ess_down_1 = nn.Sequential(
             nn.Conv2d(22, 22, kernel_size=3, stride=1, padding=1),
             nn.ReLU(inplace=True),
@@ -209,11 +209,11 @@ class ExtraSS(BaseModel):
             nn.Conv2d(68, 12, kernel_size=3, stride=1, padding=1)
         )
 
-    def forward(self, x: torch.Tensor, features: torch.Tensor, his: torch.Tensor):
-        if torch.is_tensor(features):
-            x = torch.cat([x, features], dim=1)
+    def forward(self, x: torch.Tensor, mask: torch.Tensor, features: torch.Tensor, his: torch.Tensor):
         # SS Encoder forward pass
         if not self.extra:
+            if torch.is_tensor(features):
+                x = torch.cat([x, features], dim=1)
             x1 = self.ss_red_1(x)
             x2 = self.ss_down_1(x1)
             x2 = self.ss_red_2(x2)
@@ -225,15 +225,17 @@ class ExtraSS(BaseModel):
             x5 = self.ss_red_5(x5)
         # ESS Encoder forward pass
         else:
-            # Use SS frame as additonal input
-            hr = space_to_depth(self.hr_input, 2)
+            x = torch.cat([x, x * mask], dim=1)
+            if torch.is_tensor(features):
+                x = torch.cat([x, features], dim=1)
             # Use FRNet as additional input
             if torch.is_tensor(his):
                 his = torch.cat(torch.unbind(his, 1), 1)
                 his = self.fr(his)
-                x = torch.cat([x, hr, his], dim=1)
-            else:
-                x = torch.cat([x, hr], dim=1)
+                x = torch.cat([x, his], dim=1)
+            # Use SS frame as additonal input
+            hr = space_to_depth(self.hr_input, 2)
+            x = torch.cat([x, hr], dim=1)
             x1 = self.ess_red_1(x)
             x2 = self.ess_down_1(x1)
             x2 = self.ess_red_2(x2)
@@ -266,9 +268,10 @@ def main() -> None:
 
     batch_size = 1
     input_data = (batch_size, 3, 1920, 1088)
+    mask = (batch_size, 1, 1920, 1088)
     buffer = (batch_size, 16, 1920, 1088)
     his = (batch_size, 4, 3, 1920, 1088)
-    input_size = (input_data, buffer, his)
+    input_size = (input_data, mask, buffer, his)
     model = ExtraSS(scale=2, batch_size=1, buffer_cha=16, history_cha=4*3).to(device)
 
     model.summary(input_size)
