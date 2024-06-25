@@ -17,7 +17,7 @@ from models.stss_original import StssOriginal
 from models.stss import Stss
 from models.extrass import ExtraSS
 
-from data.dataloader import SingleImagePair, MultiImagePair, STSSImagePair, STSSCrossValidation, DiskMode
+from data.dataloader import SingleImagePair, MultiImagePair, STSSImagePair, VSR, STSSCrossValidation, DiskMode
 from loss.loss import EBMELoss
 
 
@@ -112,7 +112,7 @@ def init_scheduler(scheduler_data: dict, optimizer: optim.Optimizer, epochs: int
             raise ValueError(f"The scheduler '{scheduler_name}' is not a valid scheduler.")
 
 
-def init_dataset(name: str, extra: bool, history: int, buffers: dict[str, bool], crop_size: int, use_hflip: bool, use_rotation: bool) -> (Dataset, Dataset):
+def init_dataset(name: str, extra: bool, history: int, warp: bool, buffers: dict[str, bool], crop_size: int, use_hflip: bool, use_rotation: bool) -> (Dataset, Dataset):
     root = f"dataset/{name}"
     match name:
         case "DIV2K":
@@ -163,27 +163,25 @@ def init_dataset(name: str, extra: bool, history: int, buffers: dict[str, bool],
                                  transform=transforms.ToTensor(), crop_size=crop_size, scale=2,
                                  use_hflip=use_hflip, use_rotation=use_rotation, digits=4, disk_mode=DiskMode.NPZ)
             return train, val
-        # case "ue_data_npz":
-        #     train = MultiImagePair(root=f"{root}/train", number_of_frames=3, last_frame_idx=299,
-        #                            transform=transforms.ToTensor(), crop_size=crop_size, scale=2,
-        #                            use_hflip=use_hflip, use_rotation=use_rotation, digits=4, disk_mode=DiskMode.NPZ)
-        #     val = MultiImagePair(root=f"{root}/val", number_of_frames=3, last_frame_idx=299,
-        #                          transform=transforms.ToTensor(), crop_size=crop_size, scale=2,
-        #                          use_hflip=use_hflip, use_rotation=use_rotation, digits=4, disk_mode=DiskMode.NPZ)
+        # case "ue_data":
+        #     train = STSSImagePair(root=f"{root}/train", scale=2, extra=extra, history=history, buffers=buffers, last_frame_idx=299, crop_size=crop_size,
+        #                           use_hflip=use_hflip, use_rotation=use_rotation, digits=4)
+        #     val = STSSImagePair(root=f"{root}/val", scale=2, extra=extra, history=history, buffers=buffers, last_frame_idx=299, crop_size=crop_size,
+        #                         use_hflip=use_hflip, use_rotation=use_rotation, digits=4)
         #     return train, val
-        case "ue_data":
-            train = STSSImagePair(root=f"{root}/train", scale=2, extra=extra, history=history, buffers=buffers, last_frame_idx=299, crop_size=crop_size,
-                                  use_hflip=use_hflip, use_rotation=use_rotation, digits=4)
-            val = STSSImagePair(root=f"{root}/val", scale=2, extra=extra, history=history, buffers=buffers, last_frame_idx=299, crop_size=crop_size,
-                                use_hflip=use_hflip, use_rotation=use_rotation, digits=4)
-            return train, val
+        # case "ue_data_npz":
+        #     train = STSSImagePair(root=f"{root}/train", scale=2, extra=extra, history=history, buffers=buffers, last_frame_idx=299, crop_size=crop_size,
+        #                           use_hflip=use_hflip, use_rotation=use_rotation, digits=4, disk_mode=DiskMode.NPZ)
+        #     val = STSSImagePair(root=f"{root}/val", scale=2, extra=extra, history=history, buffers=buffers, last_frame_idx=299, crop_size=crop_size,
+        #                         use_hflip=use_hflip, use_rotation=use_rotation, digits=4, disk_mode=DiskMode.NPZ)
+        #     return train, val
         case "ue_data_npz":
-            train = STSSImagePair(root=f"{root}/train", scale=2, extra=extra, history=history, buffers=buffers, last_frame_idx=299, crop_size=crop_size,
-                                  use_hflip=use_hflip, use_rotation=use_rotation, digits=4, disk_mode=DiskMode.NPZ)
-            val = STSSImagePair(root=f"{root}/val", scale=2, extra=extra, history=history, buffers=buffers, last_frame_idx=299, crop_size=crop_size,
-                                use_hflip=use_hflip, use_rotation=use_rotation, digits=4, disk_mode=DiskMode.NPZ)
-            # val = STSSCrossValidation(root=f"dataset/STSS_val_lewis_png", scale=2, history=2, crop_size=crop_size,
-            #                           use_hflip=False, use_rotation=False)
+            train = VSR(root=f"{root}/train", scale=2, history=history, warp=warp, buffers=buffers, last_frame_idx=299,
+                        crop_size=crop_size, use_hflip=use_hflip, use_rotation=use_rotation, digits=4,
+                        disk_mode=DiskMode.NPZ)
+            val = VSR(root=f"{root}/val", scale=2, history=history, warp=warp, buffers=buffers, last_frame_idx=299,
+                      crop_size=crop_size, use_hflip=use_hflip, use_rotation=use_rotation, digits=4,
+                      disk_mode=DiskMode.NPZ)
             return train, val
         case _:
             raise ValueError(f"The dataset '{name}' is not a valid dataset.")
@@ -216,7 +214,7 @@ class Config:
                  crop_size: int, use_hflip: bool, use_rotation: bool, number_workers: int,
                  learning_rate: float, criterion: str, optimizer: dict, scheduler: dict,
                  start_decay_epoch: Optional[int],
-                 dataset: str, history: int, buffers: dict[str, bool]):
+                 dataset: str, history: int, warp: bool, buffers: dict[str, bool]):
         self.filename: str = filename
         self.model: BaseModel = init_model(model, scale, batch_size, crop_size, calc_buffer_cha(buffers), 3*history)
         self.extra = extra
@@ -234,8 +232,9 @@ class Config:
         self.start_decay_epoch: Optional[int] = start_decay_epoch
         self.dataset: str = dataset
         self.history = history
+        self.warp = warp
         self.buffers = buffers
-        self.train_dataset, self.val_dataset = init_dataset(dataset, extra, history, buffers, crop_size, use_hflip, use_rotation)
+        self.train_dataset, self.val_dataset = init_dataset(dataset, extra, history, warp, buffers, crop_size, use_hflip, use_rotation)
 
     def __str__(self):
         return f"Config:\n" \
@@ -256,6 +255,7 @@ class Config:
                f"  Start Decay Epoch: {self.start_decay_epoch if self.start_decay_epoch else 'None'}\n" \
                f"  Dataset: {self.dataset} \n" \
                f"  History: {self.history} \n" \
+               f"  Warp: {self.warp} \n" \
                f"  Buffers: \n" \
                f"    Base Color: {self.buffers['BASE_COLOR']} \n" \
                f"    Depth: {self.buffers['DEPTH']} \n" \
@@ -303,13 +303,14 @@ def load_yaml_into_config(file_path: str) -> Config:
         dataset = config_dict["DATASET"]
         dataset_name = dataset["NAME"]
         history = dataset["HISTORY"]
+        warp = dataset["WARP"]
         buffers = dataset["BUFFERS"]
         filename = file_path.split('/')[-1].split('.')[0]
 
     return Config(filename, model_name, extra, epochs, scale, batch_size,
                   crop_size, use_hflip, use_rotation, number_workers,
                   learning_rate, criterion, optimizer, scheduler, start_decay_epoch,
-                  dataset_name, history, buffers)
+                  dataset_name, history, warp, buffers)
 
 
 def create_comment_from_config(file: Config) -> str:

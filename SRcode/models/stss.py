@@ -111,7 +111,7 @@ class Stss(BaseModel):
         super(Stss, self).__init__(scale=scale, down_and_up=3, do_two=False)
 
         self.conv_in = nn.Sequential(
-            LWGatedConv2D(3+3 + buffer_cha*2, 24, kernel=3, stride=1, pad=1),
+            LWGatedConv2D(3 + buffer_cha, 24, kernel=3, stride=1, pad=1),
             nn.ReLU(inplace=True),
             LWGatedConv2D(24, 24, kernel=3, stride=1, pad=1),
             nn.ReLU(inplace=True)
@@ -155,11 +155,11 @@ class Stss(BaseModel):
         self.up_3 = Up(48, 24)
 
         self.conv_out = nn.Sequential(
-            nn.Conv2d(24, 3*2 * self.scale ** 2, kernel_size=1),
+            nn.Conv2d(24, 3 * self.scale ** 2, kernel_size=1),
             nn.PixelShuffle(scale)
         )
 
-    def forward(self, x, buffer, his):
+    def forward(self, x, buffer, his, mask = None):
         if torch.is_tensor(buffer):
             x = torch.cat([x, buffer], 1)
         x1 = self.conv_in(x)
@@ -183,7 +183,7 @@ class Stss(BaseModel):
         x = self.up_3(x, x1)
         x = self.conv_out(x)
 
-        x = torch.split(x, dim=1, split_size_or_sections=3)
+        # x = torch.split(x, dim=1, split_size_or_sections=3)
 
         return x
 
@@ -191,12 +191,12 @@ class Stss(BaseModel):
 def main() -> None:
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    model = Stss(scale=2, buffer_cha=3, history_cha=3 * 3).to(device)
+    model = Stss(scale=2, buffer_cha=6, history_cha=3 * 3).to(device)
     batch_size = 1
     input_data = (batch_size, 3, 1920, 1080)
-    buffer = (batch_size, 2*3, 1920, 1080) # 3 for SS, 3 for ESS
+    buffer = (batch_size, 6, 1920, 1080) #
     his = (batch_size, 3, 3, 1920, 1080)
-    input_size = (input_data, his, buffer)
+    input_size = (input_data, buffer, his)
 
     model.summary(input_size)
     model.measure_inference_time(input_size)

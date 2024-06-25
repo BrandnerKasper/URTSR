@@ -1280,14 +1280,13 @@ def normalize_data(arr):
 
 
 class VSR(Dataset):
-    def __init__(self, root: str, history: int = 3, warp: bool = False, mask: bool = False, buffers: dict[str, bool] = None,
+    def __init__(self, root: str, history: int = 3, warp: bool = False, buffers: dict[str, bool] = None,
                  last_frame_idx: int = 299, transform=transforms.ToTensor(), crop_size: int = None, scale: int = 2,
                  use_hflip: bool = False, use_rotation: bool = False, digits: int = 4, disk_mode=DiskMode.CV2):
         self.root_hr = os.path.join(root, "HR")
         self.root_lr = os.path.join(root, "LR")
         self.history = history
         self.warp = warp
-        self.mask = mask
         self.buffers = buffers
         self.last_frame_idx = last_frame_idx
         self.transform = transform
@@ -1479,7 +1478,7 @@ class VSR(Dataset):
         # masks for history
         masks = []
         masks_names = []
-        if self.mask:
+        if self.warp:
             for i, h_frame in enumerate(history_frames):
                 mask = generate_error_mask(lr_frame, h_frame)
                 mask = normalize_data(mask)
@@ -1590,7 +1589,7 @@ def main() -> None:
 
     buffers = {"BASE_COLOR": True, "DEPTH": True, "METALLIC": True, "NOV": True, "ROUGHNESS": True,
                "WORLD_NORMAL": True, "WORLD_POSITION": True}
-    vsr = VSR(root="../dataset/ue_data_npz/test", scale=2, warp=True, history=2, mask=True, buffers=buffers, last_frame_idx=299,
+    vsr = VSR(root="../dataset/ue_data_npz/test", scale=2, warp=True, history=2, buffers=buffers, last_frame_idx=299,
               crop_size=1024, use_hflip=True, use_rotation=True, digits=4, disk_mode=DiskMode.NPZ)
     vsr.display_item(80)
     for i in range(12):

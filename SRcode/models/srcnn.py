@@ -16,7 +16,7 @@ class SRCNN(BaseModel):
         # self.relu = nn.ReLU()
         self.gelu = nn.GELU()
 
-    def forward(self, x, features: torch.Tensor, his: torch.Tensor):
+    def forward(self, x, **kwargs):
         # Upscaling my lr image by times 2 to have the same tensor size than the hr image
         x = nn.functional.interpolate(x, scale_factor=self.scale, mode="bilinear")
         # Input shape: (batch_size, channels, height, width)
