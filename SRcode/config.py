@@ -17,7 +17,7 @@ from models.stss_original import StssOriginal
 from models.stss import Stss
 from models.extrass import ExtraSS
 
-from data.dataloader import SingleImagePair, MultiImagePair, STSSImagePair, VSR, STSSCrossValidation, DiskMode
+from data.dataloader import SingleImagePair, MultiImagePair, STSSImagePair, VSR, STSSCrossValidation, DiskMode, EVSR
 from loss.loss import EBMELoss
 
 
@@ -176,6 +176,15 @@ def init_dataset(name: str, extra: bool, history: int, warp: bool, buffers: dict
         #                         use_hflip=use_hflip, use_rotation=use_rotation, digits=4, disk_mode=DiskMode.NPZ)
         #     return train, val
         case "ue_data_npz":
+            if extra:
+                train = EVSR(root=f"{root}/train", scale=2, history=history, warp=warp, buffers=buffers,
+                            last_frame_idx=299,
+                            crop_size=crop_size, use_hflip=use_hflip, use_rotation=use_rotation, digits=4,
+                            disk_mode=DiskMode.NPZ)
+                val = EVSR(root=f"{root}/val", scale=2, history=history, warp=warp, buffers=buffers, last_frame_idx=299,
+                          crop_size=crop_size, use_hflip=use_hflip, use_rotation=use_rotation, digits=4,
+                          disk_mode=DiskMode.NPZ)
+                return train, val
             train = VSR(root=f"{root}/train", scale=2, history=history, warp=warp, buffers=buffers, last_frame_idx=299,
                         crop_size=crop_size, use_hflip=use_hflip, use_rotation=use_rotation, digits=4,
                         disk_mode=DiskMode.NPZ)
