@@ -296,6 +296,20 @@ def save_grayscale_image(img: np.ndarray, name: str) -> None:
     cv2.imwrite(name, img)
 
 
+def normalize_data(arr):
+    arr_min, arr_max = arr.min(), arr.max()
+    return (arr - arr_min) / (arr_max - arr_min)
+
+
+def set_negatives_to_zero(arr):
+    arr[arr < 0] = 0
+    return arr
+
+
+def threshold_mask(x, gate):
+    return np.where(np.abs(x) < gate, False, True)
+
+
 def test_mv_mask() -> None:
     mv_next = '../dataset/ue_data_npz/test/LR/17/0084.velocity'
     mv_next = load_image_from_disk(DiskMode.NPZ, mv_next)
@@ -304,10 +318,105 @@ def test_mv_mask() -> None:
 
     mv_next = mv_next.numpy()
     mv_current = mv_current.numpy()
-    error = mv_mask(mv_next, mv_current)
+
+    # mv_current = normalize_data(mv_current)
+    # mv_next = normalize_data(mv_next)
+
+    dual_mv = (mv_current + mv_next) / 2
+
+    mv_diff_1 = dual_mv - mv_current
+    mv_diff_2 = dual_mv - mv_next
+
+    mv_diff_1 = set_negatives_to_zero(mv_diff_1)
+    mv_diff_1 = normalize_data(mv_diff_1)
+    mv_diff_1 = threshold_mask(mv_diff_1, 0.1)
+    mv_diff_2 = set_negatives_to_zero(mv_diff_2)
+    # Display r and g channels
+    mv_r_curr = mv_current[0, :, :]  # Red channel
+    mv_g_curr = mv_current[1, :, :]  # Green channel
+
+    mv_r_next = mv_next[0, :, :]  # Red channel
+    mv_g_next = mv_next[1, :, :]  # Green channel
+
+    mv_r_dual = dual_mv[0, :, :]  # Red channel
+    mv_g_dual = dual_mv[1, :, :]  # Green channel
+
+
+    mv_r_diff_1 = mv_diff_1[0, :, :]  # Red channel
+    mv_g_diff_1 = mv_diff_1[1, :, :]  # Green channel
+
+    mv_r_diff_2 = mv_diff_2[0, :, :]  # Red channel
+    mv_g_diff_2 = mv_diff_2[1, :, :]  # Green channel
+
+    plt.figure(figsize=(18, 12))
+
+    # Current Red channel
+    plt.subplot(3, 4, 1)
+    plt.imshow(mv_r_curr, cmap='Reds')
+    plt.title('Current Red Channel')
+    plt.colorbar()
+
+    # Current Green channel
+    plt.subplot(3, 4, 2)
+    plt.imshow(mv_g_curr, cmap='Greens')
+    plt.title('Current Green Channel')
+    plt.colorbar()
+
+    # Next Red channel
+    plt.subplot(3, 4, 3)
+    plt.imshow(mv_r_next, cmap='Reds')
+    plt.title('Next Red Channel')
+    plt.colorbar()
+
+    # Next Green channel
+    plt.subplot(3, 4, 4)
+    plt.imshow(mv_g_next, cmap='Greens')
+    plt.title('Next Green Channel')
+    plt.colorbar()
+
+    # Dual Red channel
+    plt.subplot(3, 4, 5)
+    plt.imshow(mv_r_dual, cmap='Reds')
+    plt.title('Dual Red Channel')
+    plt.colorbar()
+
+    # Dual Green channel
+    plt.subplot(3, 4, 6)
+    plt.imshow(mv_g_dual, cmap='Greens')
+    plt.title('Dual Green Channel')
+    plt.colorbar()
+
+    # Difference 1 Red channel
+    plt.subplot(3, 4, 7)
+    plt.imshow(mv_r_diff_1, cmap='Reds')
+    plt.title('Difference 1 Red Channel')
+    plt.colorbar()
+
+    # Difference 1 Green channel
+    plt.subplot(3, 4, 8)
+    plt.imshow(mv_g_diff_1, cmap='Greens')
+    plt.title('Difference 1 Green Channel')
+    plt.colorbar()
+
+    # Difference 2 Red channel
+    plt.subplot(3, 4, 9)
+    plt.imshow(mv_r_diff_2, cmap='Reds')
+    plt.title('Difference 2 Red Channel')
+    plt.colorbar()
+
+    # Difference 2 Green channel
+    plt.subplot(3, 4, 10)
+    plt.imshow(mv_g_diff_2, cmap='Greens')
+    plt.title('Difference 2 Green Channel')
+    plt.colorbar()
+
+    plt.tight_layout()
+    plt.show()
+
+    # error = mv_mask(mv_next, mv_current)
     # error_t = np.transpose(error, (1, 2, 0))
 
-    save_grayscale_image(error.numpy(), "mv_error_mask.jpg")
+    # save_grayscale_image(error.numpy(), "mv_error_mask.jpg")
     # visualize_error_mask(mv_current, mv_next, error)
 
 
@@ -437,8 +546,8 @@ def error_mask_test() -> None:
 
 
 def main() -> None:
-    # test_mv_mask()
-    error_mask_test()
+    test_mv_mask()
+    # error_mask_test()
     # mv_zoom_windmill()
     # move_all_directions()
     # mv_zoom_windmill()

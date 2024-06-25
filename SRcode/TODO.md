@@ -96,6 +96,8 @@ Make a similiar data loader to STSS
 Abstract data loader so that:
 - [ ] the multi image dataloader can load multiple images as well as the buffers
 - [ ] the stss dataloader can load optionally load history and buffers
+- [ ] optionally warp the frames based on motion vectors
+- [ ] optionally create a mask based on motion vectors or sth else
 
 ### Video
 - [ ] Load and process the [Reds](https://seungjunnah.github.io/Datasets/reds.html) dataset with x4 for simplicity
