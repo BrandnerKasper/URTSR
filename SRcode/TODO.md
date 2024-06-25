@@ -30,6 +30,10 @@ Just some notes and todos what I'd like to consider for my thesis.
 - [x] make buffers optional
 - [x] make history frames optional
 - [ ] generate warping mask and use it for the gated convolution
+- [ ] train on VSR only
+- [ ] train on extrapolation only
+- [ ] train for extrapolation and try warping the lr image
+- [ ] train for extrapolation and try warping the history images
 
 ### Flow-Agnostic Video Representations for Fast Frame Interpolation (FLAVR)
 - [ ] Spatial SR for Single Image Super Resolution (SISR)
@@ -95,8 +99,8 @@ Make a similiar data loader to STSS
 
 Abstract data loader so that:
 - [ ] the multi image dataloader can load multiple images as well as the buffers
-- [ ] the stss dataloader can load optionally load history and buffers
-- [ ] optionally warp the frames based on motion vectors
+- [x] the stss dataloader can load optionally load history and buffers
+- [x] optionally warp the frames based on motion vectors
 - [ ] optionally create a mask based on motion vectors or sth else
 
 ### Video
