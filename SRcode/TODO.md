@@ -17,6 +17,9 @@ Just some notes and todos what I'd like to consider for my thesis.
 - [x] make buffers optional
 - [x] make history frames optional
 
+### Neural Super Sampling for Real Time Rendering with Radiance Demodulation (NDSR)
+- [ ] VSR, but with motion mask and the shit
+
 ### Space-time Supersampling (STSS):
 - [ ] Spatial SR for Single Image Super Resolution (SISR)
 - [x] Spatial SR for Real-Time Super Resolution (RTSR) -> multiple input frames
@@ -324,8 +327,10 @@ Calc PSNR, SSIM in Multi Image:
 - [ ] abstract the number of images based on the second dimension of the output tensor ([8, 2, 3, 1920, 1080])
 
 Against:
-- [x] Bilinear
-- [x] Bicubic
+- [ ] Bilinear
+- [ ] Bicubic
+- [ ] two single image sr method (maybe a method from Eduard's 4k performance challenge and EDSR)
+- [ ] two VSR methods (one should be EVRNet, the other let's see)
 - [ ] DLSS
 - [ ] FSR
 - [ ] XeSS
