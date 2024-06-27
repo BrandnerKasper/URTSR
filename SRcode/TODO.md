@@ -106,6 +106,11 @@ Abstract data loader so that:
 - [x] optionally warp the frames based on motion vectors
 - [ ] optionally create a mask based on motion vectors or sth else
 
+Generate additional dataloader:
+- [ ] do only shuffle btw sequences
+- [ ] do not batch stuff which does not belong to same sequence!!
+- [ ] handle prev state -> EVRNet, NDSR need that logic!
+
 ### Video
 - [ ] Load and process the [Reds](https://seungjunnah.github.io/Datasets/reds.html) dataset with x4 for simplicity
 
