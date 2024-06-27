@@ -401,7 +401,7 @@ def generate_error_mask(pre_warped: torch.Tensor, warped: torch.Tensor) -> torch
     # If you want to apply a threshold, uncomment the following line:
     # error_norm = torch.where(error_norm < 0.3, torch.tensor(0.0), error_norm)
     # We turn the mask to greyscale:
-    return error_norm#mask.unsqueeze(0) # general for masking it is more interesting to use the error_norm here
+    return mask.unsqueeze(0) # general for masking it is more interesting to use the error_norm here
 
 
 class STSSImagePair(Dataset):
@@ -1279,6 +1279,20 @@ def normalize_data(arr):
     return (arr - arr_min) / (arr_max - arr_min)
 
 
+def generate_motion_mask(cur: torch.Tensor, prev: torch.Tensor) -> torch.Tensor:
+    # Convert images to float32 for precise difference calculation
+    cur = cur.float()
+    prev = prev.float()
+    dual = (cur + prev) / 2
+    mask = dual - prev
+    mask[mask < 0] = 0
+    mask = normalize_data(mask)
+    mask = torch.where(mask > 0.1, 1.0, 0.0)
+    # x, y = mask[0, :, :], mask[1, :, :]
+    # mask = torch.where(torch.logical_or(x > 0, y > 0), 1.0, 0.0)
+    return mask
+
+
 class VSR(Dataset):
     def __init__(self, root: str, history: int = 3, warp: bool = False, buffers: dict[str, bool] = None,
                  last_frame_idx: int = 299, transform=transforms.ToTensor(), crop_size: int = None, scale: int = 2,
@@ -1479,11 +1493,19 @@ class VSR(Dataset):
         masks = []
         masks_names = []
         if self.warp:
+            mv = f"{self.root_lr}/{folder}/{filename}.velocity"
+            mv = load_image_from_disk(self.disk_mode, mv, self.transform)
             for i, h_frame in enumerate(history_frames):
                 mask = generate_error_mask(lr_frame, h_frame)
                 mask = normalize_data(mask)
                 mask = torch.where(mask < 0.1, 0.0, 1.0)
                 masks.append(mask)
+                # mv_filename = int(filename) - (i + 1) * 2
+                # mv_filename = f"{mv_filename:0{self.digits}d}"  # Ensure 4/8 digit format
+                # mv_his = f"{self.root_lr}/{folder}/{mv_filename}.velocity"
+                # mv_his = load_image_from_disk(self.disk_mode, mv_his, self.transform)
+                # mask = generate_motion_mask(mv, mv_his)
+                # masks.append(mask)
                 masks_names.append(f"Diff {filename} to {history_frames_names[i]}")
 
         # hr frame
@@ -1874,14 +1896,14 @@ def main() -> None:
 
     buffers = {"BASE_COLOR": False, "DEPTH": False, "METALLIC": False, "NOV": False, "ROUGHNESS": False,
                "WORLD_NORMAL": False, "WORLD_POSITION": False}
-    # vsr = VSR(root="../dataset/ue_data_npz/test", scale=2, warp=True, history=2, buffers=buffers, last_frame_idx=299,
-    #           crop_size=None, use_hflip=False, use_rotation=False, digits=4, disk_mode=DiskMode.NPZ)
-    # vsr.display_item(80)
-    # for i in range(12):
-    #     vsr.display_item(i*100)
-    e_vsr = EVSR(root="../dataset/ue_data_npz/test", scale=2, warp=False, history=2, buffers=buffers, last_frame_idx=299,
-                 crop_size=None, use_hflip=False, use_rotation=False, digits=4, disk_mode=DiskMode.NPZ)
-    e_vsr.display_item(80)
+    vsr = VSR(root="../dataset/ue_data_npz/test", scale=2, warp=True, history=2, buffers=buffers, last_frame_idx=299,
+              crop_size=None, use_hflip=False, use_rotation=False, digits=4, disk_mode=DiskMode.NPZ)
+    vsr.display_item(80)
+    for i in range(12):
+        vsr.display_item(i*100)
+    # e_vsr = EVSR(root="../dataset/ue_data_npz/test", scale=2, warp=False, history=2, buffers=buffers, last_frame_idx=299,
+    #              crop_size=None, use_hflip=False, use_rotation=False, digits=4, disk_mode=DiskMode.NPZ)
+    # e_vsr.display_item(80)
 
 
 if __name__ == '__main__':
