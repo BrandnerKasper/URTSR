@@ -16,6 +16,9 @@ from models.flavr_original import Flavr_Original
 from models.stss_original import StssOriginal
 from models.stss import Stss
 from models.extrass import ExtraSS
+from models.rfdn import RFDN
+from models.rtsrn import RealTimeSRNet
+from models.evrnet import EVRNet
 
 from data.dataloader import SingleImagePair, MultiImagePair, STSSImagePair, VSR, STSSCrossValidation, DiskMode, EVSR
 from loss.loss import EBMELoss, STSSLoss
@@ -68,6 +71,12 @@ def init_model(model_name: str, scale: int, batch_size: int, crop_size: int, buf
             return Stss(scale=scale, buffer_cha=buffer_cha, history_cha=history_cha)
         case "ExtraSS":
             return ExtraSS(scale=scale, batch_size=batch_size, crop_size=crop_size, buffer_cha=buffer_cha, history_cha=history_cha)
+        case "RFDN":
+            return RFDN(upscale=scale)
+        case "RTSRN":
+            return RealTimeSRNet(upscale=scale)
+        case "EVRNet":
+            return EVRNet(scale=scale, batch_size=batch_size, crop_size=crop_size)
         case _:
             raise ValueError(f"The model '{model_name}' is not a valid model.")
 
