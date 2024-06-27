@@ -7,7 +7,7 @@ from utils import utils
 import argparse
 from torch.utils.data import DataLoader
 
-from data.dataloader import SingleImagePair, MultiImagePair, STSSCrossValidation2, STSSImagePair, DiskMode
+from data.dataloader import SingleImagePair, MultiImagePair, STSSCrossValidation2, STSSImagePair, DiskMode, VSR
 from config import load_yaml_into_config, Config
 
 
@@ -215,10 +215,35 @@ def evaluate_trad(config_path: str) -> None:
     file.close()
 
 
+def evaluate_trad2() -> None:
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    # Loading and preparing data
+    dataset_path = f"dataset/ue_data_npz/val"
+    buffers = {"BASE_COLOR": False, "DEPTH": False, "METALLIC": False, "NOV": False, "ROUGHNESS": False,
+               "WORLD_NORMAL": False, "WORLD_POSITION": False}
+    eval_dataset = VSR(root=dataset_path, scale=2, history=0, warp=False, buffers=buffers, last_frame_idx=299,
+                        crop_size=None, use_hflip=False, use_rotation=False, digits=4,
+                        disk_mode=DiskMode.NPZ)
+    eval_loader = DataLoader(dataset=eval_dataset, batch_size=1, shuffle=False, num_workers=8)
+
+    total_metric = utils.Metrics([0], [0])
+
+    for ss in tqdm(eval_loader, desc=f"Eval on ue data", dynamic_ncols=True):
+        lr = ss[0].to(device)
+        hr = ss[4].to(device)
+        res = utils.upscale(lr, 2, ).unsqueeze(0)
+        metric = utils.calculate_metrics(hr, res, "single")
+        total_metric += metric
+
+    average_metric = total_metric / len(eval_loader)
+    print(average_metric)
+
+
 def main() -> None:
-    args = parse_arguments()
-    file_path = args.file_path
-    evaluate(file_path)
+    # args = parse_arguments()
+    # file_path = args.file_path
+    # evaluate(file_path)
+    evaluate_trad2()
 
 
 if __name__ == '__main__':
