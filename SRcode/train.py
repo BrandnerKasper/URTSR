@@ -15,7 +15,7 @@ from config import load_yaml_into_config, create_comment_from_config
 
 def parse_arguments() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Train a SR network based on a config file.")
-    parser.add_argument('file_path', type=str, nargs='?', default='configs/stss_extra.yaml', help="Path to the config file")
+    parser.add_argument('file_path', type=str, nargs='?', default='configs/rfdn.yaml', help="Path to the config file")
     args = parser.parse_args()
     return args
 
@@ -340,10 +340,10 @@ def train2(filepath: str) -> None:
     # Loading and preparing data
     # train data
     train_dataset = config.train_dataset
-    train_loader = DataLoader(dataset=train_dataset, batch_size=batch_size, num_workers=num_workers, shuffle=True)
+    train_loader = DataLoader(dataset=train_dataset, batch_size=batch_size, num_workers=num_workers, shuffle=False)
     # val data
     val_dataset = config.val_dataset
-    val_loader = DataLoader(dataset=val_dataset, batch_size=1, shuffle=True, num_workers=num_workers)
+    val_loader = DataLoader(dataset=val_dataset, batch_size=1, shuffle=False, num_workers=num_workers)
 
     writer.add_text("Model detail", f"{config}", -1)
 
@@ -371,7 +371,7 @@ def train2(filepath: str) -> None:
             hr_image = ss[4].to(device)
 
             # forward pass
-            output = model(lr_image, feature_images, history_images, mask_images)
+            output = model(lr_image) #feature_images, history_images, mask_images)
             loss = criterion(output, hr_image)  # + 0.1 * lpips
             loss.backward()
 
@@ -413,7 +413,7 @@ def train2(filepath: str) -> None:
 
             with torch.no_grad():
                 # forward pass
-                output = model(lr_image, feature_images, history_images, mask_images)
+                output = model(lr_image)#, feature_images, history_images, mask_images)
                 output = torch.clamp(output, min=0.0, max=1.0)
 
             # Calc PSNR and SSIM
