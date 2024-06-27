@@ -1,6 +1,12 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import lpips
+
+try:
+    from ..utils.utils import calculate_ssim
+except ImportError:
+    from utils.utils import calculate_ssim
 
 
 def census_transform(img, kernel_size=3):
@@ -29,7 +35,7 @@ def census_transform(img, kernel_size=3):
     return torch.nn.functional.pad(census.float() / 255, (1, 1, 1, 1), mode='reflect')
 
 
-class CensusTransform(torch.nn.Module):
+class CensusTransform(nn.Module):
     """
     Calculates the census transform of an image of shape [N x C x H x W] with batch size N, number of channels C,
     height H and width W. If C > 1, the census transform is applied independently on each channel.
@@ -79,3 +85,33 @@ class EBMELoss(nn.Module):
 
     def forward(self, x, y):
         return self.charbonnier_loss(x, y) + 0.1 * self.census_loss(x, y)
+
+
+class SSIM(nn.Module):
+    def __init__(self):
+        super(SSIM, self).__init__()
+
+    def forward(self, sr, hr):
+        return 1 - calculate_ssim(hr, sr)
+
+
+class STSSLoss(nn.Module):
+    def __init__(self):
+        super(STSSLoss, self).__init__()
+        self.l1_loss = nn.L1Loss()
+        self.vgg_model = lpips.LPIPS(net='vgg').cuda()
+
+    def forward(self, x, y):
+        return (self.l1_loss(x, y) + 0.1 * self.vgg_model(x * 2 - 1, y * 2 - 1)).mean()
+
+
+class NDSRLoss(nn.Module):
+    def __init__(self):
+        super(NDSRLoss, self).__init__()
+        self.ssim = SSIM()
+        self.l1 = nn.L1Loss()
+        self.temporal = nn.HuberLoss()
+
+    def forward(self, x, y, mask_prev):
+        mask_prev = F.interpolate(mask_prev, scale_factor=2, mode="bilinear")
+        return 1 * self.l1(x, y) + 1 * self.ssim(x, y) + 1 * self.huber_loss(mask_prev * x, mask_prev * y)
