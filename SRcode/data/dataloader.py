@@ -182,6 +182,205 @@ class SingleImagePair(Dataset):
         plt.show()
 
 
+class SISR(Dataset):
+    def __init__(self, root: str, transform=transforms.ToTensor(), scale: int = 2,
+                 sequence_length: int = 300, shuffle_sequence: bool = False, shuffle_frames: bool = False,
+                 crop_size: int = None, use_hflip: bool = False, use_rotation: bool = False):
+        self.root_hr = os.path.join(root, "HR")
+        if scale == 4:
+            self.root_lr = os.path.join(root, "LRX4")
+        else:
+            self.root_lr = os.path.join(root, "LR")
+        self.transform = transform
+        self.crop_size = crop_size
+        self.scale = scale
+        self.sequence_length = sequence_length
+        self.use_hflip = use_hflip
+        self.use_rotation = use_rotation
+        self.filenames, self.sequence_names = self.init_filenames()
+        if shuffle_sequence:
+            self.shuffle_sequences()
+        if shuffle_frames:
+            self.shuffle_frames()
+
+    def init_filenames(self) -> (list[list[str]], list[str]):
+        filenames = []
+        sequence_names = []
+        for directory in os.listdir(self.root_hr):
+            sequence_names.append(directory)
+            sub_filenames = []
+            for file in os.listdir(os.path.join(self.root_hr, directory)):
+                file = os.path.splitext(file)[0]
+                sub_filenames.append(file)
+            filenames.append(sorted(set(sub_filenames)))
+        return filenames, sequence_names
+
+    def shuffle_sequences(self):
+        combined = list(zip(self.filenames, self.sequence_names))
+        random.shuffle(combined)
+        self.filenames, self.sequence_names = zip(*combined)
+        self.filenames, self.sequence_names = list(self.filenames), list(self.sequence_names)
+
+    def shuffle_frames(self):
+        for sequence in self.filenames:
+            random.shuffle(sequence)
+
+    def __len__(self) -> int:
+        length = 0
+        for sequence in self.filenames:
+            length += len(sequence)
+        return length
+
+    def get(self, idx) -> str:
+        sub_idx = math.floor(idx / self.sequence_length)
+        idx = idx - self.sequence_length * sub_idx
+        return f"{self.sequence_names[sub_idx]}/{self.filenames[sub_idx][idx]}"
+
+    def __getitem__(self, idx: int) -> (torch.Tensor, torch.Tensor):
+        common_filename = self.get(idx)
+
+        lr_path = os.path.join(self.root_lr, common_filename)
+        hr_path = os.path.join(self.root_hr, common_filename)
+
+        lr_image = load_image_from_disk(DiskMode.CV2, lr_path, self.transform)
+        hr_image = load_image_from_disk(DiskMode.CV2, hr_path, self.transform)
+
+        # Randomly crop image
+        if self.crop_size:
+            lr_image, hr_image = get_random_crop_pair(lr_image, hr_image, self.crop_size, self.scale)
+
+        # Augment image by h and v flip and rot by 90
+        lr_image, hr_image = self.augment(lr_image, hr_image)
+
+        return lr_image, hr_image
+
+    def augment(self, lr_image: torch.Tensor, hr_image: torch.Tensor) -> (torch.Tensor, torch.Tensor):
+        # Apply random horizontal flip
+        if self.use_hflip:
+            if random.random() > 0.5:
+                lr_image = flip_image_horizontal(lr_image)
+                hr_image = flip_image_horizontal(hr_image)
+
+        # Apply random rotation by v flipping and rot of 90
+        if self.use_rotation:
+            if random.random() > 0.5:
+                lr_image = flip_image_vertical(lr_image)
+                hr_image = flip_image_vertical(hr_image)
+        if self.use_rotation:
+            if random.random() > 0.5:
+                angle = -90  # for clockwise rotation like BasicSR
+                lr_image = rotate_image(lr_image, angle)
+                hr_image = rotate_image(hr_image, angle)
+        return lr_image, hr_image
+
+    def get_filename(self, idx: int) -> str:
+        path = self.get(idx)
+        filename = path.split("/")[-1]
+        filename = filename.split(".")[0]
+        return filename
+
+    def get_sequence(self, idx: int) -> str:
+        sub_idx = math.floor(idx / self.sequence_length)
+        return self.sequence_names[sub_idx]
+
+    def display_item(self, idx: int) -> None:
+        lr_image, hr_image = self.__getitem__(idx)
+        lr_image = FV.to_pil_image(lr_image)
+        hr_image = FV.to_pil_image(hr_image)
+
+        fig, axes = plt.subplots(1, 2, figsize=(10, 10))
+        fig.suptitle(f"Sequence {self.get_sequence(idx)} Image {self.get_filename(idx)}")
+        axes[0].imshow(lr_image)
+        axes[0].set_title(f'LR')
+        axes[1].imshow(hr_image)
+        axes[1].set_title(f'HR')
+        plt.show()
+
+
+class SimpleSTSS(Dataset):
+    def __init__(self, root: str, transform=transforms.ToTensor(), pattern: str = None,
+                 crop_size: int = None, scale: int = 2,
+                 use_hflip: bool = False, use_rotation: bool = False):
+        self.root_hr = os.path.join(root, "HR")
+        self.root_lr = os.path.join(root, "LR")
+        self.transform = transform
+        self.pattern = pattern
+        self.crop_size = crop_size
+        self.scale = scale
+        self.use_hflip = use_hflip
+        self.use_rotation = use_rotation
+        self.filenames = self.init_filenames()
+
+    def init_filenames(self) -> list[str]:
+        filenames = []
+        for i in range(1000 + 1):
+            if i < 5:
+                continue
+            filenames.append(f"{i:0{4}d}")
+        return filenames
+
+    def __len__(self) -> int:
+        return len(self.filenames)
+
+    def __getitem__(self, idx: int) -> (torch.Tensor, torch.Tensor):
+        common_filename = self.filenames[idx]
+        if self.pattern:
+            lr_path = os.path.join(self.root_lr, common_filename + self.pattern)
+        else:
+            lr_path = os.path.join(self.root_lr, common_filename)
+        hr_path = os.path.join(self.root_hr, common_filename)
+
+        lr_image = load_image_from_disk(DiskMode.CV2, lr_path, self.transform)
+        hr_image = load_image_from_disk(DiskMode.CV2, hr_path, self.transform)
+
+        # Randomly crop image
+        if self.crop_size:
+            lr_image, hr_image = get_random_crop_pair(lr_image, hr_image, self.crop_size, self.scale)
+
+        # Augment image by h and v flip and rot by 90
+        lr_image, hr_image = self.augment(lr_image, hr_image)
+
+        return lr_image, hr_image
+
+    def augment(self, lr_image: torch.Tensor, hr_image: torch.Tensor) -> (torch.Tensor, torch.Tensor):
+        # Apply random horizontal flip
+        if self.use_hflip:
+            if random.random() > 0.5:
+                lr_image = flip_image_horizontal(lr_image)
+                hr_image = flip_image_horizontal(hr_image)
+
+        # Apply random rotation by v flipping and rot of 90
+        if self.use_rotation:
+            if random.random() > 0.5:
+                lr_image = flip_image_vertical(lr_image)
+                hr_image = flip_image_vertical(hr_image)
+        if self.use_rotation:
+            if random.random() > 0.5:
+                angle = -90  # for clockwise rotation like BasicSR
+                lr_image = rotate_image(lr_image, angle)
+                hr_image = rotate_image(hr_image, angle)
+        return lr_image, hr_image
+
+    def get_filename(self, idx: int) -> str:
+        path = self.filenames[idx]
+        filename = path.split("/")[-1]
+        filename = filename.split(".")[0]
+        return filename
+
+    def display_item(self, idx: int) -> None:
+        lr_image, hr_image = self.__getitem__(idx)
+        lr_image = FV.to_pil_image(lr_image)
+        hr_image = FV.to_pil_image(hr_image)
+
+        fig, axes = plt.subplots(1, 2, figsize=(10, 10))
+        axes[0].imshow(lr_image)
+        axes[0].set_title('LR image')
+        axes[1].imshow(hr_image)
+        axes[1].set_title('HR image')
+        plt.show()
+
+
+
 class MultiImagePair(Dataset):
     def __init__(self, root: str, number_of_frames: int = 4, last_frame_idx: int = 100,
                  transform=transforms.ToTensor(), crop_size: int = None, scale: int = 4,
@@ -1894,13 +2093,24 @@ def main() -> None:
     #                                   use_hflip=False, use_rotation=False)
     # cross_val2.display_item(len(cross_val2)-1)
 
-    buffers = {"BASE_COLOR": False, "DEPTH": False, "METALLIC": False, "NOV": False, "ROUGHNESS": False,
-               "WORLD_NORMAL": False, "WORLD_POSITION": False}
-    vsr = VSR(root="../dataset/ue_data_npz/test", scale=2, warp=True, history=2, buffers=buffers, last_frame_idx=299,
-              crop_size=None, use_hflip=False, use_rotation=False, digits=4, disk_mode=DiskMode.NPZ)
-    vsr.display_item(80)
-    for i in range(12):
-        vsr.display_item(i*100)
+    # path = "//media/tobiasbrandner/Data/UE_data/val"
+    # eval_dataset = SISR(root=path, scale=4, shuffle_frames=True, shuffle_sequence=True)
+    # eval_dataset.__len__()
+    # for i in range(8):
+    #     print(eval_dataset.sequence_names[i])
+    #     eval_dataset.display_item(i*300)
+
+    path = "//media/tobiasbrandner/Data/STSS/Lewis/test"
+    stss_dataset = SimpleSTSS(root=path)
+    stss_dataset.display_item(995)
+
+    # buffers = {"BASE_COLOR": False, "DEPTH": False, "METALLIC": False, "NOV": False, "ROUGHNESS": False,
+    #            "WORLD_NORMAL": False, "WORLD_POSITION": False}
+    # vsr = VSR(root="../dataset/ue_data_npz/test", scale=2, warp=True, history=2, buffers=buffers, last_frame_idx=299,
+    #           crop_size=None, use_hflip=False, use_rotation=False, digits=4, disk_mode=DiskMode.NPZ)
+    # vsr.display_item(80)
+    # for i in range(12):
+    #     vsr.display_item(i*100)
     # e_vsr = EVSR(root="../dataset/ue_data_npz/test", scale=2, warp=False, history=2, buffers=buffers, last_frame_idx=299,
     #              crop_size=None, use_hflip=False, use_rotation=False, digits=4, disk_mode=DiskMode.NPZ)
     # e_vsr.display_item(80)

@@ -142,50 +142,6 @@ def init_dataset(name: str, extra: bool, history: int, warp: bool, buffers: dict
                                   transform=transforms.ToTensor(), crop_size=None, scale=4,
                                   use_hflip=False, use_rotation=False, digits=8)
             return train, val
-        case "matrix":
-            train = MultiImagePair(root=f"{root}/train", number_of_frames=4, last_frame_idx=100,
-                                   transform=transforms.ToTensor(), crop_size=crop_size, scale=2,
-                                   use_hflip=use_hflip, use_rotation=use_rotation, digits=4, disk_mode=DiskMode.CV2)
-            val = MultiImagePair(root=f"{root}/val", number_of_frames=4, last_frame_idx=100,
-                                   transform=transforms.ToTensor(), crop_size=crop_size, scale=2,
-                                   use_hflip=use_hflip, use_rotation=use_rotation, digits=4, disk_mode=DiskMode.CV2)
-            return train, val
-        case "matrix_png":
-            train = MultiImagePair(root=f"{root}/train", number_of_frames=4, last_frame_idx=1499,
-                                   transform=transforms.ToTensor(), crop_size=crop_size, scale=2,
-                                   use_hflip=use_hflip, use_rotation=use_rotation, digits=4, disk_mode=DiskMode.CV2)
-            val = MultiImagePair(root=f"{root}/val", number_of_frames=4, last_frame_idx=599,
-                                 transform=transforms.ToTensor(), crop_size=crop_size, scale=2,
-                                 use_hflip=use_hflip, use_rotation=use_rotation, digits=4, disk_mode=DiskMode.CV2)
-            return train, val
-        case "matrix_pt":
-            train = MultiImagePair(root=f"{root}/train", number_of_frames=4, last_frame_idx=1499,
-                                   transform=transforms.ToTensor(), crop_size=crop_size, scale=2,
-                                   use_hflip=use_hflip, use_rotation=use_rotation, digits=4, disk_mode=DiskMode.PT)
-            val = MultiImagePair(root=f"{root}/val", number_of_frames=4, last_frame_idx=599,
-                                 transform=transforms.ToTensor(), crop_size=crop_size, scale=2,
-                                 use_hflip=use_hflip, use_rotation=use_rotation, digits=4, disk_mode=DiskMode.PT)
-            return train, val
-        case "matrix_npz":
-            train = MultiImagePair(root=f"{root}/train", number_of_frames=4, last_frame_idx=1499,
-                                   transform=transforms.ToTensor(), crop_size=crop_size, scale=2,
-                                   use_hflip=use_hflip, use_rotation=use_rotation, digits=4, disk_mode=DiskMode.NPZ)
-            val = MultiImagePair(root=f"{root}/val", number_of_frames=4, last_frame_idx=599,
-                                 transform=transforms.ToTensor(), crop_size=crop_size, scale=2,
-                                 use_hflip=use_hflip, use_rotation=use_rotation, digits=4, disk_mode=DiskMode.NPZ)
-            return train, val
-        # case "ue_data":
-        #     train = STSSImagePair(root=f"{root}/train", scale=2, extra=extra, history=history, buffers=buffers, last_frame_idx=299, crop_size=crop_size,
-        #                           use_hflip=use_hflip, use_rotation=use_rotation, digits=4)
-        #     val = STSSImagePair(root=f"{root}/val", scale=2, extra=extra, history=history, buffers=buffers, last_frame_idx=299, crop_size=crop_size,
-        #                         use_hflip=use_hflip, use_rotation=use_rotation, digits=4)
-        #     return train, val
-        # case "ue_data_npz":
-        #     train = STSSImagePair(root=f"{root}/train", scale=2, extra=extra, history=history, buffers=buffers, last_frame_idx=299, crop_size=crop_size,
-        #                           use_hflip=use_hflip, use_rotation=use_rotation, digits=4, disk_mode=DiskMode.NPZ)
-        #     val = STSSImagePair(root=f"{root}/val", scale=2, extra=extra, history=history, buffers=buffers, last_frame_idx=299, crop_size=crop_size,
-        #                         use_hflip=use_hflip, use_rotation=use_rotation, digits=4, disk_mode=DiskMode.NPZ)
-        #     return train, val
         case "ue_data_npz":
             if extra:
                 train = EVSR(root=f"{root}/train", scale=2, history=history, warp=warp, buffers=buffers,
@@ -203,6 +159,8 @@ def init_dataset(name: str, extra: bool, history: int, warp: bool, buffers: dict
                       crop_size=crop_size, use_hflip=use_hflip, use_rotation=use_rotation, digits=4,
                       disk_mode=DiskMode.NPZ)
             return train, val
+        case "UE_data":
+            pass
         case _:
             raise ValueError(f"The dataset '{name}' is not a valid dataset.")
 

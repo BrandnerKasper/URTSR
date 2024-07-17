@@ -392,7 +392,7 @@ def train2(filepath: str) -> None:
         writer.add_scalar('Train/Loss', average_loss, epoch)
 
         # val loop
-        if (epoch + 1) % 5 != 1:
+        if (epoch + 1) % 5 != 0:
             continue
         total_metrics = utils.Metrics([0], [0])
 

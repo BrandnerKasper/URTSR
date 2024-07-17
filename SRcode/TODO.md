@@ -18,25 +18,26 @@ Just some notes and todos what I'd like to consider for my thesis.
 - [x] make history frames optional
 
 ### Neural Super Sampling for Real Time Rendering with Radiance Demodulation (NDSR)
-- [ ] VSR, but with motion mask and the shit
+- [ ] take the NDSR network with their convLSTM and modify it to perform VSR on the original image instead of the demodulated one
 
 ### Space-time Supersampling (STSS):
 - [ ] Spatial SR for Single Image Super Resolution (SISR)
 - [x] Spatial SR for Real-Time Super Resolution (RTSR) -> multiple input frames
 - [ ] Temporal SR
 - [x] find out how to train STSS correctly (two forward passes: 1. SS frame, 2. ESS frame)
-- [ ] implement their loss
+- [x] implement their loss
 - [x] for now generate two images based on one forward pass and have an output of 6
 - [ ] later try it with two different forward passes but update the weights (backward) after each forward pass and NOT together
 - [x] instead of the hole inpaint function use a small attention layer from [here](https://github.com/swz30/Restormer/blob/main/basicsr/models/archs/restormer_arch.py)
 - [x] train without buffers on my data set and cross validate on Lewis scene and look how good it performs
 - [x] make buffers optional
 - [x] make history frames optional
-- [ ] generate warping mask and use it for the gated convolution
-- [ ] train on VSR only
-- [ ] train on extrapolation only
-- [ ] train for extrapolation and try warping the lr image
-- [ ] train for extrapolation and try warping the history images
+- [x] generate warping mask and use it for the gated convolution
+- [x] train on VSR only
+- [x] train on extrapolation only
+- [x] train for extrapolation and try warping the lr image
+- [x] train for extrapolation and try warping the history images
+- [ ] take the original STSS network and slightly modify it to only do VSR and train that on each sequence!
 
 ### Flow-Agnostic Video Representations for Fast Frame Interpolation (FLAVR)
 - [ ] Spatial SR for Single Image Super Resolution (SISR)
@@ -55,13 +56,16 @@ Just some notes and todos what I'd like to consider for my thesis.
 - [x] add a 'how often is the image divided' number to every model so it can be abstracted for train, evaluate and test
 - [x] checkout the formula in BasicSR for calculating the epochs amount based on iterations/dataset.size (check if batch size influences sth here)
 - [ ] abstract config and train so it can be trained on SISR and MISR (includes Spatial SR as well as Temporal SR)
-- [ ] abstract code base so that networks can be trained with different amount of buffer data
+- [x] abstract code base so that networks can be trained with different amount of buffer data
+- [ ] add LPIPS as metric
+- [ ] clean up code!
 
 ### Training
 At the moment training is quite slow as we need to read 4 png images per get_item for LR (1080p) and two for HR (4k)
 - [x] check how Eduard handled reading such big images from disk -> cv2 imread
-- [ ] cv2 still too slow, try to compress all training and val data into npz and pt files and see how much faster it would be (XTX PC!)
-- [ ] find more ways to speed up the loading from disk thing..
+- [x] cv2 still too slow, try to compress all training and val data into npz and pt files and see how much faster it would be (XTX PC!)
+- [x] find more ways to speed up the loading from disk thing..
+- [x] npz is a bit faster but a bit bigger size
 
 ### Timing:
 A forward pass of our network should at max take 33.3ms.

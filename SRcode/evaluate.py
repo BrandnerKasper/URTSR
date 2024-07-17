@@ -7,7 +7,8 @@ from utils import utils
 import argparse
 from torch.utils.data import DataLoader
 
-from data.dataloader import SingleImagePair, MultiImagePair, STSSCrossValidation2, STSSImagePair, DiskMode, VSR
+from data.dataloader import SingleImagePair, MultiImagePair, STSSCrossValidation2, STSSImagePair, DiskMode, VSR, SISR, \
+    SimpleSTSS
 from config import load_yaml_into_config, Config
 
 
@@ -218,32 +219,71 @@ def evaluate_trad(config_path: str) -> None:
 def evaluate_trad2() -> None:
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     # Loading and preparing data
-    dataset_path = f"dataset/ue_data_npz/val"
-    buffers = {"BASE_COLOR": False, "DEPTH": False, "METALLIC": False, "NOV": False, "ROUGHNESS": False,
-               "WORLD_NORMAL": False, "WORLD_POSITION": False}
-    eval_dataset = VSR(root=dataset_path, scale=2, history=0, warp=False, buffers=buffers, last_frame_idx=299,
-                        crop_size=None, use_hflip=False, use_rotation=False, digits=4,
-                        disk_mode=DiskMode.NPZ)
+    dataset_path = "/media/tobiasbrandner/Data/UE_data/val"
+    upscale_mode = "bicubic"
+    scale = 2
+    eval_dataset = SISR(root=dataset_path, scale=scale)
     eval_loader = DataLoader(dataset=eval_dataset, batch_size=1, shuffle=False, num_workers=8)
+    sequence_length = eval_dataset.sequence_length
+    sequence_names = eval_dataset.sequence_names
+    metrics = {}
 
-    total_metric = utils.Metrics([0], [0])
+    total_metric = utils.Metrics()
+    count = 0
+    sequences = 0
+    for lr, hr in tqdm(eval_loader, desc=f"Eval on ue data", dynamic_ncols=True):
+        lr = lr.to(device)
+        hr = hr.to(device).squeeze(0)
+        if upscale_mode == "bilinear":
+            res = utils.upscale(lr, scale, upscale_mode).squeeze(0)
+        else:
+            res = utils.upscale(lr, scale, upscale_mode).squeeze(0).squeeze(0)
+        metric = utils.calculate_metrics(hr, torch.clamp(res, min=0.0, max=1.0))
+        total_metric += metric
+        if count == sequence_length - 1:
+            metrics[sequence_names[sequences]] = total_metric / sequence_length
+            total_metric = utils.Metrics()
+            count = 0
+            sequences += 1
+        else:
+            count += 1
 
-    for ss in tqdm(eval_loader, desc=f"Eval on ue data", dynamic_ncols=True):
-        lr = ss[0].to(device)
-        hr = ss[4].to(device)
-        res = utils.upscale(lr, 2, ).unsqueeze(0)
-        metric = utils.calculate_metrics(hr, res, "single")
+    # Printing
+    for k, v in metrics.items():
+        print(f"Sequence {k}: {v}")
+
+
+def eval_trad_stss_simple():
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    path = "//media/tobiasbrandner/Data/STSS/Lewis/test"
+    upscale_mode = "bicubic"
+    scale = 2
+
+    eval_dataset = SimpleSTSS(root=path, scale=scale)
+    eval_loader = DataLoader(dataset=eval_dataset, batch_size=1, shuffle=False, num_workers=8)
+    total_metric = utils.Metrics()
+
+    for lr, hr in tqdm(eval_loader, desc=f"Eval on stss data", dynamic_ncols=True):
+        lr = lr.to(device)
+        hr = hr.to(device).squeeze(0)
+        if upscale_mode == "bilinear":
+            res = utils.upscale(lr, scale, upscale_mode).squeeze(0)
+        else:
+            res = utils.upscale(lr, scale, upscale_mode).squeeze(0).squeeze(0)
+        metric = utils.calculate_metrics(hr, torch.clamp(res, min=0.0, max=1.0))
         total_metric += metric
 
-    average_metric = total_metric / len(eval_loader)
-    print(average_metric)
+    # Printing
+    total_metric = total_metric / len(eval_loader)
+    print(total_metric)
 
 
 def main() -> None:
     # args = parse_arguments()
     # file_path = args.file_path
     # evaluate(file_path)
-    evaluate_trad2()
+    # evaluate_trad2()
+    eval_trad_stss_simple()
 
 
 if __name__ == '__main__':
