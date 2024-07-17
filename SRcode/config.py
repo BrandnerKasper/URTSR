@@ -20,7 +20,7 @@ from models.rfdn import RFDN
 from models.rtsrn import RealTimeSRNet
 from models.evrnet import EVRNet
 
-from data.dataloader import SingleImagePair, MultiImagePair, STSSImagePair, VSR, STSSCrossValidation, DiskMode, EVSR
+from data.dataloader import SingleImagePair, MultiImagePair, STSSImagePair, VSR, DiskMode, EVSR
 from loss.loss import EBMELoss, STSSLoss
 
 
