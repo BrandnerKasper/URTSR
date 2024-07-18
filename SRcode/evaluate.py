@@ -1,4 +1,5 @@
 import yaml
+from lpips import lpips
 from torchvision import transforms
 import torch
 from tqdm import tqdm
@@ -164,8 +165,10 @@ def evaluate_trad() -> None:
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     # Loading and preparing data
     dataset_path = "/media/tobiasbrandner/Data/UE_data/val"
-    upscale_mode = "bicubic"
+    upscale_mode = "bilinear"
     scale = 2
+    eval_alex_model = lpips.LPIPS(net='alex').cuda()
+
     eval_dataset = SISR(root=dataset_path, scale=scale)
     eval_loader = DataLoader(dataset=eval_dataset, batch_size=1, shuffle=False, num_workers=8)
     sequence_length = eval_dataset.sequence_length
@@ -182,7 +185,7 @@ def evaluate_trad() -> None:
             res = utils.upscale(lr, scale, upscale_mode).squeeze(0)
         else:
             res = utils.upscale(lr, scale, upscale_mode).squeeze(0).squeeze(0)
-        metric = utils.calculate_metrics(hr, torch.clamp(res, min=0.0, max=1.0))
+        metric = utils.calculate_metrics(hr, torch.clamp(res, min=0.0, max=1.0), eval_alex_model)
         total_metric += metric
         if count == sequence_length - 1:
             metrics[sequence_names[sequences]] = total_metric / sequence_length
@@ -200,8 +203,9 @@ def evaluate_trad() -> None:
 def eval_trad_stss_simple():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     path = "//media/tobiasbrandner/Data/STSS/Lewis/test"
-    upscale_mode = "bicubic"
+    upscale_mode = "bilinear"
     scale = 2
+    eval_alex_model = lpips.LPIPS(net='alex').cuda()
 
     eval_dataset = SimpleSTSS(root=path, scale=scale)
     eval_loader = DataLoader(dataset=eval_dataset, batch_size=1, shuffle=False, num_workers=8)
@@ -214,7 +218,7 @@ def eval_trad_stss_simple():
             res = utils.upscale(lr, scale, upscale_mode).squeeze(0)
         else:
             res = utils.upscale(lr, scale, upscale_mode).squeeze(0).squeeze(0)
-        metric = utils.calculate_metrics(hr, torch.clamp(res, min=0.0, max=1.0))
+        metric = utils.calculate_metrics(hr, torch.clamp(res, min=0.0, max=1.0), eval_alex_model)
         total_metric += metric
 
     # Printing
@@ -226,8 +230,8 @@ def main() -> None:
     # args = parse_arguments()
     # file_path = args.file_path
     # evaluate(file_path)
-    evaluate_trad()
-    # eval_trad_stss_simple()
+    # evaluate_trad()
+    eval_trad_stss_simple()
 
 
 if __name__ == '__main__':

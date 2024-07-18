@@ -417,10 +417,9 @@ class RVSRSingleSequence(Dataset):
         filename = path.split("/")[-1]
 
         # lr frames = [current, current - 1, ..., current -n], where n = # of frames
-        lr_frames = []
         lr_path = os.path.join(self.root_lr, path)
         lr_frame = load_image_from_disk(DiskMode.CV2, lr_path, self.transform)
-        lr_frames.append(lr_frame)
+        history_frames = []
         for i in range(self.history):
             # Extract the numeric part
             file = int(filename) - (i + 1) * 2
@@ -429,7 +428,7 @@ class RVSRSingleSequence(Dataset):
             # Put folder and file name back together and load the tensor
             file = f"{self.root_lr}/{folder}/{file}"
             file = load_image_from_disk(self.disk_mode, file, self.transform)
-            lr_frames.append(file)
+            history_frames.append(file)
 
         # hr frame
         hr_path = os.path.join(self.root_hr, path)
@@ -437,11 +436,11 @@ class RVSRSingleSequence(Dataset):
 
         # Randomly crop image
         if self.crop_size:
-            lr_frames, hr_frame = self.get_random_crop_pair(lr_frames, hr_frame)
+            lr_frame, history_frames, hr_frame = self.get_random_crop_pair(lr_frame, history_frames, hr_frame)
         # Augment image by h and v flip and rot by 90
-        lr_frames, hr_frame = self.augment(lr_frames, hr_frame)
+        lr_frame, history_frames, hr_frame = self.augment(lr_frame, history_frames, hr_frame)
 
-        return lr_frames, hr_frame
+        return lr_frame, history_frames, hr_frame
 
     def get_filename(self, idx: int) -> str:
         path = self.filenames[idx]
@@ -453,64 +452,75 @@ class RVSRSingleSequence(Dataset):
         return self.filenames[idx]
 
     def display_item(self, idx: int) -> None:
-        lr_frames, hr_frame = self.__getitem__(idx)
+        lr_frame, history_frames, hr_frame = self.__getitem__(idx)
 
-        num_lr_frames = len(lr_frames)
+        num_history_frames = len(history_frames)
 
         # Create a single plot with LR images on the left and HR images on the right
-        fig, axes = plt.subplots(1, num_lr_frames + 1, figsize=(15, 5))
+        fig, axes = plt.subplots(1, 1 + num_history_frames + 1, figsize=(15, 5))
 
-        # Display LR frames
-        for i, lr_frame in enumerate(lr_frames):
-            lr_image = FV.to_pil_image(lr_frame)
-            axes[i].imshow(lr_image)
-            axes[i].set_title(f'LR image {int(self.get_filename(idx)) - i*2:0{4}d}')
+        # Display LR frame
+        lr_image = FV.to_pil_image(lr_frame)
+        axes[0].imshow(lr_image)
+        axes[0].set_title(f"LR image {self.get_filename(idx)}")
+        
+        # Display history frames
+        for i, history_frame in enumerate(history_frames):
+            history_frame = FV.to_pil_image(history_frame)
+            axes[i+1].imshow(history_frame)
+            axes[i+1].set_title(f'History image {int(self.get_filename(idx)) - (i+1)*2:0{4}d}')
 
         # Display HR frame
         hr_image = FV.to_pil_image(hr_frame)
-        axes[num_lr_frames].imshow(hr_image)
-        axes[num_lr_frames].set_title(f'HR image {self.get_filename(idx)}')
+        axes[num_history_frames+1].imshow(hr_image)
+        axes[num_history_frames+1].set_title(f'HR image {self.get_filename(idx)}')
 
         plt.tight_layout()
         plt.show()
 
-    def get_random_crop_pair(self, lr_frames: list[torch.Tensor], hr_frame: torch.Tensor) \
-            -> (list[torch.Tensor], torch.Tensor):
-        lr_i, lr_j, lr_h, lr_w = transforms.RandomCrop.get_params(lr_frames[0],
+    def get_random_crop_pair(self, lr_frame: torch.Tensor, history_frames: list[torch.Tensor], hr_frame: torch.Tensor) \
+            -> (torch.Tensor, list[torch.Tensor], torch.Tensor):
+        lr_i, lr_j, lr_h, lr_w = transforms.RandomCrop.get_params(lr_frame,
                                                                   output_size=(self.crop_size, self.crop_size))
         hr_i, hr_j, hr_h, hr_w = lr_i * self.scale, lr_j * self.scale, lr_h * self.scale, lr_w * self.scale
 
-        # lrs
-        lr_frame_patches = []
-        for lr_frame in lr_frames:
-            lr_frame_patches.append(FV.crop(lr_frame, lr_i, lr_j, lr_h, lr_w))
+        # lr
+        lr_frame_patch = FV.crop(lr_frame, lr_i, lr_j, lr_h, lr_w)
+
+        # history frames
+        history_frame_patches = []
+        for history_frame in history_frames:
+            history_frame_patches.append(FV.crop(history_frame, lr_i, lr_j, lr_h, lr_w))
         # hr
         hr_frame_patch = FV.crop(hr_frame, hr_i, hr_j, hr_h, hr_w)
 
-        return lr_frame_patches, hr_frame_patch
+        return lr_frame_patch, history_frame_patches, hr_frame_patch
 
-    def augment(self, lr_frames: list[torch.Tensor], hr_frame: torch.Tensor) \
+    def augment(self, lr_frame: torch.Tensor, history_frames: list[torch.Tensor], hr_frame: torch.Tensor) \
             -> (list[torch.Tensor], torch.Tensor):
         # Apply random horizontal flip
         if self.use_hflip:
             if random.random() > 0.5:
-                for i in range(len(lr_frames)):
-                    lr_frames[i] = flip_image_horizontal(lr_frames[i])
+                lr_frame = flip_image_horizontal(lr_frame)
+                for i in range(len(history_frames)):
+                    history_frames[i] = flip_image_horizontal(history_frames[i])
                 hr_frame = flip_image_horizontal(hr_frame)
 
         # Apply random rotation by v flipping and rot of 90
         if self.use_rotation:
             if random.random() > 0.5:
-                for i in range(len(lr_frames)):
-                    lr_frames[i] = flip_image_vertical(lr_frames[i])
+                lr_frame = flip_image_vertical(lr_frame)
+                for i in range(len(history_frames)):
+                    history_frames[i] = flip_image_vertical(history_frames[i])
                 hr_frame = flip_image_vertical(hr_frame)
         if self.use_rotation:
             if random.random() > 0.5:
                 angle = -90  # for clockwise rotation like BasicSR
-                for i in range(len(lr_frames)):
-                    lr_frames[i] = rotate_image(lr_frames[i], angle)
+                lr_frame = rotate_image(lr_frame, angle)
+                for i in range(len(history_frames)):
+                    history_frames[i] = rotate_image(history_frames[i], angle)
                 hr_frame = rotate_image(hr_frame, angle)
-        return lr_frames, hr_frame
+        return lr_frame, history_frames, hr_frame
 
 
 class MultiImagePair(Dataset):

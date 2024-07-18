@@ -72,11 +72,11 @@ class Up(nn.Module):
 
 
 class StssOriginal(BaseModel):
-    def __init__(self, scale: int):
+    def __init__(self, scale: int, buffer_cha: int = 0, history_cha: int = 3 * 2):
         super(StssOriginal, self).__init__(scale=scale, down_and_up=3)
 
         self.conv_in = nn.Sequential(
-            LWGatedConv2D(3 + 9, 24, kernel=3, stride=1, pad=1),
+            LWGatedConv2D(3 + buffer_cha, 24, kernel=3, stride=1, pad=1),
             nn.ReLU(inplace=True),
             LWGatedConv2D(24, 24, kernel=3, stride=1, pad=1),
             nn.ReLU(inplace=True)
@@ -87,7 +87,7 @@ class StssOriginal(BaseModel):
         self.down_3 = DownLWGated(32, 32)
 
         self.his_1 = nn.Sequential(
-            nn.Conv2d(6, 24, kernel_size=3, stride=2, padding=1),
+            nn.Conv2d(history_cha, 24, kernel_size=3, stride=2, padding=1),
             nn.ReLU(inplace=True),
             nn.Conv2d(24, 24, kernel_size=3, stride=1, padding=1),
             nn.ReLU(inplace=True),
@@ -137,8 +137,8 @@ class StssOriginal(BaseModel):
             nn.PixelShuffle(scale)
         )
 
-    def forward(self, x, feature, his):
-        x = torch.cat([x, feature], 1)
+    def forward(self, x, his): #feature, his):
+        # x = torch.cat([x, feature], 1)
         x1 = self.conv_in(x)
         x2 = self.down_1(x1)
         x3 = self.down_2(x2)
@@ -185,12 +185,12 @@ class StssOriginal(BaseModel):
 def main() -> None:
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    model = StssOriginal(scale=2).to(device)
+    model = StssOriginal(scale=2, ).to(device)
     batch_size = 1
     input_data = (batch_size, 3, 1920, 1080)
-    feature = (batch_size, 9, 1920, 1080)
+    # feature = (batch_size, 9, 1920, 1080)
     his = (batch_size, 3, 2, 1920, 1080)
-    input_size = (input_data, feature, his)
+    input_size = (input_data, his) # feature, his)
 
     model.summary(input_size)
     model.measure_inference_time(input_size)

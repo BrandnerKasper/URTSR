@@ -7,9 +7,6 @@ from pytorch_msssim import ssim
 from torch import Tensor
 
 
-# import lpips
-
-
 # Upscale
 def upscale(lr_tensor: torch.Tensor, scale_factor: int, upscale_mode: str = 'bicubic') -> torch.Tensor:
     return nn.functional.interpolate(lr_tensor, scale_factor=scale_factor, mode=upscale_mode)
@@ -44,32 +41,34 @@ def pad_or_crop_to_target(input_t: torch.Tensor, target_t: torch.Tensor) -> Tens
 
 # Metrics
 class Metrics:
-    def __init__(self, psnr_value: float = 0.0, ssim_value: float = 0.0):
+    def __init__(self, psnr_value: float = 0.0, ssim_value: float = 0.0, lpips_value: float = 0.0):
         self.psnr_value = round(psnr_value, 2)
         self.ssim_value = round(ssim_value, 2)
+        self.lpips_value = round(lpips_value, 4)
 
     def __add__(self, other):
         if not isinstance(other, Metrics):
             raise TypeError(f"Can't add type {other} to a Metric instance.")
 
-        return Metrics(self.psnr_value + other.psnr_value, self.ssim_value + other.ssim_value)
+        return Metrics(self.psnr_value + other.psnr_value, self.ssim_value + other.ssim_value, self.lpips_value + other.lpips_value)
 
     def __truediv__(self, divisor):
         if not isinstance(divisor, (int, float)):
             raise TypeError(f"Unsupported type for division: {type(divisor)}")
 
-        return Metrics(self.psnr_value / divisor, self.ssim_value / divisor)
+        return Metrics(self.psnr_value / divisor, self.ssim_value / divisor, self.lpips_value / divisor)
 
     def __eq__(self, other):
         if not isinstance(other, Metrics):
             raise TypeError(f"Can't compare type {other} to a Metric instance.")
 
-        return (self.psnr_value, self.ssim_value) == (other.psnr_value, other.ssim_value)
+        return (self.psnr_value, self.ssim_value, self.lpips_value) == (other.psnr_value, other.ssim_value, other.lpips_value)
 
     def __str__(self):
         return (f"Metrics:\n"
                 f"  PSNR: {self.psnr_value}\n"
-                f"  SSIM: {self.ssim_value}\n")
+                f"  SSIM: {self.ssim_value}\n"
+                f"  LPIPS: {self.lpips_value}\n")
 
 
 def calculate_psnr(input_t: torch.Tensor, target_t: torch.Tensor, data_range: float = 1.0) -> float:
@@ -96,10 +95,17 @@ def calculate_ssim(img1_t: torch.Tensor, img2_t: torch.Tensor) -> float:
     return ssim_value
 
 
-def calculate_metrics(img_tensor1: torch.Tensor, img_tensor2: torch.Tensor) -> Metrics:
+def calculate_lpips(img: torch.Tensor, label: torch.Tensor, lpips_model: nn.Module) -> float:
+    lpips_t = lpips_model(img * 2 - 1, label * 2 - 1)
+    lpips_score = lpips_t.item()
+    return lpips_score
+
+
+def calculate_metrics(img_tensor1: torch.Tensor, img_tensor2: torch.Tensor, lpips_model: nn.Module) -> Metrics:
     psnr_value = calculate_psnr(img_tensor1, img_tensor2)
     ssim_value = calculate_ssim(img_tensor1, img_tensor2)
-    return Metrics(psnr_value, ssim_value)
+    lpips_value = calculate_lpips(img_tensor1, img_tensor2, lpips_model)
+    return Metrics(psnr_value, ssim_value, lpips_value)
 
 
 def main() -> None:

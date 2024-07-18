@@ -20,7 +20,7 @@ from models.rfdn import RFDN
 from models.rtsrn import RealTimeSRNet
 from models.evrnet import EVRNet
 
-from data.dataloader import SingleImagePair, MultiImagePair, STSSImagePair, VSR, DiskMode, EVSR
+from data.dataloader import SingleImagePair, MultiImagePair, VSR, DiskMode, EVSR, RVSRSingleSequence
 from loss.loss import EBMELoss, STSSLoss
 
 
@@ -66,7 +66,7 @@ def init_model(model_name: str, scale: int, batch_size: int, crop_size: int, buf
         case "Flavr_Original":
             return Flavr_Original(scale=scale)
         case "STSS_Original":
-            return StssOriginal(scale=scale)
+            return StssOriginal(scale=scale, buffer_cha=buffer_cha, history_cha=history_cha)
         case "STSS":
             return Stss(scale=scale, buffer_cha=buffer_cha, history_cha=history_cha)
         case "ExtraSS":
@@ -123,7 +123,7 @@ def init_scheduler(scheduler_data: dict, optimizer: optim.Optimizer, epochs: int
             raise ValueError(f"The scheduler '{scheduler_name}' is not a valid scheduler.")
 
 
-def init_dataset(name: str, extra: bool, history: int, warp: bool, buffers: dict[str, bool], crop_size: int, use_hflip: bool, use_rotation: bool) -> (Dataset, Dataset):
+def init_dataset(name: str, sequence: int, extra: bool, history: int, warp: bool, buffers: dict[str, bool], crop_size: int, use_hflip: bool, use_rotation: bool) -> (Dataset, Dataset):
     root = f"dataset/{name}"
     match name:
         case "DIV2K":
@@ -160,7 +160,14 @@ def init_dataset(name: str, extra: bool, history: int, warp: bool, buffers: dict
                       disk_mode=DiskMode.NPZ)
             return train, val
         case "UE_data":
-            pass
+            train = RVSRSingleSequence(root="//media/tobiasbrandner/Data/UE_data/train", scale=2, history=history,
+                                       sequence=f"{sequence:0{2}d}", sequence_length=2400, crop_size=crop_size, use_hflip=use_hflip,
+                                       use_rotation=use_rotation, disk_mode=DiskMode.CV2)
+            val_sequence = sequence + 6 # we only have 6 sequences for training..
+            val = RVSRSingleSequence(root="//media/tobiasbrandner/Data/UE_data/val", scale=2, history=history,
+                                     sequence=f"{val_sequence:0{2}d}", sequence_length=300, crop_size=None, use_hflip=False,
+                                     use_rotation=False, disk_mode=DiskMode.CV2)
+            return train, val
         case _:
             raise ValueError(f"The dataset '{name}' is not a valid dataset.")
 
@@ -192,7 +199,7 @@ class Config:
                  crop_size: int, use_hflip: bool, use_rotation: bool, number_workers: int,
                  learning_rate: float, criterion: str, optimizer: dict, scheduler: dict,
                  start_decay_epoch: Optional[int],
-                 dataset: str, history: int, warp: bool, buffers: dict[str, bool]):
+                 dataset: str, sequence: int, history: int, warp: bool, buffers: dict[str, bool]):
         self.filename: str = filename
         self.model: BaseModel = init_model(model, scale, batch_size, crop_size, calc_buffer_cha(buffers), 3*history)
         self.extra = extra
@@ -209,10 +216,11 @@ class Config:
         self.scheduler: Optional[lr_scheduler.LRScheduler] = init_scheduler(scheduler, self.optimizer, self.epochs)
         self.start_decay_epoch: Optional[int] = start_decay_epoch
         self.dataset: str = dataset
+        self.sequence: int = sequence
         self.history = history
         self.warp = warp
         self.buffers = buffers
-        self.train_dataset, self.val_dataset = init_dataset(dataset, extra, history, warp, buffers, crop_size, use_hflip, use_rotation)
+        self.train_dataset, self.val_dataset = init_dataset(dataset, sequence, extra, history, warp, buffers, crop_size, use_hflip, use_rotation)
 
     def __str__(self):
         return f"Config:\n" \
@@ -232,6 +240,7 @@ class Config:
                f"  Scheduler: {self.scheduler.__class__.__name__ if self.scheduler else 'None'}\n" \
                f"  Start Decay Epoch: {self.start_decay_epoch if self.start_decay_epoch else 'None'}\n" \
                f"  Dataset: {self.dataset} \n" \
+               f"  Sequence: {self.sequence} \n" \
                f"  History: {self.history} \n" \
                f"  Warp: {self.warp} \n" \
                f"  Buffers: \n" \
@@ -280,6 +289,7 @@ def load_yaml_into_config(file_path: str) -> Config:
         start_decay_epoch = scheduler["START_DECAY_EPOCH"]
         dataset = config_dict["DATASET"]
         dataset_name = dataset["NAME"]
+        sequence = dataset["SEQUENCE"]
         history = dataset["HISTORY"]
         warp = dataset["WARP"]
         buffers = dataset["BUFFERS"]
@@ -288,7 +298,7 @@ def load_yaml_into_config(file_path: str) -> Config:
     return Config(filename, model_name, extra, epochs, scale, batch_size,
                   crop_size, use_hflip, use_rotation, number_workers,
                   learning_rate, criterion, optimizer, scheduler, start_decay_epoch,
-                  dataset_name, history, warp, buffers)
+                  dataset_name, sequence, history, warp, buffers)
 
 
 def create_comment_from_config(file: Config) -> str:

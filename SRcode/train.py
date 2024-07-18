@@ -1,9 +1,11 @@
 import argparse
 from typing import Union
 
+from lpips import lpips
 from tqdm import tqdm
 import torch
 import torch.nn as nn
+from torch.cuda import amp
 from torchvision import transforms
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
@@ -15,7 +17,7 @@ from config import load_yaml_into_config, create_comment_from_config
 
 def parse_arguments() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Train a SR network based on a config file.")
-    parser.add_argument('file_path', type=str, nargs='?', default='configs/rfdn.yaml', help="Path to the config file")
+    parser.add_argument('file_path', type=str, nargs='?', default='configs/stss_original.yaml', help="Path to the config file")
     args = parser.parse_args()
     return args
 
@@ -65,7 +67,20 @@ def write_frames(writer: SummaryWriter, step: int, extra: bool, buffers: dict[st
     writer.add_images("ESS/GT", gt_t1, step)
 
 
-def write_vsr_frames(writer: SummaryWriter, step: int, buffer_dict: dict[str, bool], lr_image: torch.Tensor,
+def write_vsr_frames(writer: SummaryWriter, step: int, lr_image: torch.Tensor, history: list[torch.Tensor],
+                     output: torch.Tensor, gt: torch.Tensor) -> None:
+    # LR
+    writer.add_images("Images/LR", lr_image, step)
+    # History
+    for i, history_frame in enumerate(history):
+        writer.add_images(f"Images/History T-{(i + 1) * 2}", history_frame, step)
+    # Output
+    writer.add_images("Images/Output", output, step)
+    # GT
+    writer.add_images("Images/GT", gt, step)
+
+
+def write_vsr_frames_with_buffers(writer: SummaryWriter, step: int, buffer_dict: dict[str, bool], lr_image: torch.Tensor,
                      buffers: list[torch.Tensor], history: list[torch.Tensor], masks: list[torch.Tensor],
                      output: torch.Tensor, gt: torch.Tensor) -> None:
     # LR
@@ -445,10 +460,131 @@ def train2(filepath: str) -> None:
     save_model(filename, model)
 
 
+def train3(filepath: str) -> None:
+    # Setup
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    print(f"Device: {device}")
+    config = load_yaml_into_config(filepath)
+    print(config)
+    filename = config.filename.split('.')[0]
+    writer = SummaryWriter(filename_suffix=create_comment_from_config(config), comment=filename)  # log_dir="runs"
+    # Hyperparameters
+    batch_size = config.batch_size
+    epochs = config.epochs
+    num_workers = config.number_workers
+    start_decay_epoch = config.start_decay_epoch
+
+    # Model details
+    model = config.model.to(device)
+    scaler = amp.GradScaler()
+    # buffers_dict = config.buffers
+    criterion = config.criterion
+    optimizer = config.optimizer
+    scheduler = config.scheduler
+
+    # Loading and preparing data
+    # train data
+    train_dataset = config.train_dataset
+    train_loader = DataLoader(dataset=train_dataset, batch_size=batch_size, num_workers=num_workers, shuffle=True)
+    # val data
+    val_dataset = config.val_dataset
+    val_loader = DataLoader(dataset=val_dataset, batch_size=1, shuffle=True, num_workers=num_workers)
+    eval_alex_model = lpips.LPIPS(net='alex').cuda()
+
+    writer.add_text("Model detail", f"{config}", -1)
+
+    iteration_counter = 0
+
+    # Training & Validation Loop
+    for epoch in tqdm(range(epochs), desc='Train & Validate', dynamic_ncols=True):
+        # train loop
+        total_loss = 0.0
+
+        for lr_image, history_images, hr_image in tqdm(train_loader, desc=f'Training, Epoch {epoch + 1}/{epochs}', dynamic_ncols=True):
+            # setup
+            optimizer.zero_grad()
+            # prepare data
+            lr_image = lr_image.to(device)
+            history_images = [img.to(device) for img in history_images]
+            history_images = torch.stack(history_images, dim=2)
+            hr_image = hr_image.to(device)
+
+            # forward pass
+            with amp.autocast():
+                output = model(lr_image, history_images)
+                loss = criterion(output, hr_image)
+            scaler.scale(loss.mean()).backward()
+
+            scaler.step(optimizer)
+            scaler.update()
+
+            total_loss += loss.item()
+            iteration_counter += 1 * batch_size
+
+        # scheduler update if we have one
+        if scheduler is not None:
+            if epoch > start_decay_epoch:
+                scheduler.step()
+        # Loss
+        average_loss = total_loss / len(train_loader)
+        print("\n")
+        print(f"Loss: {average_loss:.4f}\n")
+        # Log loss to TensorBoard
+        writer.add_scalar('Train/Loss', average_loss, epoch)
+
+        # val loop
+        if (epoch + 1) % 10 != 0:
+            continue
+        total_metrics = utils.Metrics(0, 0)
+
+        val_counter = 0
+        for lr_image, history_images, hr_image in tqdm(val_loader, desc=f"Validation, Epoch {epoch + 1}/{epochs}", dynamic_ncols=True):
+            # prepare data
+            lr_image = lr_image.to(device)
+            history_images = [img.to(device) for img in history_images]
+            history_images = torch.stack(history_images, dim=2)
+            hr_image = hr_image.to(device)
+
+            with torch.no_grad():
+                # forward pass
+                with amp.autocast():
+                    output = model(lr_image, history_images)
+                output = torch.clamp(output, min=0.0, max=1.0)
+
+            # Calc PSNR and SSIM
+            # SS frame
+            metric = utils.calculate_metrics(hr_image.squeeze(0), output.squeeze(0), eval_alex_model)
+            total_metrics += metric
+
+            # Display the val process in tensorboard
+            if val_counter != 0:
+                continue
+            write_vsr_frames(writer, iteration_counter, lr_image, torch.unbind(history_images, dim=2), output, hr_image)
+            val_counter += 1
+
+        # PSNR & SSIM
+        average_metric = total_metrics / len(val_loader)
+        print("\n")
+        print(f"Total {average_metric}")
+
+        # Log PSNR & SSIM to TensorBoard
+        # PSNR
+        writer.add_scalar("Val/PSNR", average_metric.psnr_value, epoch)
+        # SSIM
+        writer.add_scalar("Val/SSIM", average_metric.ssim_value, epoch)
+        # LPIPS
+        writer.add_scalar("Val/LPIPS", average_metric.lpips_value, epoch)
+
+        # End Log
+    writer.close()
+    # Save trained models
+    save_model(filename, model)
+
+
 def main() -> None:
     args = parse_arguments()
     file_path = args.file_path
-    train2(file_path)
+    train3(file_path)
 
 
 # Press the green button in the gutter to run the script.
