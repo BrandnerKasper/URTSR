@@ -17,7 +17,7 @@ from config import load_yaml_into_config, create_comment_from_config
 
 def parse_arguments() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Train a SR network based on a config file.")
-    parser.add_argument('file_path', type=str, nargs='?', default='configs/stss_original.yaml', help="Path to the config file")
+    parser.add_argument('file_path', type=str, nargs='?', default='configs/STSS/stss_original_01.yaml', help="Path to the config file")
     args = parser.parse_args()
     return args
 
