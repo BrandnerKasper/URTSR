@@ -19,6 +19,7 @@ from models.extrass import ExtraSS
 from models.rfdn import RFDN
 from models.rtsrn import RealTimeSRNet
 from models.evrnet import EVRNet
+from models.ndsr import NDSR
 
 from data.dataloader import SingleImagePair, MultiImagePair, VSR, DiskMode, EVSR, RVSRSingleSequence
 from loss.loss import EBMELoss, STSSLoss
@@ -77,6 +78,8 @@ def init_model(model_name: str, scale: int, batch_size: int, crop_size: int, buf
             return RealTimeSRNet(upscale=scale)
         case "EVRNet":
             return EVRNet(scale=scale, batch_size=batch_size, crop_size=crop_size)
+        case "NDSR":
+            return NDSR(scale=scale, batch_size=batch_size, crop_size=crop_size)
         case _:
             raise ValueError(f"The model '{model_name}' is not a valid model.")
 
@@ -160,11 +163,11 @@ def init_dataset(name: str, sequence: int, extra: bool, history: int, warp: bool
                       disk_mode=DiskMode.NPZ)
             return train, val
         case "UE_data":
-            train = RVSRSingleSequence(root="//media/tobiasbrandner/Data/UE_data/train", scale=2, history=history,
+            train = RVSRSingleSequence(root=f"{root}/train", scale=2, history=history,
                                        sequence=f"{sequence:0{2}d}", sequence_length=2400, crop_size=crop_size, use_hflip=use_hflip,
                                        use_rotation=use_rotation, disk_mode=DiskMode.CV2)
             val_sequence = sequence + 6 # we only have 6 sequences for training..
-            val = RVSRSingleSequence(root="//media/tobiasbrandner/Data/UE_data/val", scale=2, history=history,
+            val = RVSRSingleSequence(root=f"{root}/val", scale=2, history=history,
                                      sequence=f"{val_sequence:0{2}d}", sequence_length=300, crop_size=None, use_hflip=False,
                                      use_rotation=False, disk_mode=DiskMode.CV2)
             return train, val
