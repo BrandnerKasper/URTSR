@@ -160,8 +160,8 @@ class NDSR(BaseModel):
         super(NDSR, self).__init__(scale=scale, down_and_up=2, do_two=False)
         self.crop_size = crop_size
         if self.crop_size is None:
-            self.pre_sr = torch.randn(batch_size, 3, 3840, 2160).to(device='cuda')
-            self.pre_lstm = torch.randn(batch_size, 2, 64, 1920, 1080).to(device='cuda')
+            self.pre_sr = torch.randn(batch_size, 3, 2160, 3840).to(device='cuda')
+            self.pre_lstm = torch.randn(batch_size, 2, 64, 1080, 1920).to(device='cuda')
         else:
             self.pre_sr = torch.randn(batch_size, 3, crop_size*2, crop_size*2).to(device='cuda')
             self.pre_lstm = torch.randn(batch_size, 2, 64, crop_size, crop_size).to(device='cuda')
@@ -216,6 +216,15 @@ class NDSR(BaseModel):
             nn.PixelShuffle(scale)
         )
 
+    def reset_pre_val(self, batch_size: int, crop_size: int) -> None:
+        self.crop_size = crop_size
+        if crop_size is None:
+            self.pre_sr = torch.randn(batch_size, 3, 2160, 3840).to(device='cuda')
+            self.pre_lstm = torch.randn(batch_size, 2, 64, 1080, 1920).to(device='cuda')
+        else:
+            self.pre_sr = torch.randn(batch_size, 3, crop_size * 2, crop_size * 2).to(device='cuda')
+            self.pre_lstm = torch.randn(batch_size, 2, 64, crop_size, crop_size).to(device='cuda')
+
     def forward(self, x, his): #buffers, his, masks, pre_sr, pre_lstm):
         # append buffers if valid
         # if torch.is_tensor(buffers):
@@ -253,7 +262,7 @@ class NDSR(BaseModel):
         res = self.decoder_2(torch.cat([res, x1], dim=1))
         res = self.upsampling(res)
         if self.crop_size is None:
-            res = pad_or_crop_to_size(res, (3840, 2160))
+            res = pad_or_crop_to_size(res, (2160, 3840))
         else:
             res = pad_or_crop_to_size(res, (2*self.crop_size, 2*self.crop_size))
         # save old states
