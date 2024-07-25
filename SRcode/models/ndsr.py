@@ -242,13 +242,11 @@ class NDSR(BaseModel):
             h.append(self.conv_gate(his_frame))
         h = torch.cat(h, 1)
 
-        # TODO: prev frame -> Dataloader
         pre_sr = self.unshuffle(self.pre_sr)
         pre_sr = self.conv_pre_sr(pre_sr)
 
         # ConvLSTM
         x = torch.cat([x, h, pre_sr], dim=1)
-        # TODO: prev state -> Dataloader
         pre_lstm = torch.unbind(self.pre_lstm, dim=1)
         pre_lstm = self.conv_lstm(x, pre_lstm)
         x1 = self.encoder_1(pre_lstm[0])
