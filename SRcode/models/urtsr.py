@@ -155,7 +155,7 @@ class URTSR(BaseModel):
             nn.PixelShuffle(scale)
         )
 
-    def reset_lstm(self):
+    def reset(self):
         self.pre_lstm = None
 
     def forward(self, x, his):
