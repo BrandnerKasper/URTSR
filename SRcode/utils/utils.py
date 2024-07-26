@@ -43,7 +43,7 @@ def pad_or_crop_to_target(input_t: torch.Tensor, target_t: torch.Tensor) -> Tens
 class Metrics:
     def __init__(self, psnr_value: float = 0.0, ssim_value: float = 0.0, lpips_value: float = 0.0):
         self.psnr_value = round(psnr_value, 2)
-        self.ssim_value = round(ssim_value, 2)
+        self.ssim_value = round(ssim_value, 4)
         self.lpips_value = round(lpips_value, 4)
 
     def __add__(self, other):
