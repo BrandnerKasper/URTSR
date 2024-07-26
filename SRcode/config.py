@@ -55,7 +55,7 @@ def create_yaml(filename: str, model: str, epochs: int, scale: int, batch_size: 
     return yaml_text
 
 
-def init_model(model_name: str, scale: int, batch_size: int, crop_size: int, buffer_cha: int, history_cha: int) -> BaseModel:
+def init_model(model_name: str, scale: int, batch_size: int, crop_size: int, buffer_cha: int, history: int) -> BaseModel:
     match model_name:
         case "SRCNN":
             return SRCNN(scale=scale)
@@ -68,11 +68,11 @@ def init_model(model_name: str, scale: int, batch_size: int, crop_size: int, buf
         case "Flavr_Original":
             return Flavr_Original(scale=scale)
         case "STSS_Original":
-            return StssOriginal(scale=scale, buffer_cha=buffer_cha, history_cha=history_cha)
+            return StssOriginal(scale=scale, buffer_cha=buffer_cha, history_frames=history)
         case "STSS":
-            return Stss(scale=scale, buffer_cha=buffer_cha, history_cha=history_cha)
+            return Stss(scale=scale, buffer_cha=buffer_cha, history_cha=history)
         case "ExtraSS":
-            return ExtraSS(scale=scale, batch_size=batch_size, crop_size=crop_size, buffer_cha=buffer_cha, history_cha=history_cha)
+            return ExtraSS(scale=scale, batch_size=batch_size, crop_size=crop_size, buffer_cha=buffer_cha, history_cha=history)
         case "RFDN":
             return RFDN(upscale=scale)
         case "RTSRN":
@@ -82,7 +82,7 @@ def init_model(model_name: str, scale: int, batch_size: int, crop_size: int, buf
         case "NDSR":
             return NDSR(scale=scale, batch_size=batch_size, crop_size=crop_size)
         case "URTSR":
-            return URTSR(scale=scale, history_frames=history_cha)
+            return URTSR(scale=scale, history_frames=history)
         case _:
             raise ValueError(f"The model '{model_name}' is not a valid model.")
 
