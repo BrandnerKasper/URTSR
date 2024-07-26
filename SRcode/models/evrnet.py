@@ -107,7 +107,8 @@ class EVRNet(BaseModel):
         self.fusion = EVRModule(32, 2)
 
         # hidden
-        self.conv_hidden = nn.Conv2d(32, 3, 3, stride=1, padding=1)
+        self.conv_hidden = nn.Conv2d(32, 3, 1)
+        self.hidden = None
 
         # upsample
         self.conv_up = nn.Sequential(
@@ -115,16 +116,27 @@ class EVRNet(BaseModel):
             nn.Conv2d(8, 3, 3, stride=1, padding=1)
         )
 
-    def forward(self, x, x_prev, y_prev):
-        x_concat = torch.cat([x, x_prev, y_prev], dim=1)
+    def reset(self):
+        self.hidden = None
+
+    def init_hidden(self, input_):
+        if self.hidden is None:
+            batch_size = input_.data.size()[0]
+            spatial_size = input_.data.size()[2:]
+            self.hidden = torch.randn(batch_size, 3, spatial_size[0], spatial_size[1]).to('cuda')
+
+    def forward(self, x, his):
+        self.init_hidden(x)
+        his = torch.unbind(his, dim=1)[0]
+        x_concat = torch.cat([x, his, self.hidden], dim=1)
         x_feature = self.conv_feature(x)
         x_align = self.alignment(x_concat)
         x = self.differential(x_feature - x_align)
         x = self.fusion(x_feature + x)
-        x_hidden = self.conv_hidden(x)
+        self.hidden = self.conv_hidden(x).detach()
         x = self.conv_up(x)
 
-        return x, x_hidden
+        return x
 
 
 def main() -> None:
@@ -133,9 +145,8 @@ def main() -> None:
     model = EVRNet(scale=2).to(device)
     batch_size = 1
     input_data = (batch_size, 3, 1920, 1080)
-    prev_input_data = (batch_size, 3, 1920, 1080)
-    latent_input_date = (batch_size, 3, 1920, 1080)
-    input_size = (input_data, prev_input_data, latent_input_date)
+    his = (batch_size, 1, 3, 1920, 1080)
+    input_size = (input_data, his)
 
     model.summary(input_size)
     model.measure_inference_time(input_size)
