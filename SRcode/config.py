@@ -78,7 +78,7 @@ def init_model(model_name: str, scale: int, batch_size: int, crop_size: int, buf
         case "RTSRN":
             return RealTimeSRNet(upscale=scale)
         case "EVRNet":
-            return EVRNet(scale=scale, batch_size=batch_size, crop_size=crop_size)
+            return EVRNet(scale=scale)
         case "NDSR":
             return NDSR(scale=scale, batch_size=batch_size, crop_size=crop_size)
         case "URTSR":

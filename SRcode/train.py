@@ -17,7 +17,7 @@ from config import load_yaml_into_config, create_comment_from_config
 
 def parse_arguments() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Train a SR network based on a config file.")
-    parser.add_argument('file_path', type=str, nargs='?', default='configs/STSS/stss_original_bi_01.yaml', help="Path to the config file")
+    parser.add_argument('file_path', type=str, nargs='?', default='configs/EVRNET/evrnet_01.yaml', help="Path to the config file")
     args = parser.parse_args()
     return args
 
@@ -500,6 +500,8 @@ def train3(filepath: str) -> None:
         # train loop
         total_loss = 0.0
 
+        model.reset() # TODO not a good idea, prev state needs to be handeld from dataloader or train script, else we get a problem with the batch dim!
+
         for lr_image, history_images, hr_image in tqdm(train_loader, desc=f'Training, Epoch {epoch + 1}/{epochs}', dynamic_ncols=True):
             # setup
             optimizer.zero_grad()
@@ -538,6 +540,7 @@ def train3(filepath: str) -> None:
         total_metrics = utils.Metrics(0, 0, 0)
 
         val_counter = 0
+        model.reset()
         for lr_image, history_images, hr_image in tqdm(val_loader, desc=f"Validation, Epoch {epoch + 1}/{epochs}", dynamic_ncols=True):
             # prepare data
             lr_image = lr_image.to(device)

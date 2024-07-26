@@ -10,6 +10,10 @@ class BaseModel(nn.Module):
         self.down_and_up = down_and_up
         self.do_two = do_two
 
+    # for network architectures using information from previous inferences
+    def reset(self): # TODO not a good idea, prev state needs to be handeld from dataloader or train script, else we get a problem with the batch dim!
+        pass
+
     # for evaluation only
     def summary(self, input_size) -> None:
         summary(self, input_size)
