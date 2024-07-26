@@ -17,7 +17,7 @@ from config import load_yaml_into_config, create_comment_from_config
 
 def parse_arguments() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Train a SR network based on a config file.")
-    parser.add_argument('file_path', type=str, nargs='?', default='configs/STSS/stss_original_01.yaml', help="Path to the config file")
+    parser.add_argument('file_path', type=str, nargs='?', default='configs/STSS/stss_original_bi_01.yaml', help="Path to the config file")
     args = parser.parse_args()
     return args
 
@@ -506,7 +506,7 @@ def train3(filepath: str) -> None:
             # prepare data
             lr_image = lr_image.to(device)
             history_images = [img.to(device) for img in history_images]
-            history_images = torch.stack(history_images, dim=2)
+            history_images = torch.stack(history_images, dim=1)
             hr_image = hr_image.to(device)
 
             # forward pass
@@ -535,14 +535,14 @@ def train3(filepath: str) -> None:
         # val loop
         if (epoch + 1) % 10 != 0:
             continue
-        total_metrics = utils.Metrics(0, 0)
+        total_metrics = utils.Metrics(0, 0, 0)
 
         val_counter = 0
         for lr_image, history_images, hr_image in tqdm(val_loader, desc=f"Validation, Epoch {epoch + 1}/{epochs}", dynamic_ncols=True):
             # prepare data
             lr_image = lr_image.to(device)
             history_images = [img.to(device) for img in history_images]
-            history_images = torch.stack(history_images, dim=2)
+            history_images = torch.stack(history_images, dim=1)
             hr_image = hr_image.to(device)
 
             with torch.no_grad():
@@ -559,7 +559,7 @@ def train3(filepath: str) -> None:
             # Display the val process in tensorboard
             if val_counter != 0:
                 continue
-            write_vsr_frames(writer, iteration_counter, lr_image, torch.unbind(history_images, dim=2), output, hr_image)
+            write_vsr_frames(writer, iteration_counter, lr_image, torch.unbind(history_images, dim=1), output, hr_image)
             val_counter += 1
 
         # PSNR & SSIM
