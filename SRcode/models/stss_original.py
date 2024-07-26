@@ -139,6 +139,7 @@ class StssOriginal(BaseModel):
 
     def forward(self, x, his): #feature, his):
         # x = torch.cat([x, feature], 1)
+        x_up = F.interpolate(x, scale_factor=self.scale, mode="bilinear")
         x1 = self.conv_in(x)
         x2 = self.down_1(x1)
         x3 = self.down_2(x2)
@@ -157,6 +158,7 @@ class StssOriginal(BaseModel):
         x = self.up_2(x, x2)
         x = self.up_3(x, x1)
         x = self.conv_out(x)
+        x = x + x_up
         return x
 
     # def hole_inpaint(self, x, mask, feature):
