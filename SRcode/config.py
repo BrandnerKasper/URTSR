@@ -7,6 +7,7 @@ from torchvision import transforms
 
 from typing import Optional
 
+from models.urtsr import URTSR
 from models.basemodel import BaseModel
 from models.srcnn import SRCNN
 from models.subpixel import SubPixelNN
@@ -80,6 +81,8 @@ def init_model(model_name: str, scale: int, batch_size: int, crop_size: int, buf
             return EVRNet(scale=scale, batch_size=batch_size, crop_size=crop_size)
         case "NDSR":
             return NDSR(scale=scale, batch_size=batch_size, crop_size=crop_size)
+        case "URTSR":
+            return URTSR(scale=scale, history_frames=history_cha)
         case _:
             raise ValueError(f"The model '{model_name}' is not a valid model.")
 
@@ -204,7 +207,7 @@ class Config:
                  start_decay_epoch: Optional[int],
                  dataset: str, sequence: int, history: int, warp: bool, buffers: dict[str, bool]):
         self.filename: str = filename
-        self.model: BaseModel = init_model(model, scale, batch_size, crop_size, calc_buffer_cha(buffers), 3*history)
+        self.model: BaseModel = init_model(model, scale, batch_size, crop_size, calc_buffer_cha(buffers), history)
         self.extra = extra
         self.epochs: int = epochs
         self.scale: int = scale

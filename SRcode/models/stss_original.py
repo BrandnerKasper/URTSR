@@ -72,7 +72,7 @@ class Up(nn.Module):
 
 
 class StssOriginal(BaseModel):
-    def __init__(self, scale: int, buffer_cha: int = 0, history_cha: int = 3 * 2):
+    def __init__(self, scale: int, buffer_cha: int = 0, history_frames: int = 2):
         super(StssOriginal, self).__init__(scale=scale, down_and_up=3)
 
         self.conv_in = nn.Sequential(
@@ -87,7 +87,7 @@ class StssOriginal(BaseModel):
         self.down_3 = DownLWGated(32, 32)
 
         self.his_1 = nn.Sequential(
-            nn.Conv2d(history_cha, 24, kernel_size=3, stride=2, padding=1),
+            nn.Conv2d(history_frames * 3, 24, kernel_size=3, stride=2, padding=1),
             nn.ReLU(inplace=True),
             nn.Conv2d(24, 24, kernel_size=3, stride=1, padding=1),
             nn.ReLU(inplace=True),
