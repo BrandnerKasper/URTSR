@@ -16,14 +16,14 @@ from config import load_yaml_into_config, Config
 
 def parse_arguments() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Evaluate a trained SR network based on a pretrained model file.")
-    parser.add_argument('file_path', type=str, nargs='?', default='pretrained_models/stss_original_01.pth',
+    parser.add_argument('file_path', type=str, nargs='?', default='pretrained_models/URTSR/urtsr_01.pth',
                         help="Path to the pretrained model .pth file")
     args = parser.parse_args()
     return args
 
 
-def get_config_from_pretrained_model(name: str) -> Config:
-    config_path = f"configs/STSS/{name}.yaml"
+def get_config_from_pretrained_model(subfolder: str, name: str) -> Config:
+    config_path = f"configs/{subfolder}/{name}.yaml"
     return load_yaml_into_config(config_path)
 
 
@@ -231,11 +231,12 @@ def evaluate_vsr(pretrained_model_path: str) -> None:
     # Setup
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Device: {device}")
+    sub_folder = pretrained_model_path.split('/')[1]
     model_name = pretrained_model_path.split('/')[-1].split('.')[0]
-    config = get_config_from_pretrained_model(model_name)
+    config = get_config_from_pretrained_model(sub_folder, model_name)
     print(config)
 
-    with open(f"configs/STSS/{model_name}.yaml", "r") as file:
+    with open(f"configs/{sub_folder}/{model_name}.yaml", "r") as file:
         results: dict = yaml.safe_load(file)
 
     # Loading model
