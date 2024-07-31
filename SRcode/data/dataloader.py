@@ -24,6 +24,7 @@ multiprocessing.set_start_method('spawn', force=True)
 # Enable cv2 to load exr files
 os.environ["OPENCV_IO_ENABLE_OPENEXR"]="1"
 
+
 def get_random_crop_pair(lr_tensor: torch.Tensor, hr_tensor: torch.Tensor, patch_size: int, scale: int) \
         -> (torch.Tensor, torch.Tensor):
     lr_i, lr_j, lr_h, lr_w = transforms.RandomCrop.get_params(lr_tensor, output_size=(patch_size, patch_size))
