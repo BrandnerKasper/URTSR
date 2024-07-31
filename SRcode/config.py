@@ -22,7 +22,8 @@ from models.rtsrn import RealTimeSRNet
 from models.evrnet import EVRNet
 from models.ndsr import NDSR
 
-from data.dataloader import SingleImagePair, MultiImagePair, VSR, DiskMode, EVSR, RVSRSingleSequence
+from data.dataloader import SingleImagePair, MultiImagePair, VSR, DiskMode, EVSR, RVSRSingleSequence, \
+    RVSRSingleSequenceWarp
 from loss.loss import EBMELoss, STSSLoss
 
 
@@ -166,6 +167,17 @@ def init_dataset(name: str, sequence: int, extra: bool, history: int, warp: bool
                       disk_mode=DiskMode.NPZ)
             return train, val
         case "UE_data":
+            if warp:
+                train = RVSRSingleSequenceWarp(root=f"{root}/train", scale=2, history=history,
+                                           sequence=f"{sequence:0{2}d}", sequence_length=2400, crop_size=crop_size,
+                                           use_hflip=use_hflip,
+                                           use_rotation=use_rotation, disk_mode=DiskMode.CV2)
+                val_sequence = sequence + 6  # we only have 6 sequences for training..
+                val = RVSRSingleSequenceWarp(root=f"{root}/val", scale=2, history=history,
+                                         sequence=f"{val_sequence:0{2}d}", sequence_length=300, crop_size=None,
+                                         use_hflip=False,
+                                         use_rotation=False, disk_mode=DiskMode.CV2)
+                return train, val
             train = RVSRSingleSequence(root=f"{root}/train", scale=2, history=history,
                                        sequence=f"{sequence:0{2}d}", sequence_length=2400, crop_size=crop_size, use_hflip=use_hflip,
                                        use_rotation=use_rotation, disk_mode=DiskMode.CV2)

@@ -21,7 +21,8 @@ import multiprocessing
 
 # Set the start method for multiprocessing
 multiprocessing.set_start_method('spawn', force=True)
-
+# Enable cv2 to load exr files
+os.environ["OPENCV_IO_ENABLE_OPENEXR"]="1"
 
 def get_random_crop_pair(lr_tensor: torch.Tensor, hr_tensor: torch.Tensor, patch_size: int, scale: int) \
         -> (torch.Tensor, torch.Tensor):
@@ -51,6 +52,7 @@ class DiskMode(Enum):
     CV2 = 2
     PT = 3
     NPZ = 4
+    EXR = 5
 
 
 def load_image_from_disk(mode: DiskMode, path: str, transform=transforms.ToTensor(),
@@ -73,6 +75,10 @@ def load_image_from_disk(mode: DiskMode, path: str, transform=transforms.ToTenso
             # Load the compressed numpy .npz file to tensor
             img = np.load(f"{path}.npz")
             return torch.from_numpy(next(iter(img.values())))
+        case DiskMode.EXR:
+            mv = cv2.imread(f"{path}.exr", cv2.IMREAD_ANYCOLOR | cv2.IMREAD_ANYDEPTH)
+            mv = cv2.cvtColor(mv, cv2.COLOR_BGR2RGB)
+            return transform(mv)
         case _:
             raise ValueError(f"The mode {mode} is not a valid mode with {path}!")
 
@@ -474,6 +480,160 @@ class RVSRSingleSequence(Dataset):
         hr_image = FV.to_pil_image(hr_frame)
         axes[num_history_frames+1].imshow(hr_image)
         axes[num_history_frames+1].set_title(f'HR image {self.get_filename(idx)}')
+
+        plt.tight_layout()
+        plt.show()
+
+    def get_random_crop_pair(self, lr_frame: torch.Tensor, history_frames: list[torch.Tensor], hr_frame: torch.Tensor) \
+            -> (torch.Tensor, list[torch.Tensor], torch.Tensor):
+        lr_i, lr_j, lr_h, lr_w = transforms.RandomCrop.get_params(lr_frame,
+                                                                  output_size=(self.crop_size, self.crop_size))
+        hr_i, hr_j, hr_h, hr_w = lr_i * self.scale, lr_j * self.scale, lr_h * self.scale, lr_w * self.scale
+
+        # lr
+        lr_frame_patch = FV.crop(lr_frame, lr_i, lr_j, lr_h, lr_w)
+
+        # history frames
+        history_frame_patches = []
+        for history_frame in history_frames:
+            history_frame_patches.append(FV.crop(history_frame, lr_i, lr_j, lr_h, lr_w))
+        # hr
+        hr_frame_patch = FV.crop(hr_frame, hr_i, hr_j, hr_h, hr_w)
+
+        return lr_frame_patch, history_frame_patches, hr_frame_patch
+
+    def augment(self, lr_frame: torch.Tensor, history_frames: list[torch.Tensor], hr_frame: torch.Tensor) \
+            -> (list[torch.Tensor], torch.Tensor):
+        # Apply random horizontal flip
+        if self.use_hflip:
+            if random.random() > 0.5:
+                lr_frame = flip_image_horizontal(lr_frame)
+                for i in range(len(history_frames)):
+                    history_frames[i] = flip_image_horizontal(history_frames[i])
+                hr_frame = flip_image_horizontal(hr_frame)
+
+        # Apply random rotation by v flipping and rot of 90
+        if self.use_rotation:
+            if random.random() > 0.5:
+                lr_frame = flip_image_vertical(lr_frame)
+                for i in range(len(history_frames)):
+                    history_frames[i] = flip_image_vertical(history_frames[i])
+                hr_frame = flip_image_vertical(hr_frame)
+        if self.use_rotation:
+            if random.random() > 0.5:
+                angle = -90  # for clockwise rotation like BasicSR
+                lr_frame = rotate_image(lr_frame, angle)
+                for i in range(len(history_frames)):
+                    history_frames[i] = rotate_image(history_frames[i], angle)
+                hr_frame = rotate_image(hr_frame, angle)
+        return lr_frame, history_frames, hr_frame
+
+
+class RVSRSingleSequenceWarp(Dataset):
+    def __init__(self, root: str, transform=transforms.ToTensor(), scale: int = 2,
+                 sequence_length: int = 300, sequence: str = "99", history: int = 3,
+                 crop_size: int = None, use_hflip: bool = False, use_rotation: bool = False,
+                 disk_mode: DiskMode = DiskMode.CV2):
+        self.root_hr = os.path.join(root, "HR")
+        if scale == 4:
+            self.root_lr = os.path.join(root, "LRX4")
+        else:
+            self.root_lr = os.path.join(root, "LR")
+        self.transform = transform
+        self.crop_size = crop_size
+        self.scale = scale
+        self.sequence_length = sequence_length
+        self.sequence = sequence
+        self.history = history
+        self.use_hflip = use_hflip
+        self.use_rotation = use_rotation
+        self.disk_mode = disk_mode
+        self.filenames = self.init_filenames()
+
+    def init_filenames(self) -> list[str]:
+        filenames = []
+        for i in range(self.sequence_length):
+            if self.history * 2 - 1 < i:
+                filenames.append(f"{self.sequence}/{i:0{4}d}")
+        return sorted(set(filenames))
+
+    def __len__(self) -> int:
+        return len(self.filenames)
+
+    def load_mv(self, folder: str, filename: str) -> torch.Tensor:
+        path = f"{self.root_lr}/{folder}/{filename}.velocity"
+        return load_image_from_disk(DiskMode.EXR, path)
+
+    def __getitem__(self, idx: int) -> (list[torch.Tensor], list[torch.Tensor]):
+        path = self.filenames[idx]
+        folder = path.split("/")[0]
+        filename = path.split("/")[-1]
+
+        # lr frames = [current, current - 1, ..., current -n], where n = # of frames
+        lr_path = os.path.join(self.root_lr, path)
+        lr_frame = load_image_from_disk(DiskMode.CV2, lr_path, self.transform)
+        history_frames = []
+        for i in range(self.history):
+            # Extract the numeric part
+            h_filename = int(filename) - (i + 1) * 2
+            # Generate right file name pattern
+            h_filename = f"{h_filename:04d}"  # Ensure 4/8 digit format
+            # Put folder and file name back together and load the tensor
+            file = f"{self.root_lr}/{folder}/{h_filename}"
+            file = load_image_from_disk(self.disk_mode, file, self.transform)
+            # warp history frames
+            counter = int(filename) - int(h_filename)
+            for j in range(counter):  # we need to warp from t_-i to t_0
+                mv_filename = int(filename) - counter + j + 1
+                mv_filename = f"{mv_filename:04d}"
+                mv = self.load_mv(folder, mv_filename)
+                file = warp_img(file, mv)
+            history_frames.append(file)
+
+        # hr frame
+        hr_path = os.path.join(self.root_hr, path)
+        hr_frame = load_image_from_disk(DiskMode.CV2, hr_path, self.transform)
+
+        # Randomly crop image
+        if self.crop_size:
+            lr_frame, history_frames, hr_frame = self.get_random_crop_pair(lr_frame, history_frames, hr_frame)
+        # Augment image by h and v flip and rot by 90
+        lr_frame, history_frames, hr_frame = self.augment(lr_frame, history_frames, hr_frame)
+
+        return lr_frame, history_frames, hr_frame
+
+    def get_filename(self, idx: int) -> str:
+        path = self.filenames[idx]
+        filename = path.split("/")[-1]
+        filename = filename.split(".")[0]
+        return filename
+
+    def get_path(self, idx: int) -> str:
+        return self.filenames[idx]
+
+    def display_item(self, idx: int) -> None:
+        lr_frame, history_frames, hr_frame = self.__getitem__(idx)
+
+        num_history_frames = len(history_frames)
+
+        # Create a single plot with LR images on the left and HR images on the right
+        fig, axes = plt.subplots(1, 1 + num_history_frames + 1, figsize=(15, 5))
+
+        # Display LR frame
+        lr_image = FV.to_pil_image(lr_frame)
+        axes[0].imshow(lr_image)
+        axes[0].set_title(f"LR image {self.get_filename(idx)}")
+
+        # Display history frames
+        for i, history_frame in enumerate(history_frames):
+            history_frame = FV.to_pil_image(history_frame)
+            axes[i + 1].imshow(history_frame)
+            axes[i + 1].set_title(f'History image {int(self.get_filename(idx)) - (i + 1) * 2:0{4}d}')
+
+        # Display HR frame
+        hr_image = FV.to_pil_image(hr_frame)
+        axes[num_history_frames + 1].imshow(hr_image)
+        axes[num_history_frames + 1].set_title(f'HR image {self.get_filename(idx)}')
 
         plt.tight_layout()
         plt.show()
@@ -1705,14 +1865,14 @@ class EVSR(Dataset):
 
 
 def main() -> None:
-    path = "//media/tobiasbrandner/Data/UE_data/val"
+    path = "../dataset/UE_data/val"
     # eval_dataset = SISR(root=path, scale=4, shuffle_frames=True, shuffle_sequence=True)
     # eval_dataset.__len__()
     # for i in range(8):
     #     print(eval_dataset.sequence_names[i])
     #     eval_dataset.display_item(i*300)
 
-    eval_dataset = RVSRSingleSequence(root=path, sequence="08")
+    eval_dataset = RVSRSingleSequenceWarp(root=path, sequence="08")
     eval_dataset.display_item(0)
 
     # path = "//media/tobiasbrandner/Data/STSS/Lewis/test"
