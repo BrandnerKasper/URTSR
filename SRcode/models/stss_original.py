@@ -137,9 +137,10 @@ class StssOriginal(BaseModel):
             nn.PixelShuffle(scale)
         )
 
-    def forward(self, x, his): #feature, his):
-        # x = torch.cat([x, feature], 1)
+    def forward(self, x, his, feature=None):
         x_up = F.interpolate(x, scale_factor=self.scale, mode="bilinear")
+        if feature is not None:
+            x = torch.cat([x, feature], 1)
         x1 = self.conv_in(x)
         x2 = self.down_1(x1)
         x3 = self.down_2(x2)
@@ -187,12 +188,12 @@ class StssOriginal(BaseModel):
 def main() -> None:
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    model = StssOriginal(scale=2, ).to(device)
+    model = StssOriginal(scale=2, buffer_cha=9).to(device)
     batch_size = 1
     input_data = (batch_size, 3, 1920, 1080)
-    # feature = (batch_size, 9, 1920, 1080)
     his = (batch_size, 3, 2, 1920, 1080)
-    input_size = (input_data, his) # feature, his)
+    feature = (batch_size, 9, 1920, 1080)
+    input_size = (input_data, his, feature)
 
     model.summary(input_size)
     model.measure_inference_time(input_size)
