@@ -17,7 +17,7 @@ from config import load_yaml_into_config, create_comment_from_config
 
 def parse_arguments() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Train a SR network based on a config file.")
-    parser.add_argument('file_path', type=str, nargs='?', default='configs/STSS/stss_original_bi_warp_01.yaml', help="Path to the config file")
+    parser.add_argument('file_path', type=str, nargs='?', default='configs/Urteil_2/urteil_2_01.yaml', help="Path to the config file")
     args = parser.parse_args()
     return args
 
@@ -68,12 +68,22 @@ def write_frames(writer: SummaryWriter, step: int, extra: bool, buffers: dict[st
 
 
 def write_vsr_frames(writer: SummaryWriter, step: int, lr_image: torch.Tensor, history: list[torch.Tensor],
-                     output: torch.Tensor, gt: torch.Tensor) -> None:
+                     buffers: list[torch.Tensor], buffer_dict: dict[str, bool], output: torch.Tensor, gt: torch.Tensor)\
+        -> None:
     # LR
     writer.add_images("Images/LR", lr_image, step)
     # History
-    for i, history_frame in enumerate(history):
-        writer.add_images(f"Images/History T-{(i + 1) * 2}", history_frame, step)
+    if history:
+        for i, history_frame in enumerate(history):
+            writer.add_images(f"Images/History T-{(i + 1) * 2}", history_frame, step)
+    # Buffers
+    if buffers:
+        buffer_keys = []
+        for key, val in buffer_dict.items():
+            if val:
+                buffer_keys.append(key)
+        for i, buffer in enumerate(buffers):
+            writer.add_images(f"Images/Buffer {buffer_keys[i]}", buffer, step)
     # Output
     writer.add_images("Images/Output", output, step)
     # GT
@@ -477,7 +487,7 @@ def train3(filepath: str) -> None:
     # Model details
     model = config.model.to(device)
     scaler = amp.GradScaler()
-    # buffers_dict = config.buffers
+    buffers_dict = config.buffers
     criterion = config.criterion
     optimizer = config.optimizer
     scheduler = config.scheduler
@@ -502,18 +512,27 @@ def train3(filepath: str) -> None:
 
         model.reset() # TODO not a good idea, prev state needs to be handeld from dataloader or train script, else we get a problem with the batch dim!
 
-        for lr_image, history_images, hr_image in tqdm(train_loader, desc=f'Training, Epoch {epoch + 1}/{epochs}', dynamic_ncols=True):
+        for lr_image, history_images, buffer_images, hr_image in tqdm(train_loader, desc=f'Training, Epoch {epoch + 1}/{epochs}', dynamic_ncols=True):
             # setup
             optimizer.zero_grad()
             # prepare data
             lr_image = lr_image.to(device)
-            history_images = [img.to(device) for img in history_images]
-            history_images = torch.stack(history_images, dim=1)
+            if history_images:
+                history_images = [img.to(device) for img in history_images]
+                history_images = torch.stack(history_images, dim=1)
+            if buffer_images:
+                buffer_images = [img.to(device) for img in buffer_images]
+                buffer_images = torch.cat(buffer_images, dim=1)
             hr_image = hr_image.to(device)
 
             # forward pass
             with amp.autocast():
-                output = model(lr_image, history_images)
+                if len(buffer_images) != 0: # RRSR
+                    output = model(lr_image, history_images, buffer_images)
+                elif len(history_images) != 0: # VSR
+                    output = model(lr_image, history_images)
+                else: # SISR
+                    output = model(lr_image)
                 loss = criterion(output, hr_image)
             scaler.scale(loss.mean()).backward()
 
@@ -541,28 +560,40 @@ def train3(filepath: str) -> None:
 
         val_counter = 0
         model.reset()
-        for lr_image, history_images, hr_image in tqdm(val_loader, desc=f"Validation, Epoch {epoch + 1}/{epochs}", dynamic_ncols=True):
+        write_history = None
+        write_buffers = None
+        for lr_image, history_images, buffer_images, hr_image in tqdm(val_loader, desc=f"Validation, Epoch {epoch + 1}/{epochs}", dynamic_ncols=True):
             # prepare data
             lr_image = lr_image.to(device)
-            history_images = [img.to(device) for img in history_images]
-            history_images = torch.stack(history_images, dim=1)
+            if history_images:
+                write_history = history_images
+                history_images = [img.to(device) for img in history_images]
+                history_images = torch.stack(history_images, dim=1)
+            if buffer_images:
+                write_buffers = buffer_images
+                buffer_images = [img.to(device) for img in buffer_images]
+                buffer_images = torch.cat(buffer_images, dim=1)
             hr_image = hr_image.to(device)
 
             with torch.no_grad():
                 # forward pass
                 with amp.autocast():
-                    output = model(lr_image, history_images)
+                    if len(buffer_images) != 0: # RRSR
+                        output = model(lr_image, history_images, buffer_images)
+                    elif len(history_images) != 0: # VSR
+                        output = model(lr_image, history_images)
+                    else:
+                        output = model(lr_image) # SISR
                 output = torch.clamp(output, min=0.0, max=1.0)
 
             # Calc PSNR and SSIM
-            # SS frame
             metric = utils.calculate_metrics(hr_image.squeeze(0), output.squeeze(0), eval_alex_model)
             total_metrics += metric
 
             # Display the val process in tensorboard
             if val_counter != 0:
                 continue
-            write_vsr_frames(writer, iteration_counter, lr_image, torch.unbind(history_images, dim=1), output, hr_image)
+            write_vsr_frames(writer, iteration_counter, lr_image, write_history, write_buffers, buffers_dict, output, hr_image)
             val_counter += 1
 
         # PSNR & SSIM

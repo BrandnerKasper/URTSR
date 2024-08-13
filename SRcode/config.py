@@ -7,6 +7,9 @@ from torchvision import transforms
 
 from typing import Optional
 
+from SRcode.models.rep_net import RepNet
+from SRcode.models.urteil import Urteil
+from SRcode.models.urteil_2 import Urteil_2
 from models.urtsr import URTSR
 from models.basemodel import BaseModel
 from models.srcnn import SRCNN
@@ -23,7 +26,7 @@ from models.evrnet import EVRNet
 from models.ndsr import NDSR
 
 from data.dataloader import SingleImagePair, MultiImagePair, VSR, DiskMode, EVSR, RVSRSingleSequence, \
-    RVSRSingleSequenceWarp
+    RVSRSingleSequenceWarp, RRSRSingleSequence
 from loss.loss import EBMELoss, STSSLoss
 
 
@@ -85,6 +88,12 @@ def init_model(model_name: str, scale: int, batch_size: int, crop_size: int, buf
             return NDSR(scale=scale, batch_size=batch_size, crop_size=crop_size)
         case "URTSR":
             return URTSR(scale=scale, history_frames=history)
+        case "RepNet":
+            return RepNet(scale=scale)
+        case "Urteil":
+            return Urteil(scale=scale, history_frames=history, buffer_cha=buffer_cha)
+        case "Urteil_2":
+            return Urteil_2(scale=scale, history_frames=history, buffer_cha=buffer_cha)
         case _:
             raise ValueError(f"The model '{model_name}' is not a valid model.")
 
@@ -183,26 +192,33 @@ def init_dataset(name: str, sequence: int, extra: bool, history: int, warp: bool
                       disk_mode=DiskMode.NPZ)
             return train, val
         case "UE_data":
-            if warp:
-                train = RVSRSingleSequenceWarp(root=f"{root}/train", scale=2, history=history,
-                                           sequence=f"{sequence:0{2}d}", sequence_length=2400, crop_size=crop_size,
-                                           use_hflip=use_hflip,
-                                           use_rotation=use_rotation, disk_mode=DiskMode.CV2)
-                val_sequence = sequence + 6  # we only have 6 sequences for training..
-                val = RVSRSingleSequenceWarp(root=f"{root}/val", scale=2, history=history,
-                                         sequence=f"{val_sequence:0{2}d}", sequence_length=300, crop_size=None,
-                                         use_hflip=False,
-                                         use_rotation=False, disk_mode=DiskMode.CV2)
-                return train, val
-            train = RVSRSingleSequence(root=f"{root}/train", scale=2, history=history,
+            train = RRSRSingleSequence(f"{root}/train", scale=2, history=history, warp=warp, buffers=buffers,
                                        sequence=f"{sequence:0{2}d}", sequence_length=2400, crop_size=crop_size,
-                                       use_hflip=use_hflip,
-                                       use_rotation=use_rotation, disk_mode=DiskMode.CV2)
-            val_sequence = sequence + 6  # we only have 6 sequences for training..
-            val = RVSRSingleSequence(root=f"{root}/val", scale=2, history=history,
+                                       use_hflip=use_hflip, use_rotation=use_rotation, disk_mode=DiskMode.CV2)
+            val_sequence = sequence + 6 # we only have 6 sequences for training..
+            val = RRSRSingleSequence(root=f"{root}/val", scale=2, history=history, warp=warp, buffers=buffers,
                                      sequence=f"{val_sequence:0{2}d}", sequence_length=300, crop_size=None,
-                                     use_hflip=False,
-                                     use_rotation=False, disk_mode=DiskMode.CV2)
+                                     use_hflip=False, use_rotation=False, disk_mode=DiskMode.CV2)
+            # if warp:
+            #     train = RVSRSingleSequenceWarp(root=f"{root}/train", scale=2, history=history,
+            #                                sequence=f"{sequence:0{2}d}", sequence_length=2400, crop_size=crop_size,
+            #                                use_hflip=use_hflip,
+            #                                use_rotation=use_rotation, disk_mode=DiskMode.CV2)
+            #     val_sequence = sequence + 6  # we only have 6 sequences for training..
+            #     val = RVSRSingleSequenceWarp(root=f"{root}/val", scale=2, history=history,
+            #                              sequence=f"{val_sequence:0{2}d}", sequence_length=300, crop_size=None,
+            #                              use_hflip=False,
+            #                              use_rotation=False, disk_mode=DiskMode.CV2)
+            #     return train, val
+            # train = RVSRSingleSequence(root=f"{root}/train", scale=2, history=history,
+            #                            sequence=f"{sequence:0{2}d}", sequence_length=2400, crop_size=crop_size,
+            #                            use_hflip=use_hflip,
+            #                            use_rotation=use_rotation, disk_mode=DiskMode.CV2)
+            # val_sequence = sequence + 6  # we only have 6 sequences for training..
+            # val = RVSRSingleSequence(root=f"{root}/val", scale=2, history=history,
+            #                          sequence=f"{val_sequence:0{2}d}", sequence_length=300, crop_size=None,
+            #                          use_hflip=False,
+            #                          use_rotation=False, disk_mode=DiskMode.CV2)
             return train, val
         case _:
             raise ValueError(f"The dataset '{name}' is not a valid dataset.")
