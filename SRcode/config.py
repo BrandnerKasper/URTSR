@@ -8,6 +8,7 @@ from torchvision import transforms
 from typing import Optional
 
 from SRcode.models.rep_net import RepNet
+from SRcode.models.rep_net_rrsr import RepNetRRSR
 from SRcode.models.urteil import Urteil
 from SRcode.models.urteil_2 import Urteil_2
 from models.urtsr import URTSR
@@ -90,6 +91,8 @@ def init_model(model_name: str, scale: int, batch_size: int, crop_size: int, buf
             return URTSR(scale=scale, history_frames=history)
         case "RepNet":
             return RepNet(scale=scale)
+        case "RepNetRRSR":
+            return RepNetRRSR(scale=scale, history_frames=history, buffer_cha=buffer_cha)
         case "Urteil":
             return Urteil(scale=scale, history_frames=history, buffer_cha=buffer_cha)
         case "Urteil_2":

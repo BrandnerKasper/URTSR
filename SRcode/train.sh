@@ -5,6 +5,7 @@ file_paths=(
     "configs/RepNet/repnet_01.yaml"
     "configs/Urteil/urteil_01.yaml"
     "configs/Urteil_2/urteil_2_01.yaml"
+    "configs/RepNetRRSR/repnet_rrsr_01.yaml"
 )
 
 # Loop through each file path and call the Python script
