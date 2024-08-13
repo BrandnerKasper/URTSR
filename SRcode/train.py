@@ -14,6 +14,8 @@ from utils import utils
 from data.dataloader import SingleImagePair, MultiImagePair
 from config import load_yaml_into_config, create_comment_from_config
 
+torch.manual_seed(42)
+
 
 def parse_arguments() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Train a SR network based on a config file.")
