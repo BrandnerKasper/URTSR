@@ -7,10 +7,10 @@ from torchvision import transforms
 
 from typing import Optional
 
-from SRcode.models.rep_net import RepNet
-from SRcode.models.rep_net_rrsr import RepNetRRSR
-from SRcode.models.urteil import Urteil
-from SRcode.models.urteil_2 import Urteil_2
+from models.rep_net import RepNet
+from models.rep_net_rrsr import RepNetRRSR
+from models.urteil import Urteil
+from models.urteil_2 import Urteil_2
 from models.urtsr import URTSR
 from models.basemodel import BaseModel
 from models.srcnn import SRCNN
@@ -27,7 +27,7 @@ from models.evrnet import EVRNet
 from models.ndsr import NDSR
 
 from data.dataloader import SingleImagePair, MultiImagePair, VSR, DiskMode, EVSR, RVSRSingleSequence, \
-    RVSRSingleSequenceWarp, RRSRSingleSequence
+    RVSRSingleSequenceWarp, RRSRSingleSequence, RRSRMultiSequence
 from loss.loss import EBMELoss, STSSLoss
 
 
@@ -105,6 +105,8 @@ def init_criterion(criterion_name: str) -> nn.Module:
     match criterion_name:
         case "L1":
             return nn.L1Loss()
+        case "L2":
+            return nn.MSELoss()
         case "HuberLoss":
             return nn.HuberLoss()
         case "EBMELoss":
@@ -195,6 +197,14 @@ def init_dataset(name: str, sequence: int, extra: bool, history: int, warp: bool
                       disk_mode=DiskMode.NPZ)
             return train, val
         case "UE_data":
+            if sequence == "all":
+                train = RRSRMultiSequence(f"{root}/train", scale=2, history=history, warp=warp, buffers=buffers,
+                                       sequence=sequence, sequence_length=2400, crop_size=crop_size,
+                                       use_hflip=use_hflip, use_rotation=use_rotation, disk_mode=DiskMode.CV2)
+                val = RRSRMultiSequence(root=f"{root}/val", scale=2, history=history, warp=warp, buffers=buffers,
+                                     sequence=sequence, sequence_length=300, crop_size=None,
+                                     use_hflip=False, use_rotation=False, disk_mode=DiskMode.CV2)
+                return train, val
             train = RRSRSingleSequence(f"{root}/train", scale=2, history=history, warp=warp, buffers=buffers,
                                        sequence=f"{sequence:0{2}d}", sequence_length=2400, crop_size=crop_size,
                                        use_hflip=use_hflip, use_rotation=use_rotation, disk_mode=DiskMode.CV2)
