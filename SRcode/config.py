@@ -7,6 +7,7 @@ from torchvision import transforms
 
 from typing import Optional
 
+from models.urteil_3 import Urteil_3
 from models.rep_net import RepNet
 from models.rep_net_rrsr import RepNetRRSR
 from models.urteil import Urteil
@@ -97,6 +98,8 @@ def init_model(model_name: str, scale: int, batch_size: int, crop_size: int, buf
             return Urteil(scale=scale, history_frames=history, buffer_cha=buffer_cha)
         case "Urteil_2":
             return Urteil_2(scale=scale, history_frames=history, buffer_cha=buffer_cha)
+        case "Urteil_3":
+            return Urteil_3(scale=scale, history_frames=history, buffer_cha=buffer_cha, num_blocks=6, num_channels=64)
         case _:
             raise ValueError(f"The model '{model_name}' is not a valid model.")
 
@@ -205,11 +208,11 @@ def init_dataset(name: str, sequence: int, extra: bool, history: int, warp: bool
                                      sequence=sequence, sequence_length=300, crop_size=None,
                                      use_hflip=False, use_rotation=False, disk_mode=DiskMode.CV2)
                 return train, val
-            train = RRSRSingleSequence(f"{root}/train", scale=2, history=history, warp=warp, buffers=buffers,
+            train = RRSRMultiSequence(f"{root}/train", scale=2, history=history, warp=warp, buffers=buffers,
                                        sequence=f"{sequence:0{2}d}", sequence_length=2400, crop_size=crop_size,
                                        use_hflip=use_hflip, use_rotation=use_rotation, disk_mode=DiskMode.CV2)
             val_sequence = sequence + 6 # we only have 6 sequences for training..
-            val = RRSRSingleSequence(root=f"{root}/val", scale=2, history=history, warp=warp, buffers=buffers,
+            val = RRSRMultiSequence(root=f"{root}/val", scale=2, history=history, warp=warp, buffers=buffers,
                                      sequence=f"{val_sequence:0{2}d}", sequence_length=300, crop_size=None,
                                      use_hflip=False, use_rotation=False, disk_mode=DiskMode.CV2)
             # if warp:
