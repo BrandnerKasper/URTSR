@@ -7,7 +7,7 @@ from torchvision import transforms
 
 from typing import Optional
 
-from models.urteil_3 import Urteil_3
+from models.urepss import URepSS
 from models.rep_net import RepNet
 from models.rep_net_rrsr import RepNetRRSR
 from models.urteil import Urteil
@@ -98,8 +98,8 @@ def init_model(model_name: str, scale: int, batch_size: int, crop_size: int, buf
             return Urteil(scale=scale, history_frames=history, buffer_cha=buffer_cha)
         case "Urteil_2":
             return Urteil_2(scale=scale, history_frames=history, buffer_cha=buffer_cha)
-        case "Urteil_3":
-            return Urteil_3(scale=scale, history_frames=history, buffer_cha=buffer_cha, num_blocks=6, num_channels=64)
+        case "URepSS":
+            return URepSS(scale=scale, history_frames=history, buffer_cha=buffer_cha, num_blocks=6, num_channels=64)
         case _:
             raise ValueError(f"The model '{model_name}' is not a valid model.")
 
