@@ -200,11 +200,11 @@ class URepSS(BaseModel):
         )
 
         # Bottom layer with multiple rep blocks
-        layers = [RepBlock(64, num_channels)]
-        for _ in range(num_blocks - 2):
-            layers.append(RepBlock(num_channels, num_channels))
-        layers.append(RepBlock(num_channels, 64))
-        self.bottom_layer = nn.Sequential(*layers)
+        # layers = [RepBlock(64, num_channels)]
+        # for _ in range(num_blocks - 2):
+        #     layers.append(RepBlock(num_channels, num_channels))
+        # layers.append(RepBlock(num_channels, 64))
+        # self.bottom_layer = nn.Sequential(*layers)
 
         # Decoder
         self.up_1 = UpConvBlock(64 + 24, 32)
@@ -212,7 +212,7 @@ class URepSS(BaseModel):
         self.conv_out = ConvBlock(24, 48)
         self.up_sample = nn.PixelShuffle(scale * scale)
 
-    def forward(self, x, his, buf):
+    def forward(self, x, his, buf=None):
         # Setup
         x_up = F.interpolate(x, scale_factor=self.scale, mode="bilinear")
 
@@ -231,7 +231,7 @@ class URepSS(BaseModel):
 
         # Bottom Layer
         x3 = torch.cat([x3, his], 1)
-        x3 = self.bottom_layer(x3)
+        # x3 = self.bottom_layer(x3)
 
         # Decoder
         x = self.up_1(x3, x2)
@@ -243,17 +243,17 @@ class URepSS(BaseModel):
 
         return x
 
-    def restructure_bottom_layer(self):
-        for layer in self.bottom_layer:
-            if isinstance(layer, RepBlock):
-                layer.reparameterize()
+    # def restructure_bottom_layer(self):
+    #     for layer in self.bottom_layer:
+    #         if isinstance(layer, RepBlock):
+    #             layer.reparameterize()
 
 
 def main() -> None:
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     model = URepSS(scale=2, history_frames=2, buffer_cha=5, num_blocks=6, num_channels=64).to(device)
-    model.restructure_bottom_layer()
+    # model.restructure_bottom_layer()
 
     batch_size = 1
     input_data = (batch_size, 3, 1920, 1080)
