@@ -7,6 +7,9 @@ from torchvision import transforms
 
 from typing import Optional
 
+from models.urepss_2 import URepSS_02
+from models.urepss_3 import URepSS_03
+from models.urepss_4 import URepSS_04
 from models.urepss import URepSS
 from models.rep_net import RepNet
 from models.rep_net_rrsr import RepNetRRSR
@@ -100,6 +103,12 @@ def init_model(model_name: str, scale: int, batch_size: int, crop_size: int, buf
             return Urteil_2(scale=scale, history_frames=history, buffer_cha=buffer_cha)
         case "URepSS":
             return URepSS(scale=scale, history_frames=history, buffer_cha=buffer_cha, num_blocks=6, num_channels=64)
+        case "URepSS_2":
+            return URepSS_02(scale=scale, history_frames=history, buffer_cha=buffer_cha)
+        case "URepSS_3":
+            return URepSS_03(scale=scale, history_frames=history, buffer_cha=buffer_cha)
+        case "URepSS_4":
+            return URepSS_04(scale=scale, history_frames=history, buffer_cha=buffer_cha)
         case _:
             raise ValueError(f"The model '{model_name}' is not a valid model.")
 
