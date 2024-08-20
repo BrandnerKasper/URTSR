@@ -9,13 +9,13 @@ from typing import Optional
 
 from models.urepss_2 import URepSS_02
 from models.urepss_3 import URepSS_03
-from models.urepss_4 import URepSS_04
+from models.urtsr import URTSR
 from models.urepss import URepSS
 from models.rep_net import RepNet
 from models.rep_net_rrsr import RepNetRRSR
 from models.urteil import Urteil
 from models.urteil_2 import Urteil_2
-from models.urtsr import URTSR
+from models.nsrrd import NSRRD
 from models.basemodel import BaseModel
 from models.srcnn import SRCNN
 from models.subpixel import SubPixelNN
@@ -91,8 +91,8 @@ def init_model(model_name: str, scale: int, batch_size: int, crop_size: int, buf
             return EVRNet(scale=scale)
         case "NDSR":
             return NDSR(scale=scale, batch_size=batch_size, crop_size=crop_size)
-        case "URTSR":
-            return URTSR(scale=scale, history_frames=history)
+        case "NSRRD":
+            return NSRRD(scale=scale, history_frames=history)
         case "RepNet":
             return RepNet(scale=scale)
         case "RepNetRRSR":
@@ -107,8 +107,8 @@ def init_model(model_name: str, scale: int, batch_size: int, crop_size: int, buf
             return URepSS_02(scale=scale, history_frames=history, buffer_cha=buffer_cha)
         case "URepSS_3":
             return URepSS_03(scale=scale, history_frames=history, buffer_cha=buffer_cha)
-        case "URepSS_4":
-            return URepSS_04(scale=scale, history_frames=history, buffer_cha=buffer_cha)
+        case "URTSR":
+            return URTSR(scale=scale, history_frames=history, buffer_cha=buffer_cha)
         case _:
             raise ValueError(f"The model '{model_name}' is not a valid model.")
 
