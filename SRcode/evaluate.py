@@ -243,7 +243,6 @@ def evaluate_vsr(pretrained_model_path: str) -> None:
     model = config.model.to(device)
     model.load_state_dict(torch.load(pretrained_model_path))
     model.eval()
-    extra = config.extra
 
     val_dataset = config.val_dataset
     val_loader = DataLoader(dataset=val_dataset, batch_size=1, shuffle=False, num_workers=config.number_workers)

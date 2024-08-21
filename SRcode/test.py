@@ -5,23 +5,23 @@ from tqdm import tqdm
 import torchvision.transforms.functional as F
 from torch.utils.data import DataLoader
 import argparse
+from torch.cuda import amp
 
-from data.dataloader import SingleImagePair, MultiImagePair, STSSImagePair, DiskMode, STSSCrossValidation, \
-    STSSCrossValidation2
+from data.dataloader import SingleImagePair, MultiImagePair, STSSImagePair, DiskMode, RRSRMultiSequence
 from config import load_yaml_into_config, Config
 from utils import utils
 
 
 def parse_arguments() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Evaluate a trained SR network based on a pretrained model file.")
-    parser.add_argument('file_path', type=str, nargs='?', default='pretrained_models/extraSS_All.pth',
+    parser = argparse.ArgumentParser(description="Test a trained SR network based on a pretrained model file.")
+    parser.add_argument('file_path', type=str, nargs='?', default='pretrained_models/STSS/stss_all.pth',
                         help="Path to the pretrained model .pth file")
     args = parser.parse_args()
     return args
 
 
-def get_config_from_pretrained_model(name: str) -> Config:
-    config_path = f"configs/{name}.yaml"
+def get_config_from_pretrained_model(subfolder: str, name: str) -> Config:
+    config_path = f"configs/{subfolder}/{name}.yaml"
     return load_yaml_into_config(config_path)
 
 
@@ -138,10 +138,92 @@ def test(model_path: str) -> None:
             ess_frame.save(f"{save_path}/{subfolder}/{filename:04d}.png")
 
 
+def test_interpolation(interpolation: str = "bilinear") -> None:
+    # Setup
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    scale = 2
+    print(f"Device: {device}")
+    path = "dataset/UE_data/val"
+    save_path = f"results/{interpolation}"
+    test_dataset = RRSRMultiSequence(root=path, sequence="all", warp=False, buffers=None)
+
+    for idx in tqdm(range(len(test_dataset)), f"Generating sequences.."):
+        # Setup
+        filename = test_dataset.get_filename(idx)
+        subfolder = test_dataset.get_path(idx).split("/")[0]  # we want to retrieve the sub folder of the val sequences
+        generate_directory(f"{save_path}/{subfolder}")
+        print(f"Filename: {filename}\n")
+
+        # prepare data
+        lr_image, history_images, buffer_images, hr_image = test_dataset.__getitem__(idx)
+        lr_image = lr_image.to(device)
+        if history_images:
+            history_images = [img.to(device) for img in history_images]
+            history_images = torch.stack(history_images, dim=1)
+        if buffer_images:
+            buffer_images = [img.to(device) for img in buffer_images]
+            buffer_images = torch.cat(buffer_images, dim=1)
+
+        if interpolation == "bilinear":
+            res = utils.upscale(lr_image, scale, interpolation).squeeze(0)
+        else:
+            res = utils.upscale(lr_image, scale, interpolation).squeeze(0).squeeze(0)
+
+        # Safe generated images into a folder
+        frame = F.to_pil_image(res)
+        frame.save(f"{save_path}/{subfolder}/{filename}.png")
+
+
+def test_rrsr(pretrained_model_path: str) -> None:
+    # Setup
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    print(f"Device: {device}")
+    sub_folder = pretrained_model_path.split('/')[1]
+    model_name = pretrained_model_path.split('/')[-1].split('.')[0]
+    config = get_config_from_pretrained_model(sub_folder, model_name)
+    sequence = config.sequence
+    save_path = f"results/{model_name}"
+    print(config)
+
+    # Loading model
+    model = config.model.to(device)
+    model.load_state_dict(torch.load(pretrained_model_path))
+    model.eval()
+
+    test_dataset = config.val_dataset
+
+    for idx in tqdm(range(len(test_dataset)), f"Generating sequence {sequence}.."):
+        # Setup
+        filename = test_dataset.get_filename(idx)
+        subfolder = test_dataset.get_path(idx).split("/")[0]  # we want to retrieve the sub folder of the val sequences
+        generate_directory(f"{save_path}/{subfolder}")
+        print(f"Filename: {filename}\n")
+
+        # prepare data
+        lr_image, history_images, buffer_images, hr_image = test_dataset.__getitem__(idx)
+        lr_image = lr_image.unsqueeze(0).to(device)
+        if history_images:
+            history_images = [img.unsqueeze(0).to(device) for img in history_images]
+            history_images = torch.stack(history_images, dim=1)
+        if buffer_images:
+            buffer_images = [img.unsqueeze(0).to(device) for img in buffer_images]
+            buffer_images = torch.cat(buffer_images, dim=1)
+
+        with torch.no_grad():
+            # forward pass
+            with amp.autocast():
+                output = model(lr_image, history_images, buffer_images)
+            output = torch.clamp(output, min=0.0, max=1.0)
+
+            # Safe generated images into a folder
+            frame = F.to_pil_image(output.squeeze(0))
+            frame.save(f"{save_path}/{subfolder}/{filename}.png")
+
+
 def main() -> None:
     args = parse_arguments()
     file_path = args.file_path
-    test(file_path)
+    test_rrsr(file_path)
 
 
 if __name__ == '__main__':
