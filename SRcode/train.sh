@@ -2,11 +2,12 @@
 
 # List of file paths
 file_paths=(
-    "configs/urepss_05_01.yaml"
-    "configs/URTSR/Ablation/urtsr_01_bare.yaml"
-    "configs/URTSR/Ablation/urtsr_01_buff.yaml"
-    "configs/URTSR/Ablation/urtsr_01_warp.yaml"
-    "configs/URTSR/Ablation/urtsr_01_warp_buff.yaml"
+    "configs/URTSR/urtsr_02.yaml"
+    "configs/URTSR/urtsr_03.yaml"
+    "configs/URTSR/urtsr_04.yaml"
+    "configs/URTSR/urtsr_05.yaml"
+    "configs/URTSR/urtsr_06.yaml"
+    "configs/URTSR/urtsr_all.yaml"
 )
 
 # Loop through each file path and call the Python script
