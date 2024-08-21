@@ -123,15 +123,15 @@ class UpConvBlock(nn.Module):
         return self.conv(x)
 
 
-class URTSR(BaseModel):
+class URepSS_04(BaseModel):
     def __init__(self, scale: int = 2, history_frames: int = 2, buffer_cha: int = 13):
-        super(URTSR, self).__init__(scale=scale, down_and_up=3)
+        super(URepSS_04, self).__init__(scale=scale, down_and_up=3)
 
         # Encoder
         self.down_sample = nn.PixelUnshuffle(scale)
-        self.conv_in = GatedConvBlock((3 + buffer_cha)*4, 32)
-        self.down_1 = GatedDownConvBlock(32, 32)
-        self.down_2 = GatedDownConvBlock(32, 32)
+        self.conv_in = GatedConvBlock((3 + buffer_cha)*4, 24)
+        self.down_1 = GatedDownConvBlock(24, 24)
+        self.down_2 = GatedDownConvBlock(24, 32)
 
         # History encoder
         self.history_encoder = nn.Sequential(
@@ -145,13 +145,13 @@ class URTSR(BaseModel):
         self.bottom_layer = self.bottom_layer = Attention(dim=64, num_heads=8, bias=True)
 
         # Decoder
-        self.up_1 = UpConvBlock(64 + 32, 32)
-        self.up_2 = UpConvBlock(32 + 32, 24)
+        self.up_1 = UpConvBlock(64 + 24, 32)
+        self.up_2 = UpConvBlock(32 + 24, 24)
         self.conv_out = GatedConvBlock(24, 48)
         self.up_sample = nn.PixelShuffle(scale * scale)
 
     def forward(self, x, his, buf=None):
-        # Bilinear Skip
+        # Setup
         x_up = F.interpolate(x, scale_factor=self.scale, mode="bilinear")
 
         if buf is not None:
@@ -185,7 +185,7 @@ class URTSR(BaseModel):
 def main() -> None:
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    model = URTSR(scale=2, history_frames=2, buffer_cha=5).to(device)
+    model = URepSS_04(scale=2, history_frames=2, buffer_cha=5).to(device)
 
     batch_size = 1
     input_data = (batch_size, 3, 1920, 1080)

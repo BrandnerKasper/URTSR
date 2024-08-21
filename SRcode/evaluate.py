@@ -16,7 +16,7 @@ from config import load_yaml_into_config, Config
 
 def parse_arguments() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Evaluate a trained SR network based on a pretrained model file.")
-    parser.add_argument('file_path', type=str, nargs='?', default='pretrained_models/URTSR/urtsr_01.pth',
+    parser.add_argument('file_path', type=str, nargs='?', default='pretrained_models/RTSRN/rtsrn_all.pth',
                         help="Path to the pretrained model .pth file")
     args = parser.parse_args()
     return args
@@ -284,10 +284,75 @@ def evaluate_vsr(pretrained_model_path: str) -> None:
     save_results(results, model_name)
 
 
+def evaluate_rrsr(pretrained_model_path: str) -> None:
+    # Setup
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    print(f"Device: {device}")
+    sub_folder = pretrained_model_path.split('/')[1]
+    model_name = pretrained_model_path.split('/')[-1].split('.')[0]
+    config = get_config_from_pretrained_model(sub_folder, model_name)
+    print(config)
+
+    with open(f"configs/{sub_folder}/{model_name}.yaml", "r") as file:
+        results: dict = yaml.safe_load(file)
+
+    # Loading model
+    model = config.model.to(device)
+    model.load_state_dict(torch.load(pretrained_model_path))
+    model.eval()
+
+    val_dataset = config.val_dataset
+    val_loader = DataLoader(dataset=val_dataset, batch_size=1, shuffle=False, num_workers=config.number_workers)
+    eval_alex_model = lpips.LPIPS(net='alex').cuda()
+
+    total_metrics = utils.Metrics(0, 0, 0)
+
+    for lr_image, history_images, buffer_images, hr_image in tqdm(val_loader, desc=f"Validation", dynamic_ncols=True):
+        # prepare data
+        lr_image = lr_image.to(device)
+        if history_images:
+            history_images = [img.to(device) for img in history_images]
+            history_images = torch.stack(history_images, dim=1)
+        if buffer_images:
+            buffer_images = [img.to(device) for img in buffer_images]
+            buffer_images = torch.cat(buffer_images, dim=1)
+        hr_image = hr_image.to(device)
+
+        with torch.no_grad():
+            # forward pass
+            with amp.autocast():
+                if len(buffer_images) != 0:  # RRSR
+                    output = model(lr_image, history_images, buffer_images)
+                elif len(history_images) != 0:  # VSR
+                    output = model(lr_image, history_images)
+                else:
+                    output = model(lr_image)  # SISR
+            output = torch.clamp(output, min=0.0, max=1.0)
+
+        # Calc PSNR and SSIM
+        # SS frame
+        metric = utils.calculate_metrics(hr_image.squeeze(0), output.squeeze(0), eval_alex_model)
+        total_metrics += metric
+
+    # PSNR & SSIM
+    average_metric = total_metrics / len(val_loader)
+    print("\n")
+    print(f"Total {average_metric}")
+
+    # writing results
+    results["VAL SEQUENCE"] = config.sequence + 6
+    results["PSNR"] = average_metric.psnr_value
+    results["SSIM"] = average_metric.ssim_value
+    results["LPIPS"] = average_metric.lpips_value
+
+    # Save results
+    save_results(results, model_name)
+
+
 def main() -> None:
     args = parse_arguments()
     file_path = args.file_path
-    evaluate_vsr(file_path)
+    evaluate_rrsr(file_path)
     # evaluate_trad()
     # eval_trad_stss_simple()
 

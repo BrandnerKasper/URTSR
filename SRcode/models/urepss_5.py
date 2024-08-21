@@ -217,15 +217,15 @@ class Attention(nn.Module):
 
 
 
-class URepSS(BaseModel):
+class URepSS_05(BaseModel):
     def __init__(self, scale: int = 2, history_frames: int = 2, buffer_cha: int = 13, num_blocks=3, num_channels: int = 64):
-        super(URepSS, self).__init__(scale=scale, down_and_up=3)
+        super(URepSS_05, self).__init__(scale=scale, down_and_up=3)
 
         # Encoder
         self.down_sample = nn.PixelUnshuffle(scale)
-        self.conv_in = ConvBlock((3 + buffer_cha)*4, 24)
-        self.down_1 = DownConvBlock(24, 24)
-        self.down_2 = DownConvBlock(24, 32)
+        self.conv_in = ConvBlock((3 + buffer_cha)*4, 32)
+        self.down_1 = DownConvBlock(32, 32)
+        self.down_2 = DownConvBlock(32, 32)
 
         # History encoder
         self.history_encoder = nn.Sequential(
@@ -239,8 +239,8 @@ class URepSS(BaseModel):
         self.bottom_layer = Attention(dim=64, num_heads=8, bias=True)
 
         # Decoder
-        self.up_1 = UpConvBlock(64 + 24, 32)
-        self.up_2 = UpConvBlock(32 + 24, 24)
+        self.up_1 = UpConvBlock(64 + 32, 32)
+        self.up_2 = UpConvBlock(32 + 32, 24)
         self.conv_out = ConvBlock(24, 48)
         self.up_sample = nn.PixelShuffle(scale * scale)
 
@@ -284,7 +284,7 @@ class URepSS(BaseModel):
 def main() -> None:
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    model = URepSS(scale=2, history_frames=2, buffer_cha=5, num_blocks=6, num_channels=64).to(device)
+    model = URepSS_05(scale=2, history_frames=2, buffer_cha=5, num_blocks=6, num_channels=64).to(device)
     # model.restructure_bottom_layer()
 
     batch_size = 1

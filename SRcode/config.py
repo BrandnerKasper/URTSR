@@ -7,6 +7,7 @@ from torchvision import transforms
 
 from typing import Optional
 
+from models.urepss_5 import URepSS_05
 from models.urepss_2 import URepSS_02
 from models.urepss_3 import URepSS_03
 from models.urtsr import URTSR
@@ -107,6 +108,8 @@ def init_model(model_name: str, scale: int, batch_size: int, crop_size: int, buf
             return URepSS_02(scale=scale, history_frames=history, buffer_cha=buffer_cha)
         case "URepSS_3":
             return URepSS_03(scale=scale, history_frames=history, buffer_cha=buffer_cha)
+        case "URepSS_05":
+            return URepSS_05(scale=scale, history_frames=history, buffer_cha=buffer_cha)
         case "URTSR":
             return URTSR(scale=scale, history_frames=history, buffer_cha=buffer_cha)
         case _:
