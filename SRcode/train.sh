@@ -2,11 +2,6 @@
 
 # List of file paths
 file_paths=(
-    "configs/URTSR/urtsr_02.yaml"
-    "configs/URTSR/urtsr_03.yaml"
-    "configs/URTSR/urtsr_04.yaml"
-    "configs/URTSR/urtsr_05.yaml"
-    "configs/URTSR/urtsr_06.yaml"
     "configs/URTSR/urtsr_all.yaml"
 )
 
