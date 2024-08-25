@@ -16,7 +16,7 @@ from config import load_yaml_into_config, Config
 
 def parse_arguments() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Evaluate a trained SR network based on a pretrained model file.")
-    parser.add_argument('file_path', type=str, nargs='?', default='pretrained_models/RTSRN/rtsrn_all.pth',
+    parser.add_argument('file_path', type=str, nargs='?', default='pretrained_models/URTSR/urtsr_all.pth',
                         help="Path to the pretrained model .pth file")
     args = parser.parse_args()
     return args

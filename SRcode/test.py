@@ -14,7 +14,7 @@ from utils import utils
 
 def parse_arguments() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Test a trained SR network based on a pretrained model file.")
-    parser.add_argument('file_path', type=str, nargs='?', default='pretrained_models/STSS/stss_all.pth',
+    parser.add_argument('file_path', type=str, nargs='?', default='pretrained_models/NSRRD/nsrrd_03.pth',
                         help="Path to the pretrained model .pth file")
     args = parser.parse_args()
     return args
@@ -145,7 +145,7 @@ def test_interpolation(interpolation: str = "bilinear") -> None:
     print(f"Device: {device}")
     path = "dataset/UE_data/val"
     save_path = f"results/{interpolation}"
-    test_dataset = RRSRMultiSequence(root=path, sequence="all", warp=False, buffers=None)
+    test_dataset = RRSRMultiSequence(root=path, sequence="11", warp=False, buffers=None)
 
     for idx in tqdm(range(len(test_dataset)), f"Generating sequences.."):
         # Setup
@@ -165,9 +165,10 @@ def test_interpolation(interpolation: str = "bilinear") -> None:
             buffer_images = torch.cat(buffer_images, dim=1)
 
         if interpolation == "bilinear":
-            res = utils.upscale(lr_image, scale, interpolation).squeeze(0)
+            res = utils.upscale(lr_image.unsqueeze(0), scale, interpolation).squeeze(0)
         else:
-            res = utils.upscale(lr_image, scale, interpolation).squeeze(0).squeeze(0)
+            res = utils.upscale(lr_image.unsqueeze(0), scale, interpolation).squeeze(0).squeeze(0)
+            res = torch.clamp(res, min=0.0, max=1.0)
 
         # Safe generated images into a folder
         frame = F.to_pil_image(res)
@@ -212,7 +213,12 @@ def test_rrsr(pretrained_model_path: str) -> None:
         with torch.no_grad():
             # forward pass
             with amp.autocast():
-                output = model(lr_image, history_images, buffer_images)
+                if len(buffer_images) != 0:  # RRSR
+                    output = model(lr_image, history_images, buffer_images)
+                elif len(history_images) != 0:  # VSR
+                    output = model(lr_image, history_images)
+                else:
+                    output = model(lr_image)  # SISR
             output = torch.clamp(output, min=0.0, max=1.0)
 
             # Safe generated images into a folder
@@ -224,6 +230,7 @@ def main() -> None:
     args = parse_arguments()
     file_path = args.file_path
     test_rrsr(file_path)
+    # test_interpolation("bicubic")
 
 
 if __name__ == '__main__':
