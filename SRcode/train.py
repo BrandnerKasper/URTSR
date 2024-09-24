@@ -29,9 +29,189 @@ def save_model(filename: str, model: nn.Module) -> None:
     torch.save(model.state_dict(), model_path)
 
 
-def write_frames(writer: SummaryWriter, step: int, extra: bool, buffers: dict[str, bool],
-                 input_t0: list[torch.Tensor], output_t0: torch.Tensor, gt_t0: torch.Tensor,
-                 input_t1: list[torch.Tensor], output_t1: torch.Tensor, gt_t1: torch.Tensor) -> None:
+def write_frames(writer: SummaryWriter, step: int, lr_image: torch.Tensor, history: list[torch.Tensor],
+                 buffers: list[torch.Tensor], buffer_dict: dict[str, bool], output: torch.Tensor, gt: torch.Tensor)\
+        -> None:
+    # LR
+    writer.add_images("Images/LR", lr_image, step)
+    # History
+    if history:
+        for i, history_frame in enumerate(history):
+            writer.add_images(f"Images/History T-{(i + 1) * 2}", history_frame, step)
+    # Buffers
+    if buffers:
+        buffer_keys = []
+        for key, val in buffer_dict.items():
+            if val:
+                buffer_keys.append(key)
+        for i, buffer in enumerate(buffers):
+            writer.add_images(f"Images/Buffer {buffer_keys[i]}", buffer, step)
+    # Output
+    writer.add_images("Images/Output", output, step)
+    # GT
+    writer.add_images("Images/GT", gt, step)
+
+
+def train(filepath: str) -> None:
+    # Setup
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    print(f"Device: {device}")
+    config = load_yaml_into_config(filepath)
+    print(config)
+    filename = config.filename.split('.')[0]
+    writer = SummaryWriter(filename_suffix=create_comment_from_config(config), comment=filename)  # log_dir="runs"
+    # Hyperparameters
+    batch_size = config.batch_size
+    epochs = config.epochs
+    num_workers = config.number_workers
+    start_decay_epoch = config.start_decay_epoch
+
+    # Model details
+    model = config.model.to(device)
+    scaler = amp.GradScaler()
+    buffers_dict = config.buffers
+    criterion = config.criterion
+    optimizer = config.optimizer
+    scheduler = config.scheduler
+
+    # Loading and preparing data
+    # train data
+    train_dataset = config.train_dataset
+    train_loader = DataLoader(dataset=train_dataset, batch_size=batch_size, num_workers=num_workers, shuffle=True)
+    # val data
+    val_dataset = config.val_dataset
+    val_loader = DataLoader(dataset=val_dataset, batch_size=1, shuffle=True, num_workers=num_workers)
+    eval_alex_model = lpips.LPIPS(net='alex').cuda()
+
+    writer.add_text("Model detail", f"{config}", -1)
+
+    iteration_counter = 0
+
+    # Training & Validation Loop
+    for epoch in tqdm(range(epochs), desc='Train & Validate', dynamic_ncols=True):
+        # train loop
+        total_loss = 0.0
+
+        model.reset()
+
+        for lr_image, history_images, buffer_images, hr_image in tqdm(train_loader, desc=f'Training, Epoch {epoch + 1}/{epochs}', dynamic_ncols=True):
+            # setup
+            optimizer.zero_grad()
+            # prepare data
+            lr_image = lr_image.to(device)
+            if history_images:
+                history_images = [img.to(device) for img in history_images]
+                history_images = torch.stack(history_images, dim=1)
+            if buffer_images:
+                buffer_images = [img.to(device) for img in buffer_images]
+                buffer_images = torch.cat(buffer_images, dim=1)
+            hr_image = hr_image.to(device)
+
+            # forward pass
+            with amp.autocast():
+                if len(buffer_images) != 0: # RRSR
+                    output = model(lr_image, history_images, buffer_images)
+                elif len(history_images) != 0: # VSR
+                    output = model(lr_image, history_images)
+                else: # SISR
+                    output = model(lr_image)
+                loss = criterion(output, hr_image)
+            scaler.scale(loss.mean()).backward()
+
+            scaler.step(optimizer)
+            scaler.update()
+
+            total_loss += loss.item()
+            iteration_counter += 1 * batch_size
+
+        # scheduler update if we have one
+        if scheduler is not None:
+            if epoch > start_decay_epoch:
+                scheduler.step()
+        # Loss
+        average_loss = total_loss / len(train_loader)
+        print("\n")
+        print(f"Loss: {average_loss:.4f}\n")
+        # Log loss to TensorBoard
+        writer.add_scalar('Train/Loss', average_loss, epoch)
+
+        # val loop
+        if (epoch + 1) % 10 != 0:
+            continue
+        total_metrics = utils.Metrics(0, 0, 0)
+
+        val_counter = 0
+        model.reset()
+        write_history = None
+        write_buffers = None
+        for lr_image, history_images, buffer_images, hr_image in tqdm(val_loader, desc=f"Validation, Epoch {epoch + 1}/{epochs}", dynamic_ncols=True):
+            # prepare data
+            lr_image = lr_image.to(device)
+            if history_images:
+                write_history = history_images
+                history_images = [img.to(device) for img in history_images]
+                history_images = torch.stack(history_images, dim=1)
+            if buffer_images:
+                write_buffers = buffer_images
+                buffer_images = [img.to(device) for img in buffer_images]
+                buffer_images = torch.cat(buffer_images, dim=1)
+            hr_image = hr_image.to(device)
+
+            with torch.no_grad():
+                # forward pass
+                with amp.autocast():
+                    if len(buffer_images) != 0: # RRSR
+                        output = model(lr_image, history_images, buffer_images)
+                    elif len(history_images) != 0: # VSR
+                        output = model(lr_image, history_images)
+                    else:
+                        output = model(lr_image) # SISR
+                output = torch.clamp(output, min=0.0, max=1.0)
+
+            # Calc PSNR and SSIM
+            metric = utils.calculate_metrics(hr_image.squeeze(0), output.squeeze(0), eval_alex_model)
+            total_metrics += metric
+
+            # Display the val process in tensorboard
+            if val_counter != 0:
+                continue
+            write_frames(writer, iteration_counter, lr_image, write_history, write_buffers, buffers_dict, output, hr_image)
+            val_counter += 1
+
+        # PSNR & SSIM
+        average_metric = total_metrics / len(val_loader)
+        print("\n")
+        print(f"Total {average_metric}")
+
+        # Log PSNR & SSIM to TensorBoard
+        # PSNR
+        writer.add_scalar("Val/PSNR", average_metric.psnr_value, epoch)
+        # SSIM
+        writer.add_scalar("Val/SSIM", average_metric.ssim_value, epoch)
+        # LPIPS
+        writer.add_scalar("Val/LPIPS", average_metric.lpips_value, epoch)
+
+    # End Log
+    writer.close()
+    # Save trained models
+    save_model(filename, model)
+
+
+def main() -> None:
+    args = parse_arguments()
+    file_path = args.file_path
+    train(file_path)
+
+
+# Press the green button in the gutter to run the script.
+if __name__ == '__main__':
+    main()
+
+
+# Extrapolation
+def write_frames_extrapolation(writer: SummaryWriter, step: int, extra: bool, buffers: dict[str, bool],
+                               input_t0: list[torch.Tensor], output_t0: torch.Tensor, gt_t0: torch.Tensor,
+                               input_t1: list[torch.Tensor], output_t1: torch.Tensor, gt_t1: torch.Tensor) -> None:
     # SS
     # LR
     writer.add_images("SS/LR", input_t0[0], step)
@@ -69,54 +249,7 @@ def write_frames(writer: SummaryWriter, step: int, extra: bool, buffers: dict[st
     writer.add_images("ESS/GT", gt_t1, step)
 
 
-def write_vsr_frames(writer: SummaryWriter, step: int, lr_image: torch.Tensor, history: list[torch.Tensor],
-                     buffers: list[torch.Tensor], buffer_dict: dict[str, bool], output: torch.Tensor, gt: torch.Tensor)\
-        -> None:
-    # LR
-    writer.add_images("Images/LR", lr_image, step)
-    # History
-    if history:
-        for i, history_frame in enumerate(history):
-            writer.add_images(f"Images/History T-{(i + 1) * 2}", history_frame, step)
-    # Buffers
-    if buffers:
-        buffer_keys = []
-        for key, val in buffer_dict.items():
-            if val:
-                buffer_keys.append(key)
-        for i, buffer in enumerate(buffers):
-            writer.add_images(f"Images/Buffer {buffer_keys[i]}", buffer, step)
-    # Output
-    writer.add_images("Images/Output", output, step)
-    # GT
-    writer.add_images("Images/GT", gt, step)
-
-
-def write_vsr_frames_with_buffers(writer: SummaryWriter, step: int, buffer_dict: dict[str, bool], lr_image: torch.Tensor,
-                     buffers: list[torch.Tensor], history: list[torch.Tensor], masks: list[torch.Tensor],
-                     output: torch.Tensor, gt: torch.Tensor) -> None:
-    # LR
-    writer.add_images("Images/LR", lr_image, step)
-    # Buffers
-    buffer_keys = []
-    for key, val in buffer_dict.items():
-        if val:
-            buffer_keys.append(key)
-    for i, buffer in enumerate(buffers):
-        writer.add_images(f"Images/Buffer {buffer_keys[i]}", buffer, step)
-    # History
-    for i, history_frame in enumerate(history):
-        writer.add_images(f"Images/History T-{(i + 1) * 2}", history_frame, step)
-    # Masks
-    for i, mask in enumerate(masks):
-        writer.add_images(f"Images/Mask T-{(i + 1) * 2}", mask, step)
-    # Output
-    writer.add_images("Images/Output", output, step)
-    # GT
-    writer.add_images("Images/GT", gt, step)
-
-
-def train(filepath: str) -> None:
+def train_extrapolation(filepath: str) -> None:
     # Setup
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Device: {device}")
@@ -309,7 +442,7 @@ def train(filepath: str) -> None:
             # Display the val process in tensorboard
             if val_counter != 0:
                 continue
-            write_frames(writer, iteration_counter, extra, buffers, ss, ss_output, ss_hr_image, ess, ess_output, ess_hr_image)
+            write_frames_extrapolation(writer, iteration_counter, extra, buffers, ss, ss_output, ss_hr_image, ess, ess_output, ess_hr_image)
             val_counter += 1
 
         # PSNR & SSIM
@@ -342,287 +475,3 @@ def train(filepath: str) -> None:
     # Save trained models
     save_model(filename, model)
 
-
-def train2(filepath: str) -> None:
-    # Setup
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    print(f"Device: {device}")
-    config = load_yaml_into_config(filepath)
-    print(config)
-    filename = config.filename.split('.')[0]
-    writer = SummaryWriter(filename_suffix=create_comment_from_config(config), comment=filename)  # log_dir="runs"
-    # Hyperparameters
-    batch_size = config.batch_size
-    epochs = config.epochs
-    num_workers = config.number_workers
-    start_decay_epoch = config.start_decay_epoch
-
-    # Model details
-    model = config.model.to(device)
-    buffers_dict = config.buffers
-    criterion = config.criterion
-    optimizer = config.optimizer
-    scheduler = config.scheduler
-
-    # Loading and preparing data
-    # train data
-    train_dataset = config.train_dataset
-    train_loader = DataLoader(dataset=train_dataset, batch_size=batch_size, num_workers=num_workers, shuffle=False)
-    # val data
-    val_dataset = config.val_dataset
-    val_loader = DataLoader(dataset=val_dataset, batch_size=1, shuffle=False, num_workers=num_workers)
-
-    writer.add_text("Model detail", f"{config}", -1)
-
-    iteration_counter = 0
-
-    # Training & Validation Loop
-    for epoch in tqdm(range(epochs), desc='Train & Validate', dynamic_ncols=True):
-        # train loop
-        total_loss = 0.0
-
-        for ss in tqdm(train_loader, desc=f'Training, Epoch {epoch + 1}/{epochs}', dynamic_ncols=True):
-            # setup
-            optimizer.zero_grad()
-            # prepare data
-            lr_image = ss[0].to(device)  # shared
-            feature_images = [img.to(device) for img in ss[1]]
-            if feature_images:
-                feature_images = torch.cat(feature_images, dim=1)
-            history_images = [img.to(device) for img in ss[2]]
-            if history_images:
-                history_images = torch.stack(history_images, dim=2)
-            mask_images = [img.to(device) for img in ss[3]]
-            if mask_images:
-                mask_images = torch.stack(mask_images, dim=2)
-            hr_image = ss[4].to(device)
-
-            # forward pass
-            output = model(lr_image) #feature_images, history_images, mask_images)
-            loss = criterion(output, hr_image)  # + 0.1 * lpips
-            loss.backward()
-
-            optimizer.step()
-
-            total_loss += loss.item()
-            iteration_counter += 1 * batch_size
-
-        # scheduler update if we have one
-        if scheduler is not None:
-            if epoch > start_decay_epoch:
-                scheduler.step()
-        # Loss
-        average_loss = total_loss / len(train_loader)
-        print("\n")
-        print(f"Loss: {average_loss:.4f}\n")
-        # Log loss to TensorBoard
-        writer.add_scalar('Train/Loss', average_loss, epoch)
-
-        # val loop
-        if (epoch + 1) % 5 != 0:
-            continue
-        total_metrics = utils.Metrics([0], [0])
-
-        val_counter = 0
-        for ss in tqdm(val_loader, desc=f"Validation, Epoch {epoch + 1}/{epochs}", dynamic_ncols=True):
-            # prepare data
-            lr_image = ss[0].to(device)  # shared
-            feature_images = [img.to(device) for img in ss[1]]
-            if feature_images:
-                feature_images = torch.cat(feature_images, dim=1)
-            history_images = [img.to(device) for img in ss[2]]
-            if history_images:
-                history_images = torch.stack(history_images, dim=2)
-            mask_images = [img.to(device) for img in ss[3]]
-            if mask_images:
-                mask_images = torch.stack(mask_images, dim=2)
-            hr_image = ss[4].to(device)
-
-            with torch.no_grad():
-                # forward pass
-                output = model(lr_image)#, feature_images, history_images, mask_images)
-                output = torch.clamp(output, min=0.0, max=1.0)
-
-            # Calc PSNR and SSIM
-            # SS frame
-            metric = utils.calculate_metrics(hr_image, output, "single")
-            total_metrics += metric
-
-            # Display the val process in tensorboard
-            if val_counter != 0:
-                continue
-            write_vsr_frames(writer, iteration_counter, buffers_dict, ss[0], ss[1], ss[2], ss[3],
-                             output, ss[4])
-            val_counter += 1
-
-        # PSNR & SSIM
-        average_metric = total_metrics / len(val_loader)
-        print("\n")
-        print(f"Total {average_metric}")
-
-        # Log PSNR & SSIM to TensorBoard
-        # PSNR
-        writer.add_scalar("Val/PSNR", average_metric.average_psnr, epoch)
-        # SSIM
-        writer.add_scalar("Val/SSIM", average_metric.average_ssim, epoch)
-
-    # End Log
-    writer.close()
-    # Save trained models
-    save_model(filename, model)
-
-
-def train3(filepath: str) -> None:
-    # Setup
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    print(f"Device: {device}")
-    config = load_yaml_into_config(filepath)
-    print(config)
-    filename = config.filename.split('.')[0]
-    writer = SummaryWriter(filename_suffix=create_comment_from_config(config), comment=filename)  # log_dir="runs"
-    # Hyperparameters
-    batch_size = config.batch_size
-    epochs = config.epochs
-    num_workers = config.number_workers
-    start_decay_epoch = config.start_decay_epoch
-
-    # Model details
-    model = config.model.to(device)
-    scaler = amp.GradScaler()
-    buffers_dict = config.buffers
-    criterion = config.criterion
-    optimizer = config.optimizer
-    scheduler = config.scheduler
-
-    # Loading and preparing data
-    # train data
-    train_dataset = config.train_dataset
-    train_loader = DataLoader(dataset=train_dataset, batch_size=batch_size, num_workers=num_workers, shuffle=True)
-    # val data
-    val_dataset = config.val_dataset
-    val_loader = DataLoader(dataset=val_dataset, batch_size=1, shuffle=True, num_workers=num_workers)
-    eval_alex_model = lpips.LPIPS(net='alex').cuda()
-
-    writer.add_text("Model detail", f"{config}", -1)
-
-    iteration_counter = 0
-
-    # Training & Validation Loop
-    for epoch in tqdm(range(epochs), desc='Train & Validate', dynamic_ncols=True):
-        # train loop
-        total_loss = 0.0
-
-        model.reset() # TODO not a good idea, prev state needs to be handeld from dataloader or train script, else we get a problem with the batch dim!
-
-        for lr_image, history_images, buffer_images, hr_image in tqdm(train_loader, desc=f'Training, Epoch {epoch + 1}/{epochs}', dynamic_ncols=True):
-            # setup
-            optimizer.zero_grad()
-            # prepare data
-            lr_image = lr_image.to(device)
-            if history_images:
-                history_images = [img.to(device) for img in history_images]
-                history_images = torch.stack(history_images, dim=1)
-            if buffer_images:
-                buffer_images = [img.to(device) for img in buffer_images]
-                buffer_images = torch.cat(buffer_images, dim=1)
-            hr_image = hr_image.to(device)
-
-            # forward pass
-            with amp.autocast():
-                if len(buffer_images) != 0: # RRSR
-                    output = model(lr_image, history_images, buffer_images)
-                elif len(history_images) != 0: # VSR
-                    output = model(lr_image, history_images)
-                else: # SISR
-                    output = model(lr_image)
-                loss = criterion(output, hr_image)
-            scaler.scale(loss.mean()).backward()
-
-            scaler.step(optimizer)
-            scaler.update()
-
-            total_loss += loss.item()
-            iteration_counter += 1 * batch_size
-
-        # scheduler update if we have one
-        if scheduler is not None:
-            if epoch > start_decay_epoch:
-                scheduler.step()
-        # Loss
-        average_loss = total_loss / len(train_loader)
-        print("\n")
-        print(f"Loss: {average_loss:.4f}\n")
-        # Log loss to TensorBoard
-        writer.add_scalar('Train/Loss', average_loss, epoch)
-
-        # val loop
-        if (epoch + 1) % 10 != 0:
-            continue
-        total_metrics = utils.Metrics(0, 0, 0)
-
-        val_counter = 0
-        model.reset()
-        write_history = None
-        write_buffers = None
-        for lr_image, history_images, buffer_images, hr_image in tqdm(val_loader, desc=f"Validation, Epoch {epoch + 1}/{epochs}", dynamic_ncols=True):
-            # prepare data
-            lr_image = lr_image.to(device)
-            if history_images:
-                write_history = history_images
-                history_images = [img.to(device) for img in history_images]
-                history_images = torch.stack(history_images, dim=1)
-            if buffer_images:
-                write_buffers = buffer_images
-                buffer_images = [img.to(device) for img in buffer_images]
-                buffer_images = torch.cat(buffer_images, dim=1)
-            hr_image = hr_image.to(device)
-
-            with torch.no_grad():
-                # forward pass
-                with amp.autocast():
-                    if len(buffer_images) != 0: # RRSR
-                        output = model(lr_image, history_images, buffer_images)
-                    elif len(history_images) != 0: # VSR
-                        output = model(lr_image, history_images)
-                    else:
-                        output = model(lr_image) # SISR
-                output = torch.clamp(output, min=0.0, max=1.0)
-
-            # Calc PSNR and SSIM
-            metric = utils.calculate_metrics(hr_image.squeeze(0), output.squeeze(0), eval_alex_model)
-            total_metrics += metric
-
-            # Display the val process in tensorboard
-            if val_counter != 0:
-                continue
-            write_vsr_frames(writer, iteration_counter, lr_image, write_history, write_buffers, buffers_dict, output, hr_image)
-            val_counter += 1
-
-        # PSNR & SSIM
-        average_metric = total_metrics / len(val_loader)
-        print("\n")
-        print(f"Total {average_metric}")
-
-        # Log PSNR & SSIM to TensorBoard
-        # PSNR
-        writer.add_scalar("Val/PSNR", average_metric.psnr_value, epoch)
-        # SSIM
-        writer.add_scalar("Val/SSIM", average_metric.ssim_value, epoch)
-        # LPIPS
-        writer.add_scalar("Val/LPIPS", average_metric.lpips_value, epoch)
-
-        # End Log
-    writer.close()
-    # Save trained models
-    save_model(filename, model)
-
-
-def main() -> None:
-    args = parse_arguments()
-    file_path = args.file_path
-    train3(file_path)
-
-
-# Press the green button in the gutter to run the script.
-if __name__ == '__main__':
-    main()

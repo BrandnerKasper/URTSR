@@ -7,19 +7,11 @@ from torchvision import transforms
 
 from typing import Optional
 
-from models.urepss_5 import URepSS_05
-from models.urepss_2 import URepSS_02
-from models.urepss_3 import URepSS_03
 from models.urtsr import URTSR
-from models.urepss import URepSS
 from models.rep_net import RepNet
-from models.rep_net_rrsr import RepNetRRSR
-from models.urteil import Urteil
-from models.urteil_2 import Urteil_2
 from models.nsrrd import NSRRD
 from models.basemodel import BaseModel
 from models.srcnn import SRCNN
-from models.subpixel import SubPixelNN
 from models.extraNet import ExtraNet
 from models.flavr import Flavr
 from models.flavr_original import Flavr_Original
@@ -29,7 +21,6 @@ from models.extrass import ExtraSS
 from models.rfdn import RFDN
 from models.rtsrn import RealTimeSRNet
 from models.evrnet import EVRNet
-from models.ndsr import NDSR
 
 from data.dataloader import SingleImagePair, MultiImagePair, VSR, DiskMode, EVSR, RVSRSingleSequence, \
     RVSRSingleSequenceWarp, RRSRSingleSequence, RRSRMultiSequence
@@ -69,8 +60,6 @@ def init_model(model_name: str, scale: int, batch_size: int, crop_size: int, buf
     match model_name:
         case "SRCNN":
             return SRCNN(scale=scale)
-        case "SubPixel":
-            return SubPixelNN(scale=scale)
         case "ExtraNet":
             return ExtraNet(scale=scale)
         case "Flavr":
@@ -90,26 +79,10 @@ def init_model(model_name: str, scale: int, batch_size: int, crop_size: int, buf
             return RealTimeSRNet(upscale=scale)
         case "EVRNet":
             return EVRNet(scale=scale)
-        case "NDSR":
-            return NDSR(scale=scale, batch_size=batch_size, crop_size=crop_size)
         case "NSRRD":
             return NSRRD(scale=scale, history_frames=history)
         case "RepNet":
             return RepNet(scale=scale)
-        case "RepNetRRSR":
-            return RepNetRRSR(scale=scale, history_frames=history, buffer_cha=buffer_cha)
-        case "Urteil":
-            return Urteil(scale=scale, history_frames=history, buffer_cha=buffer_cha)
-        case "Urteil_2":
-            return Urteil_2(scale=scale, history_frames=history, buffer_cha=buffer_cha)
-        case "URepSS":
-            return URepSS(scale=scale, history_frames=history, buffer_cha=buffer_cha, num_blocks=6, num_channels=64)
-        case "URepSS_2":
-            return URepSS_02(scale=scale, history_frames=history, buffer_cha=buffer_cha)
-        case "URepSS_3":
-            return URepSS_03(scale=scale, history_frames=history, buffer_cha=buffer_cha)
-        case "URepSS_05":
-            return URepSS_05(scale=scale, history_frames=history, buffer_cha=buffer_cha)
         case "URTSR":
             return URTSR(scale=scale, history_frames=history, buffer_cha=buffer_cha)
         case _:
@@ -194,23 +167,6 @@ def init_dataset(name: str, sequence: int, extra: bool, history: int, warp: bool
                                  transform=transforms.ToTensor(), crop_size=None, scale=4,
                                  use_hflip=False, use_rotation=False, digits=8)
             return train, val
-        case "ue_data_npz":
-            if extra:
-                train = EVSR(root=f"{root}/train", scale=2, history=history, warp=warp, buffers=buffers,
-                             last_frame_idx=299,
-                             crop_size=crop_size, use_hflip=use_hflip, use_rotation=use_rotation, digits=4,
-                             disk_mode=DiskMode.NPZ)
-                val = EVSR(root=f"{root}/val", scale=2, history=history, warp=warp, buffers=buffers, last_frame_idx=299,
-                           crop_size=crop_size, use_hflip=use_hflip, use_rotation=use_rotation, digits=4,
-                           disk_mode=DiskMode.NPZ)
-                return train, val
-            train = VSR(root=f"{root}/train", scale=2, history=history, warp=warp, buffers=buffers, last_frame_idx=299,
-                        crop_size=crop_size, use_hflip=use_hflip, use_rotation=use_rotation, digits=4,
-                        disk_mode=DiskMode.NPZ)
-            val = VSR(root=f"{root}/val", scale=2, history=history, warp=warp, buffers=buffers, last_frame_idx=299,
-                      crop_size=crop_size, use_hflip=use_hflip, use_rotation=use_rotation, digits=4,
-                      disk_mode=DiskMode.NPZ)
-            return train, val
         case "UE_data":
             if sequence == "all":
                 train = RRSRMultiSequence(f"{root}/train", scale=2, history=history, warp=warp, buffers=buffers,
@@ -227,26 +183,6 @@ def init_dataset(name: str, sequence: int, extra: bool, history: int, warp: bool
             val = RRSRMultiSequence(root=f"{root}/val", scale=2, history=history, warp=warp, buffers=buffers,
                                      sequence=f"{val_sequence:0{2}d}", sequence_length=300, crop_size=None,
                                      use_hflip=False, use_rotation=False, disk_mode=DiskMode.CV2)
-            # if warp:
-            #     train = RVSRSingleSequenceWarp(root=f"{root}/train", scale=2, history=history,
-            #                                sequence=f"{sequence:0{2}d}", sequence_length=2400, crop_size=crop_size,
-            #                                use_hflip=use_hflip,
-            #                                use_rotation=use_rotation, disk_mode=DiskMode.CV2)
-            #     val_sequence = sequence + 6  # we only have 6 sequences for training..
-            #     val = RVSRSingleSequenceWarp(root=f"{root}/val", scale=2, history=history,
-            #                              sequence=f"{val_sequence:0{2}d}", sequence_length=300, crop_size=None,
-            #                              use_hflip=False,
-            #                              use_rotation=False, disk_mode=DiskMode.CV2)
-            #     return train, val
-            # train = RVSRSingleSequence(root=f"{root}/train", scale=2, history=history,
-            #                            sequence=f"{sequence:0{2}d}", sequence_length=2400, crop_size=crop_size,
-            #                            use_hflip=use_hflip,
-            #                            use_rotation=use_rotation, disk_mode=DiskMode.CV2)
-            # val_sequence = sequence + 6  # we only have 6 sequences for training..
-            # val = RVSRSingleSequence(root=f"{root}/val", scale=2, history=history,
-            #                          sequence=f"{val_sequence:0{2}d}", sequence_length=300, crop_size=None,
-            #                          use_hflip=False,
-            #                          use_rotation=False, disk_mode=DiskMode.CV2)
             return train, val
         case _:
             raise ValueError(f"The dataset '{name}' is not a valid dataset.")
