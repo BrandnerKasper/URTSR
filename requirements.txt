@@ -6,3 +6,6 @@ matplotlib
 pillow
 torchinfo
 yaml
+einops
+lpips
+pandas
