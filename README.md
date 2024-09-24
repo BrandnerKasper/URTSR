@@ -34,31 +34,71 @@ We compare our method with:
 - [NSRRD](https://github.com/Riga2/NSRD)
 
 
-## Dataset Generation
+## Dataset Generation - USMM
 
-We used Unreal Engine 5.4 for generating our (LR, HR) frame pairs with auxiliary buffer information.
+We used Unreal Engine 5.4 for generating our Unreal Stylized Motion Matching (USMM) dataset.
+The dataset contains 4 different environments each with two different sequences (overview = _o, third person = _tp), resulting in 8 sequences:
+- Egypt = E
+- Fantasy Provencal = FP
+- Eastern Village = EV
+- Town = T
+
+16800 (LR, HR) frame pairs.
 For more information please checkout [https://gitlab.informatik.uni-wuerzburg.de/Brandner/generate_ue_stylized_data](https://gitlab.informatik.uni-wuerzburg.de/Brandner/generate_ue_stylized_data)
 
-An example frame pair looks like this:
+An example of how such a frame pair looks like can be seen here:
 
 ![ex](images/example_rend-min.png)
 
-## Network Design
+## Network Design - URTSR
 
 Our neural method is called Unreal Real-Time Super Resolution (URTSR).
 URTSR is a shallow U-Net architecture with an attention mechanism in its bottom layer.
 The attention mechanism is convolution based version of the famous multi-head attention block proposed in
 the Convolutional Visual Transformer (CvT).
 
-![net](images/network.png)
+![net](images/urtsr.png)
 
 In addition to the LR frame, we utilize G-buffer information, as well as previous frames warped through motion vectors to the current point in time.
 
 ## Evaluation
 
-We share some results on the objective metrics PSNR, SSIM and LPIPS
+We evaluate our network URTSR on our USMM dataset withing the 4 enviroments and resulting 8 sequences.
 
-Show an example result image here!
+### PSNR
+
+Peak signal-to-noise ratio (PSNR) expresses the error between the original and upsampled image in decibel (dB), on a logarithmic scale.
+The error is computed based on mean squarred error (MSE).
+
+![psnr](images/psnr.png)
+
+### SSIM
+
+Structural Similiarity index measurement (SSIM) measures the difference between the original and upsampled image by changes in luminance, contrast and structure.
+
+![ssim](images/ssim.png)
+
+### LPIPS
+
+Learned perceptual image patch similiarity (LPIPS) is an unreasonably effective machine learning based approach of identifying perceived image quality.
+
+![lpips](images/lpips.png)
+
+### STATS
+
+The statistics include inference speed (no backpropagation) in miliseconds, VRAM usage in megabyte, number of parameters and multiply-addition operations.
+All statistics were recorded with system with Intel i7 14700kf and RTX 4080.
+
+![stats](images/stats.png)
+
+### Results
+
+Our neural method URTSR outperforms interpolation techniques in LPIPS and is roughly on pair in regards to PSNR and SSIM.
+Regarding our system specifications URTSR is the only method capable of upsampling 1080p input to 4K in a 60 fps gaming context.
+
+Let's look at an image comparison:
+
+![results](images/result.png)
 
 ## Code Frameworks
 We took some inspiration from the code base of [BasicSR](https://github.com/XPixelGroup/BasicSR).
