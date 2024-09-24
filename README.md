@@ -1,5 +1,8 @@
 # Real-Time Rendering Super Resolution with Unreal Engine 5
 
+This repository contains the code for my master thesis Real-Time Rendering Super Resolution with Unreal Engine 5.
+We focus on highly efficient neural upsampling from 1080p to 4K in a gaming context of 60 frames per second for real-time rendered content.
+
 ## Abstract
 
 Real-time rendering super resolution describes the process 
