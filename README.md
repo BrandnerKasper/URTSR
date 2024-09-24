@@ -105,3 +105,8 @@ Let's look at an image comparison:
 
 ## Code Frameworks
 We took some inspiration from the code base of [BasicSR](https://github.com/XPixelGroup/BasicSR).
+
+
+## More Information
+
+Please check out my thesis for more detailed information about this project.
