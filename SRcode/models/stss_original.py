@@ -72,6 +72,10 @@ class Up(nn.Module):
 
 
 class StssOriginal(BaseModel):
+    """
+    Spatial Temporal Super Sampling
+    https://github.com/ryanhe312/STSSNet-AAAI2024/tree/main
+    """
     def __init__(self, scale: int, buffer_cha: int = 0, history_frames: int = 2):
         super(StssOriginal, self).__init__(scale=scale, down_and_up=3)
 

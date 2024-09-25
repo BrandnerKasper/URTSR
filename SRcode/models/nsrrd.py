@@ -125,6 +125,10 @@ class Up(nn.Module):
 
 
 class NSRRD(BaseModel):
+    """
+    Neural Super Resolution for Radiance Demodulation
+    https://github.com/Riga2/NSRD
+    """
     def __init__(self, scale: int, history_frames: int = 2):
         super().__init__(scale=scale, down_and_up=3)
 
