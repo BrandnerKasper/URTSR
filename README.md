@@ -28,18 +28,18 @@ We believe further investigations in regard to the additional information could 
 - Providing a custom plugin for generating (LR, HR) frame pairs with auxiliary buffers in any Unreal Engine 5 project.
 - Designing our URTSR network for RRSR capable of upsampling from 1080p to 4k in a 60 fps setting.
 
-## Related Work
-We compare our method with:
-- Bilinear
-- Bicubic
-- [RTSRN](https://github.com/eduardzamfir/RT4KSR)
-- [STSS](https://github.com/ryanhe312/STSSNet-AAAI2024/tree/main)
-- [NSRRD](https://github.com/Riga2/NSRD)
+## Problem Statement
 
+Mitigating rendering artifacts:
+- <span style="color:#9efa52">aliasing</span>
+- <span style="color:#85f1f5">dithering</span>
+- <span style="color:#e052fa">detail loss</span>
+
+![artifacts](images/artifacts.png)
 
 ## Dataset Generation - USMM
 
-We used Unreal Engine 5.4 for generating our Unreal Stylized Motion Matching (USMM) dataset.
+We used Unreal Engine 5.4 for generating our Unreal Stylized Motion Matching (**USMM**) dataset.
 The dataset contains 4 different environments each with two different sequences (overview = _o, third person = _tp), resulting in 8 sequences:
 - Egypt = E
 - Fantasy Provencal = FP
@@ -47,7 +47,7 @@ The dataset contains 4 different environments each with two different sequences 
 - Town = T
 
 16800 (LR, HR) frame pairs.
-For more information please checkout [https://gitlab.informatik.uni-wuerzburg.de/Brandner/generate_ue_stylized_data](https://gitlab.informatik.uni-wuerzburg.de/Brandner/generate_ue_stylized_data)
+For more information please check out [https://gitlab.informatik.uni-wuerzburg.de/Brandner/generate_ue_stylized_data](https://gitlab.informatik.uni-wuerzburg.de/Brandner/generate_ue_stylized_data)
 
 An example of how such a frame pair looks like can be seen here:
 
@@ -55,7 +55,7 @@ An example of how such a frame pair looks like can be seen here:
 
 ## Network Design - URTSR
 
-Our neural method is called Unreal Real-Time Super Resolution (URTSR).
+Our neural method is called Unreal Real-Time Super Resolution (**URTSR**).
 URTSR is a shallow U-Net architecture with an attention mechanism in its bottom layer.
 The attention mechanism is convolution based version of the famous multi-head attention block proposed in
 the Convolutional Visual Transformer (CvT).
@@ -63,6 +63,14 @@ the Convolutional Visual Transformer (CvT).
 ![net](images/urtsr.png)
 
 In addition to the LR frame, we utilize G-buffer information, as well as previous frames warped through motion vectors to the current point in time.
+
+## Related Work
+We compare our method with:
+- Bilinear
+- Bicubic
+- [RTSRN](https://github.com/eduardzamfir/RT4KSR)
+- [STSS](https://github.com/ryanhe312/STSSNet-AAAI2024/tree/main)
+- [NSRRD](https://github.com/Riga2/NSRD)
 
 ## Evaluation
 
