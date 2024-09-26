@@ -3,6 +3,8 @@
 This repository contains the code for my master thesis Real-Time Rendering Super Resolution with Unreal Engine 5.
 We focus on highly efficient neural upsampling from 1080p to 4K in a gaming context of 60 frames per second for real-time rendered content.
 
+https://github.com/user-attachments/assets/5c55b7ce-e0a3-43f7-9d67-bc5732e01565
+
 ## Abstract
 
 Real-time rendering super resolution describes the process 
@@ -123,6 +125,8 @@ Regarding our system specifications URTSR is the only method capable of upsampli
 Let's look at an image comparison:
 
 ![results](images/result.png)
+
+A video comparison can be found at videos/URTSR.mp4.
 
 ## Code Frameworks
 We took some inspiration from the code base of [BasicSR](https://github.com/XPixelGroup/BasicSR).
