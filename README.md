@@ -31,9 +31,9 @@ We believe further investigations in regard to the additional information could 
 ## Problem Statement
 
 Mitigating rendering artifacts:
-- <span style="color:#9efa52">aliasing</span>
-- <span style="color:#85f1f5">dithering</span>
-- <span style="color:#e052fa">detail loss</span>
+- <span style="color:#9efa52">aliasing (green)</span>
+- <span style="color:#85f1f5">dithering (blue)</span>
+- <span style="color:#e052fa">detail loss (purple)</span>
 
 ![artifacts](images/artifacts.png)
 
