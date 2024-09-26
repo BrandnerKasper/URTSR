@@ -5,6 +5,8 @@ We focus on highly efficient neural upsampling from 1080p to 4K in a gaming cont
 
 https://github.com/user-attachments/assets/5c55b7ce-e0a3-43f7-9d67-bc5732e01565
 
+The example showcases 540p upscaled with our URTSR method to 4K, a times 4 upscaling. (This illustrates the difference more clearly.) 
+
 ## Abstract
 
 Real-time rendering super resolution describes the process 
